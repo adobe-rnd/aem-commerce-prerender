@@ -305,8 +305,8 @@ describe('pdp-renderer', () => {
 "<ul>
             <li>
               <h3>Size</h3>
-              <div>option id <em>size</em></div>
-              <div>required <em>false</em></div>
+              option id <em>size</em>
+              required <em>false</em>
               <ul>
                 <li>
                   <a href="https://store.com/products/hollister-backyard-sweatshirt/mh05?optionsUIDs=Y29uZmlndXJhYmxlLzU1Ni81MzI=">L <em>in stock</em></a>
