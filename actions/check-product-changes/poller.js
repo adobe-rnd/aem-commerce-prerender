@@ -73,7 +73,7 @@ async function loadState(locale, aioLibs) {
     } else {
       stateObj.skus = {};
     }
-  // eslint-disable-next-line no-unused-vars
+    // eslint-disable-next-line no-unused-vars
   } catch (e) {
     stateObj.skus = {};
   }
@@ -153,188 +153,203 @@ function checkParams(params) {
  * @param context
  * @returns {*}
  */
-function createBatches(products, context) {
+function createBatches(products) {
   return products.reduce((acc, product) => {
-        const { sku, urlKey } = product;
-        const path = getProductUrl({ urlKey, sku }, context, false).toLowerCase();
-
-        if (!acc.length || acc[acc.length - 1].length === BATCH_SIZE) {
-          acc.push([]);
-        }
-        acc[acc.length - 1].push({ path, sku });
-
-        return acc;
-      }, []);
-}
-
-/**
- * Returns array of promises for preview and publish
- * @param batches
- * @param locale
- * @param adminApi
- * @returns {*}
- */
-function previewAndPublish(batches, locale, adminApi) {
-  let batchNumber = 0;
-  return batches.reduce((acc, batch) => {
-    batchNumber++;
-    acc.push(adminApi.previewAndPublish(batch, locale, batchNumber));
+    if (!acc.length || acc[acc.length - 1].length === BATCH_SIZE) {
+      acc.push([]);
+    }
+    acc[acc.length - 1].push(product);
     return acc;
   }, []);
 }
 
 /**
- * Returns array of promises for unpublish and delete
- * @param batches
- * @param locale
- * @param adminApi
- * @returns {*}
- */
-function unpublishAndDelete(batches, locale, adminApi) {
-    let batchNumber = 0;
-    return batches.reduce((acc, batch) => {
-        batchNumber++;
-        acc.push(adminApi.unpublishAndDelete(batch, locale, batchNumber));
-        return acc;
-    }, []);
-}
-
-/**
- * Checks if a product should be processed
+ * Checks if a product should be previweed & published
+ * 
  * @param product
  * @returns {boolean}
  */
-function shouldProcessProduct(product) {
-  const { urlKey, lastModifiedDate, lastPreviewDate, currentHash, newHash } = product;
-  return urlKey?.match(/^[a-zA-Z0-9-]+$/) && lastModifiedDate >= lastPreviewDate && newHash && currentHash !== newHash;
+function shouldPreviewAndPublish({ currentHash, newHash }) {
+  return newHash && currentHash !== newHash;
 }
 
 /**
- * Processes a product to determine if it needs to be updated
+ * Checks if a product should be (re)rendered.
+ * 
+ * @param {*} param0 
+ * @returns 
+ */
+function shouldRender({ urlKey, lastModifiedDate, lastPreviewDate }) {
+  return urlKey?.match(/^[a-zA-Z0-9-]+$/) && lastModifiedDate >= lastPreviewDate;
+}
+
+/**
+ * Enrich the product data with metadata from state and context.
+ * 
  * @param {Object} product - The product to process
  * @param {Object} state - The current state
  * @param {Object} context - The context object with logger and other utilities
  * @returns {Object} Enhanced product with additional metadata
  */
-async function enrichProductWithMetadata(product, state, context) {
-  const { logger } = context;
+function enrichProductWithMetadata(product, state, context) {
   const { sku, urlKey, lastModifiedAt } = product;
   const lastPreviewDate = state.skus[sku]?.lastPreviewedAt || new Date(0);
   const lastModifiedDate = new Date(lastModifiedAt);
-  let newHash = null;
-  let productHtml = null;
+  const productUrl = getProductUrl({ urlKey, sku }, context, false).toLowerCase();
+  const currentHash = state.skus[sku]?.hash || null;
 
+  return {
+    sku,
+    urlKey,
+    path: productUrl,
+    lastModifiedDate,
+    lastPreviewDate,
+    currentHash,
+  };
+}
+
+/**
+ * Generates the HTML for a product, saves it to the public storage and include the new hash in the product object.
+ * 
+ * @param {*} param0 
+ * @returns 
+ */
+let renderLimit$;
+async function enrichProductWithRenderedHash(product, context) {
+  const { logger } = context;
+  const { sku, urlKey, path } = product;
+
+  if (!renderLimit$) {
+    renderLimit$ = import('p-limit').then(({ default: pLimit }) => pLimit(50));
+  }
+
+  return (await renderLimit$)(async () => {
   try {
-    productHtml = await generateProductHtml(sku, urlKey, context);
-    newHash = crypto.createHash('sha256').update(productHtml).digest('hex');
-
-    // Create enriched product object
-    const enrichedProduct = {
-      ...product,
-      lastModifiedDate,
-      lastPreviewDate,
-      currentHash: state.skus[sku]?.hash || null,
-      newHash,
-    };
+    const productHtml = await generateProductHtml(sku, urlKey, context);
+    product.renderedAt = new Date();
+    product.newHash = crypto.createHash('sha256').update(productHtml).digest('hex');
 
     // Save HTML immediately if product should be processed
-    if (shouldProcessProduct(enrichedProduct) && productHtml) {
+    if (shouldPreviewAndPublish(product) && productHtml) {
       try {
         const { filesLib } = context.aioLibs;
-        const productUrl = getProductUrl({ urlKey, sku }, context, false).toLowerCase();
-        const htmlPath = `/public/pdps${productUrl}.${PDP_FILE_EXT}`;
+        const htmlPath = `/public/pdps${path}.${PDP_FILE_EXT}`;
         await filesLib.write(htmlPath, productHtml);
         logger.debug(`Saved HTML for product ${sku} to ${htmlPath}`);
       } catch (e) {
-        enrichedProduct.newHash = null; // Reset newHash if saving fails
+        // Reset newHash if saving fails
+        product.newHash = null;
         logger.error(`Error saving HTML for product ${sku}:`, e);
       }
     }
+    } catch (e) {
+      logger.error(`Error generating product HTML for SKU ${sku}:`, e);
+    }
 
-    return enrichedProduct;
-  } catch (e) {
-    logger.error(`Error generating product HTML for SKU ${sku}:`, e);
-    // Return product with metadata even if HTML generation fails
-    return {
-      ...product,
-      lastModifiedDate,
-      lastPreviewDate,
-      currentHash: state.skus[sku]?.hash || null,
-      newHash: null,
-    };
-  }
+    return product;
+  });
 }
 
 /**
  * Processes publish batches and updates state
  */
-async function processPublishBatches(promiseBatches, state, counts, products, aioLibs) {
-  const processingPromises = promiseBatches.map(async (promise) => {
-    const { records } = await promise;
-    records.map((record) => {
-      if (record.previewedAt && record.publishedAt) {
-        const product = products.find(p => p.sku === record.sku);
-        state.skus[record.sku] = {
-          lastPreviewedAt: record.previewedAt,
-          hash: product?.newHash
-        };
-        counts.published++;
-      } else {
-        counts.failed++;
-      }
-    });
-    await saveState(state, aioLibs);
+async function processPublishedBatch(publishedBatch, state, counts, products, aioLibs) {
+  const { records } = publishedBatch;
+  records.map((record) => {
+    if (record.previewedAt && record.publishedAt) {
+      const product = products.find(p => p.sku === record.sku);
+      state.skus[record.sku] = {
+        lastPreviewedAt: record.renderedAt || record.previewedAt,
+        hash: product?.newHash
+      };
+      counts.published++;
+    } else {
+      counts.failed++;
+    }
   });
-  await Promise.all(processingPromises);
+  await saveState(state, aioLibs);
 }
 
 /**
  * Identifies and processes products that need to be deleted
  */
-async function processDeletedProducts(remainingSkus, locale, state, counts, context, adminApi, aioLibs, logger) {
+async function processDeletedProducts(remainingSkus, state, context, adminApi) {
   if (!remainingSkus.length) return;
+  const { locale, counts, logger, aioLibs } = context;
+  const { filesLib } = aioLibs;
 
   try {
-    const { filesLib } = aioLibs;
-    const publishedProducts = await requestSpreadsheet('published-products-index', null, context);
-    const deletedProducts = publishedProducts.data.filter(({ sku }) => remainingSkus.includes(sku));
+    const deletedProducts = (await requestSpreadsheet('published-products-index', null, context))
+      .data.filter(({ sku }) => remainingSkus.includes(sku));
 
     // Process in batches
     if (deletedProducts.length) {
       // delete in batches of BATCH_SIZE, then save state in case we get interrupted
       const batches = createBatches(deletedProducts, context);
-      const promiseBatches = unpublishAndDelete(batches, locale, adminApi);
-
-      const processingPromises = promiseBatches.map(async (promise) => {
-        const { records } = await promise;
-        records.map((record) => {
-          if (record.liveUnpublishedAt && record.previewUnpublishedAt) {
-            // Delete the HTML file from public storage
-            try {
-              const product = deletedProducts.find(p => p.sku === record.sku);
-              if (product) {
-                  const productUrl = getProductUrl({ urlKey: product.urlKey, sku: product.sku }, context, false).toLowerCase();
-                  const htmlPath = `/public/pdps${productUrl}`;
-                  filesLib.delete(htmlPath);
-                  logger.debug(`Deleted HTML file for product ${record.sku} from ${htmlPath}`);
-              }
-            } catch (e) {
-              logger.error(`Error deleting HTML file for product ${record.sku}:`, e);
-            }
-
-            delete state.skus[record.sku];
-            counts.unpublished++;
-          } else {
-            counts.failed++;
-          }
+      const pendingBatches = [];
+      for (let batchNumber = 0; batchNumber < batches.length; batchNumber++) {
+        const records = batches[batchNumber].map((product) => {
+          return {
+            sku: product.sku,
+            path: getProductUrl(product, context, false).toLowerCase(),
+          };
         });
-        await saveState(state, aioLibs);
-      });
-      await Promise.all(processingPromises);
+        const pendingBatch = adminApi.unpublishAndDelete(records, locale, batchNumber + 1)
+          .then(({ records }) => {
+            records.forEach((record) => {
+              if (record.liveUnpublishedAt && record.previewUnpublishedAt) {
+                // Delete the HTML file from public storage
+                try {
+                  const product = deletedProducts.find(p => p.sku === record.sku);
+                  if (product) {
+                    const productUrl = getProductUrl({ urlKey: product.urlKey, sku: product.sku }, context, false).toLowerCase();
+                    const htmlPath = `/public/pdps${productUrl}`;
+                    filesLib.delete(htmlPath);
+                    logger.debug(`Deleted HTML file for product ${record.sku} from ${htmlPath}`);
+                  }
+                } catch (e) {
+                  logger.error(`Error deleting HTML file for product ${record.sku}:`, e);
+                }
+
+                delete state.skus[record.sku];
+                counts.unpublished++;
+              } else {
+                counts.failed++;
+              }
+            });
+          });
+        pendingBatches.push(pendingBatch);
+      }
+      await Promise.all(pendingBatches);
+      await saveState(state, aioLibs);
     }
   } catch (e) {
     logger.error('Error processing deleted products:', e);
   }
+}
+
+/**
+ * Filters the given products based on the given condition, increments the ignored count if the 
+ * condition is not met and removes the sku from the given list of remaining skus.
+ * 
+ * @param {*} condition 
+ * @param {*} products 
+ * @param {*} remainingSkus 
+ * @param {*} context 
+ * @returns 
+ */
+function filterProducts(condition, products, remainingSkus, context) {
+  const { counts } = context;
+  return products.filter(product => {
+    const { sku } = product;
+    // remove the sku from the given list of known skus
+    const index = remainingSkus.indexOf(sku);
+    if (index !== -1) remainingSkus.splice(index, 1);
+    // increment count of ignored products if condition is not met
+    const shouldInclude = condition(product);
+    if (!shouldInclude) counts.ignored += 1;
+    return shouldInclude;
+  });
 }
 
 async function poll(params, aioLibs, logger) {
@@ -358,10 +373,7 @@ async function poll(params, aioLibs, logger) {
   } = params;
 
   const locales = LOCALES?.split(',') || [null];
-
-  const counts = {
-    published: 0, unpublished: 0, ignored: 0, failed: 0,
-  };
+  const counts = { published: 0, unpublished: 0, ignored: 0, failed: 0 };
   const sharedContext = {
     storeUrl,
     contentUrl,
@@ -376,10 +388,8 @@ async function poll(params, aioLibs, logger) {
     logIngestorEndpoint,
   };
   const timings = new Timings();
-  const adminApi = new AdminAPI({
-    org: orgName,
-    site: siteName,
-  }, sharedContext, { authToken });
+  const adminApi = new AdminAPI({ org: orgName, site: siteName }, sharedContext, { authToken });
+  const { filesLib } = aioLibs;
 
   logger.info(`Starting poll from ${storeUrl} for locales ${locales}`);
 
@@ -389,66 +399,58 @@ async function poll(params, aioLibs, logger) {
 
     const results = await Promise.all(locales.map(async (locale) => {
       const timings = new Timings();
+      const context = { ...sharedContext, startTime: new Date() };
+      if (locale) context.locale = locale;
+
       logger.info(`Polling for locale ${locale}`);
+
       // load state
       const state = await loadState(locale, aioLibs);
-      timings.sample('loadedState');
 
-      let context = { ...sharedContext };
-      if (locale) {
-        context = { ...context, locale };
-      }
-
-      const { filesLib } = aioLibs;
+      // add newly discovered produts to the state if necessary
       const productsFileName = getFileLocation(`${locale || 'default'}-products`, 'json');
-      const allskuBuffer = await filesLib.read(productsFileName);
-      const allSkusString = allskuBuffer.toString();
-      let allSkus = JSON.parse(allSkusString);
-
-      // add new skus to state if any
-      for (const sku of allSkus) {
-        if (!state.skus[sku.sku]) {
-          state.skus[sku.sku] = { lastPreviewedAt: new Date(0), hash: null };
+      JSON.parse((await filesLib.read(productsFileName)).toString()).forEach(({ sku }) => {
+        if (!state.skus[sku]) {
+          state.skus[sku] = { lastPreviewedAt: new Date(0), hash: null };
         }
-      }
-      timings.sample('fetchedSkus');
-
-      // get last modified dates
-      const skus = Object.keys(state.skus);
-      const lastModifiedResp = await requestSaaS(GetLastModifiedQuery, 'getLastModified', { skus: [...skus] }, context);
-      timings.sample('fetchedLastModifiedDates');
-      logger.info(`Fetched last modified date for ${lastModifiedResp.data.products.length} skus, total ${skus.length}`);
-
-      // Enrich products with metadata
-      const products = await Promise.all(
-        lastModifiedResp.data.products.map(product =>
-          enrichProductWithMetadata(product, state, context)
-        )
-      );
-
-      // Track remaining SKUs for deletion processing
-      const remainingSkus = [...skus];
-      products.forEach(product => {
-        const { sku } = product;
-        // remove the sku from the list of currently known skus
-        const index = remainingSkus.indexOf(sku);
-        if (index !== -1) {
-          remainingSkus.splice(index, 1);
-        }
-
-        // increment count of ignored products if condition is not met
-        if (!shouldProcessProduct(product)) counts.ignored += 1;
       });
+      timings.sample('get-discovered-products');
 
-      const batches = createBatches(products.filter(shouldProcessProduct), context);
-      const promiseBatches = previewAndPublish(batches, locale, adminApi);
-      await processPublishBatches(promiseBatches, state, counts, products, aioLibs);
-      timings.sample('publishedPaths');
+      // get last modified dates, filter out products that don't need to be (re)rendered
+      const knownSkus = Object.keys(state.skus);
+      let lastModifiedResp = await requestSaaS(GetLastModifiedQuery, 'getLastModified', { skus: knownSkus }, context);
+      logger.info(`Fetched last modified date for ${lastModifiedResp.data.products.length} skus, total ${knownSkus.length}`);
+      let products = lastModifiedResp.data?.products || [];
+      products = products.map(product => enrichProductWithMetadata(product, state, context));
+      products = filterProducts(shouldRender, products, knownSkus, context);
+      lastModifiedResp = null;
+      timings.sample('get-changed-products');
 
-      // if there are still skus left, they were not in Catalog Service and may
-      // have been disabled/deleted
-      await processDeletedProducts(remainingSkus, locale, state, counts, context, adminApi, aioLibs, logger);
-      timings.sample('unpublishedPaths', remainingSkus.length ? undefined : 0);
+      // create batches of products to preview and publish
+      const pendingBatches = createBatches(products).map((batch, batchNumber) => {
+        return Promise.all(batch.map(product => enrichProductWithRenderedHash(product, context)))
+          .then(enrichedProducts => filterProducts(shouldPreviewAndPublish, enrichedProducts, knownSkus, context))
+          .then(products => {
+            if (products.length) {
+              const records = products.map(({ sku, path, renderedAt }) => (({ sku, path, renderedAt })));
+              return adminApi.previewAndPublish(records, locale, batchNumber + 1)
+                .then(publishedBatch => processPublishedBatch(publishedBatch, state, counts, products, aioLibs));
+            } else {
+              return Promise.resolve();
+            }
+          });
+      });
+      products = null;
+      await Promise.all(pendingBatches);
+      timings.sample('published-products');
+
+      // if there are still knownSkus left, they were not in Catalog Service anymore and may have been disabled/deleted
+      if (knownSkus.length) {
+        await processDeletedProducts(knownSkus, state, context, adminApi);
+        timings.sample('unpublished-products');
+      } else {
+        timings.sample('unpublished-products', 0);
+      }
 
       return timings.measures;
     }));
@@ -492,6 +494,7 @@ async function poll(params, aioLibs, logger) {
     elapsed,
     status: { ...counts },
     timings: timings.measures,
+    memoryUsage,
   };
 }
 
