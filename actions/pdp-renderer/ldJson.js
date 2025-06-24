@@ -4,13 +4,16 @@ const { VariantsQuery } = require('../queries');
 
 function getOffer(product, url) {
   const { sku, inStock, price } = product;
+  const finalPriceCurrency = (price?.final?.amount?.currency || 'NONE') === 'NONE' ? 'USD' : price?.final?.amount?.currency;
+  const regularPriceCurrency = (price?.regular?.amount?.currency || 'NONE') === 'NONE' ? 'USD' : price?.regular?.amount?.currency;
+
   const offer = {
     '@type': 'Offer',
     sku,
     url,
     availability: inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
     price: price?.final?.amount?.value,
-    priceCurrency: price?.final?.amount?.currency,
+    priceCurrency: finalPriceCurrency,
     itemCondition: 'https://schema.org/NewCondition',
   };
 
@@ -19,7 +22,7 @@ function getOffer(product, url) {
       '@type': 'UnitPriceSpecification',
       priceType: 'https://schema.org/ListPrice',
       price: price?.regular?.amount?.value,
-      priceCurrency: price?.regular?.amount?.currency,
+      priceCurrency: regularPriceCurrency,
     };
   }
 
