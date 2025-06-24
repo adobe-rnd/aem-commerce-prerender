@@ -93,7 +93,7 @@ async function prepareBaseTemplate(url, blocks) {
 function getFormatter(locale = 'us-en', currency) {
   return new Intl.NumberFormat(locale, {
       style: 'currency',
-      currency: currency || 'USD',
+      currency: (!currency || currency === 'NONE') ? 'USD' : currency,
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
   });
