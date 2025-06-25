@@ -59,47 +59,14 @@ class ObservabilityClient {
 
   logger = {
     debug: async (...args) => {
-      const message = args.map(arg => arg instanceof Error ? arg.message : String(arg)).join(' ');
-      this.sendLogEvent(message, 'DEBUG');
       this.nativeLogger.debug(...args);
     },
     info: async(...args) => {
-      const message = args.map(arg => arg instanceof Error ? arg.message : String(arg)).join(' ');
-      this.sendLogEvent(message, 'INFO');
       this.nativeLogger.info(...args);
     },
     error: async (...args) => {
-      const message = args.map(arg => arg instanceof Error ? arg.message : String(arg)).join(' ');
-      this.sendLogEvent(message, 'ERROR');
       this.nativeLogger.error(...args);
     },
-  }
-
-  /**
-   * Sends a log event to the observability endpoint.
-   * @param {string} message The log message.
-   * @param {string} severity The log severity.
-   * @returns {Promise<void>} A promise that resolves when the log is sent, or rejects on error.
-   */
-  async sendLogEvent(message, severity = 'INFO') {
-      const severityMap = {
-          'DEBUG': 1,
-          'VERBOSE': 2,
-          'INFO': 3,
-          'WARNING': 4,
-          'ERROR': 5,
-          'CRITICAL': 6,
-      };
-
-      const payload = {
-          environment: `${this.namespace}`,
-          timestamp: Date.now(),
-          message,
-          activationId: `${this.activationId}`,
-          severity: severityMap[severity] || 2,
-      };
-
-      await this.#sendRequestToObservability('logs', payload);
   }
 }
 
