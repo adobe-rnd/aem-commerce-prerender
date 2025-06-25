@@ -1,6 +1,5 @@
 class ObservabilityClient {
   constructor(nativeLogger, options = {}) {
-      this.nativeLogger = nativeLogger;
       this.activationId = process.env.__OW_ACTIVATION_ID;
       this.namespace = process.env.__OW_NAMESPACE;
       this.instanceStartTime = Date.now();
@@ -8,6 +7,7 @@ class ObservabilityClient {
       this.org = options.org;
       this.site = options.site;
       this.endpoint = options.endpoint;
+      this. nativeLogger = nativeLogger;
   }
 
   getEndpoints(type) {
@@ -77,18 +77,6 @@ class ObservabilityClient {
       };
 
       await this.#sendRequestToObservability('activationResults', payload);
-  }
-
-  logger = {
-    debug: async (...args) => {
-      this.nativeLogger.debug(...args);
-    },
-    info: async(...args) => {
-      this.nativeLogger.info(...args);
-    },
-    error: async (...args) => {
-      this.nativeLogger.error(...args);
-    },
   }
 }
 

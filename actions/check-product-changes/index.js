@@ -16,14 +16,13 @@ const { StateManager } = require('../lib/state');
 const { ObservabilityClient } = require('../lib/observability');
 
 async function main(params) {
-  const rtLogger = Core.Logger('main', { level: params.LOG_LEVEL || 'info' });
-  const observabilityClient = new ObservabilityClient(rtLogger, { 
+  const logger = Core.Logger('main', { level: params.LOG_LEVEL || 'info' });
+  const observabilityClient = new ObservabilityClient(logger, { 
     token: params.AEM_ADMIN_AUTH_TOKEN, 
     endpoint: params.LOG_INGESTOR_ENDPOINT,
     org: params.ORG,
     site: params.SITE
   });
-  const {logger} = observabilityClient;
   const stateLib = await State.init(params.libInit || {});
   const filesLib = await Files.init(params.libInit || {});
   const stateMgr = new StateManager(stateLib, { logger });
