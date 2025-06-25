@@ -66,10 +66,10 @@ class ObservabilityClient {
           return;
       }
 
+      let severity = this.stateToSeverity(result.state);
+
       if (result?.status?.failed > 0) {
         severity = this.severityMap['WARNING'];
-      } else {
-        severity = this.stateToSeverity(result.state);
       }
 
       const payload = {
