@@ -96,11 +96,9 @@ test('complex product markup', async () => {
   expect($('.product-details > div > div:contains("Price")').next().text()).toEqual('$2.00-$52.00');
 
   // Validate images
-  expect($('.product-details > div > div:contains("Images")').next().find('a').map((_, e) => $(e).prop('outerHTML')).toArray()).toMatchInlineSnapshot(`
+  expect($('.product-details > div > div:contains("Images")').next().find('img').map((_, e) => $(e).prop('outerHTML')).toArray()).toMatchInlineSnapshot(`
 [
-  "<a href="http://www.aemshop.net/media/catalog/product/m/h/mh05-white_main_1.jpg">http://www.aemshop.net/media/catalog/product/m/h/mh05-white_main_1.jpg</a>",
-  "<a href="http://www.aemshop.net/media/catalog/product/m/h/mh05-white_alt1_1.jpg">http://www.aemshop.net/media/catalog/product/m/h/mh05-white_alt1_1.jpg</a>",
-  "<a href="http://www.aemshop.net/media/catalog/product/m/h/mh05-white_back_1.jpg">http://www.aemshop.net/media/catalog/product/m/h/mh05-white_back_1.jpg</a>",
+  "<img src="http://www.aemshop.net/media/catalog/product/a/d/adb124.jpg">",
 ]
 `);
 
@@ -109,21 +107,19 @@ test('complex product markup', async () => {
   expect($('.product-details > div > div:contains("Options")').next().html().trim()).toMatchInlineSnapshot(`
 "<ul>
               <li>
-                Size
+                <h3>Color</h3>
+                option id <em>color</em>
+                required <em>false</em>
                 <ul>
-                  <li>XS</li>
-                  <li>S</li>
-                  <li>M</li>
-                  <li>L</li>
-                  <li>XL</li>
-                </ul>
-              </li>
-              <li>
-                Color
-                <ul>
-                  <li>Green</li>
-                  <li>Red</li>
-                  <li>White</li>
+                  <li>
+                    <a href="https://main--aem-boilerplate-commerce-staging--hlxsites.aem.live/products-ssg/ssg-configurable-product/ssgconfig123?optionsUIDs=Y29uZmlndXJhYmxlLzI3OS80NQ==">blue <em>in stock</em></a>
+                  </li>
+                  <li>
+                    <a href="https://main--aem-boilerplate-commerce-staging--hlxsites.aem.live/products-ssg/ssg-configurable-product/ssgconfig123?optionsUIDs=Y29uZmlndXJhYmxlLzI3OS80Mg==">green <em>in stock</em></a>
+                  </li>
+                  <li>
+                    <a href="https://main--aem-boilerplate-commerce-staging--hlxsites.aem.live/products-ssg/ssg-configurable-product/ssgconfig123?optionsUIDs=Y29uZmlndXJhYmxlLzI3OS8zOQ==">red <em>in stock</em></a>
+                  </li>
                 </ul>
               </li>
             </ul>"
@@ -443,8 +439,8 @@ test('complex product markup', async () => {
             "sku": "MH05-XS-White",
             "url": "https://main--aem-commerce-ssg-storefront--adobe-rnd.aem.live/products/hollister-backyard-sweatshirt/MH05?optionsUIDs=Y29uZmlndXJhYmxlLzI3Ny8yMDI%3D%2CY29uZmlndXJhYmxlLzU1Ni81MjM%3D",
             "availability": "https://schema.org/InStock",
-            "price": 2,
-            "priceCurrency": "USD",
+            "price": 40,
+            "priceCurrency": "NONE",
             "itemCondition": "https://schema.org/NewCondition"
           }
         ],
