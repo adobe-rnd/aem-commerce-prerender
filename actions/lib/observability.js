@@ -37,9 +37,28 @@ class ObservabilityClient {
       }
     }
 
+    severityMap = {
+      'DEBUG': 1,
+      'VERBOSE': 2,
+      'INFO': 3,
+      'WARNING': 4,
+      'ERROR': 5,
+      'CRITICAL': 6,
+    }
+
+    stateToSeverity(state) {
+      const stateToSeverityMap = {
+        skipped: 'DEBUG',
+        completed: 'INFO',
+        failure: 'ERROR',
+      };
+
+      return this.severityMap[stateToSeverityMap[state]] || this.severityMap['DEBUG'];
+    }
+
   /**
    * Sends a single activation log entry to the observability endpoint.
-   * @param {object} activationData The JSON object representing the activation log.
+   * @param {object} result The JSON object representing the activation log.
    * @returns {Promise<void>} A promise that resolves when the log is sent, or rejects on error.
    */
   async sendActivationResult(result) {
@@ -47,10 +66,13 @@ class ObservabilityClient {
           return;
       }
 
+      const severity = this.stateToSeverity(result.state);
+
       const payload = {
           environment: `${this.namespace}`,
           timestamp: this.instanceStartTime,
           result,
+          severity,
           activationId: this.activationId,
       };
 
