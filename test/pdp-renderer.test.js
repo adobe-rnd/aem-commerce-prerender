@@ -217,9 +217,9 @@ describe('pdp-renderer', () => {
       
       const $ = cheerio.load(response.body);
       
-      expect($('body > main > div.product-details > div > div:contains("Images")').next().find('a').map((_,e) => $(e).prop('outerHTML')).toArray()).toEqual([
-        '<a href="http://www.aemshop.net/media/catalog/product/m/b/mb03-black-0.jpg">http://www.aemshop.net/media/catalog/product/m/b/mb03-black-0.jpg</a>',
-        '<a href="http://www.aemshop.net/media/catalog/product/m/b/mb03-black-0_alt1.jpg">http://www.aemshop.net/media/catalog/product/m/b/mb03-black-0_alt1.jpg</a>'
+      expect($('body > main > div.product-details > div > div:contains("Images")').next().find('img').map((_,e) => $(e).prop('outerHTML')).toArray()).toEqual([
+        '<img src="http://www.aemshop.net/media/catalog/product/m/b/mb03-black-0.jpg">',
+        '<img src="http://www.aemshop.net/media/catalog/product/m/b/mb03-black-0_alt1.jpg">'
       ]);
     });
 
@@ -287,60 +287,45 @@ describe('pdp-renderer', () => {
       });
 
       const $ = cheerio.load(response.body);
+      console.log($('body > main > div.product-details > div > div:contains("Options")').next().html().trim()); 
       expect($('body > main > div.product-details > div > div:contains("Options")')).toHaveLength(1);
       expect($('body > main > div.product-details > div > div:contains("Options")').next().html().trim()).toMatchInlineSnapshot(`
 "<ul>
             <li>
-              <div>Size</div>
-              <div>size</div>
-              <div>false</div>
+              <h3>Size</h3>
+              option id <em>size</em>
+              required <em>false</em>
               <ul>
                 <li>
-                  <div>XS</div>
-                  <div>Y29uZmlndXJhYmxlLzU1Ni81MjM=</div>
-                  <div>true</div>
+                  <a href="https://store.com/products/hollister-backyard-sweatshirt/mh05?optionsUIDs=Y29uZmlndXJhYmxlLzU1Ni81MzI=">L <em>in stock</em></a>
                 </li>
                 <li>
-                  <div>S</div>
-                  <div>Y29uZmlndXJhYmxlLzU1Ni81MjY=</div>
-                  <div>true</div>
+                  <a href="https://store.com/products/hollister-backyard-sweatshirt/mh05?optionsUIDs=Y29uZmlndXJhYmxlLzU1Ni81Mjk=">M <em>in stock</em></a>
                 </li>
                 <li>
-                  <div>M</div>
-                  <div>Y29uZmlndXJhYmxlLzU1Ni81Mjk=</div>
-                  <div>true</div>
+                  <a href="https://store.com/products/hollister-backyard-sweatshirt/mh05?optionsUIDs=Y29uZmlndXJhYmxlLzU1Ni81MjY=">S <em>in stock</em></a>
                 </li>
                 <li>
-                  <div>L</div>
-                  <div>Y29uZmlndXJhYmxlLzU1Ni81MzI=</div>
-                  <div>true</div>
+                  <a href="https://store.com/products/hollister-backyard-sweatshirt/mh05?optionsUIDs=Y29uZmlndXJhYmxlLzU1Ni81MzU=">XL <em>in stock</em></a>
                 </li>
                 <li>
-                  <div>XL</div>
-                  <div>Y29uZmlndXJhYmxlLzU1Ni81MzU=</div>
-                  <div>true</div>
+                  <a href="https://store.com/products/hollister-backyard-sweatshirt/mh05?optionsUIDs=Y29uZmlndXJhYmxlLzU1Ni81MjM=">XS <em>in stock</em></a>
                 </li>
               </ul>
             </li>
             <li>
-              <div>Color</div>
-              <div>color</div>
-              <div>false</div>
+              <h3>Color</h3>
+              option id <em>color</em>
+              required <em>false</em>
               <ul>
                 <li>
-                  <div>Green</div>
-                  <div>Y29uZmlndXJhYmxlLzI3Ny8xODQ=</div>
-                  <div>true</div>
+                  <a href="https://store.com/products/hollister-backyard-sweatshirt/mh05?optionsUIDs=Y29uZmlndXJhYmxlLzI3Ny8xODQ=">Green <em>in stock</em></a>
                 </li>
                 <li>
-                  <div>Red</div>
-                  <div>Y29uZmlndXJhYmxlLzI3Ny8xOTk=</div>
-                  <div>true</div>
+                  <a href="https://store.com/products/hollister-backyard-sweatshirt/mh05?optionsUIDs=Y29uZmlndXJhYmxlLzI3Ny8xOTk=">Red <em>in stock</em></a>
                 </li>
                 <li>
-                  <div>White</div>
-                  <div>Y29uZmlndXJhYmxlLzI3Ny8yMDI=</div>
-                  <div>true</div>
+                  <a href="https://store.com/products/hollister-backyard-sweatshirt/mh05?optionsUIDs=Y29uZmlndXJhYmxlLzI3Ny8yMDI=">White <em>in stock</em></a>
                 </li>
               </ul>
             </li>
