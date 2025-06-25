@@ -190,7 +190,7 @@ test('complex product markup', async () => {
             "itemCondition": "https://schema.org/NewCondition"
           }
         ],
-        "color": "red"      
+        "color": "red"
       }
     ],
     "image": "http://www.aemshop.net/media/catalog/product/a/d/adb124.jpg"
