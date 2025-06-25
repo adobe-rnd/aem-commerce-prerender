@@ -21,23 +21,24 @@ const runtimePackage = 'aem-commerce-ssg'
 const actionUrl = `https://${namespace}.${hostname}/api/v1/web/${runtimePackage}/pdp-renderer`
 
 test('simple product markup', async () => {
-  const res = await fetch(`${actionUrl}/products/crown-summit-backpack/24-mb03`);
+  const res = await fetch(`${actionUrl}/products-ssg/bezier-tee/ADB177`);
   const content = await res.text();
 
   // Parse markup and compare
   const $ = cheerio.load(content);
 
   // Validate H1
-  expect($('h1').text()).toEqual('Crown Summit Backpack');
+  expect($('h1').text()).toEqual('Bezier tee');
 
   // Validate price
-  expect($('.product-details > div > div:contains("Price")').next().text()).toEqual('$38.00');
+  expect($('.product-details > div > div:contains("Price")').next().text()).toEqual('$23.00');
 
   // Validate images
   expect($('.product-details > div > div:contains("Images")').next().find('a').map((_, e) => $(e).prop('outerHTML')).toArray()).toMatchInlineSnapshot(`
 [
-  "<a href="http://www.aemshop.net/media/catalog/product/m/b/mb03-black-0.jpg">http://www.aemshop.net/media/catalog/product/m/b/mb03-black-0.jpg</a>",
-  "<a href="http://www.aemshop.net/media/catalog/product/m/b/mb03-black-0_alt1.jpg">http://www.aemshop.net/media/catalog/product/m/b/mb03-black-0_alt1.jpg</a>",
+  "<a href="http://www.aemshop.net/media/catalog/product/adobestoredata/ADB177.jpg">http://www.aemshop.net/media/catalog/product/adobestoredata/ADB177.jpg</a>",
+  "<a href="http://www.aemshop.net/media/catalog/product/adobestoredata/ADB177-2.jpg">http://www.aemshop.net/media/catalog/product/adobestoredata/ADB177-2.jpg</a>",
+  "<a href="http://www.aemshop.net/media/catalog/product/adobestoredata/ADB177-3.jpg">http://www.aemshop.net/media/catalog/product/adobestoredata/ADB177-3.jpg</a>",
 ]
 `);
 
@@ -45,55 +46,46 @@ test('simple product markup', async () => {
   expect($('.product-details > div > div:contains("Options")')).toHaveLength(0);
 
   // Validate description
-  expect($('.product-details > div > div:contains("Description")').next().html().trim()).toMatchInlineSnapshot(`
-"<p>The Crown Summit Backpack is equally at home in a gym locker, study cube or a pup tent, so be sure yours is packed with books, a bag lunch, water bottles, yoga block, laptop, or whatever else you want in hand. Rugged enough for day hikes and camping trips, it has two large zippered compartments and padded, adjustable shoulder straps.</p>
-      <ul>
-      <li>Top handle.</li>
-      <li>Grommet holes.</li>
-      <li>Two-way zippers.</li>
-      <li>H 20" x W 14" x D 12".</li>
-      <li>Weight: 2 lbs, 8 oz. Volume: 29 L.</li>
-      <ul></ul></ul>"
-`);
+  expect($('.product-details > div > div:contains("Description")').next().html().trim()).toEqual('<div><span>This is an anodized aluminum push-action pen with a soft capacitive stylus. The stylus pen can be used for writing on paper and clicking on touch screen. The stylus helps protect your screen from smudges and increase sensitivity.Choose from different colored pens. Ink color: black.Adobe wordmark laser engraved near clip.<br><br></span></div>');
 
   // Validate LD-JSON
   const ldJson = JSON.parse($('script[type="application/ld+json"]').html());
   const expected = {
     "@context": "http://schema.org",
     "@type": "Product",
-    "sku": "24-MB03",
-    "name": "Crown Summit Backpack",
+    "sku": "ADB177",
+    "name": "Bezier tee",
     "gtin": "",
-    "description": "The Crown Summit Backpack is equally at home in a gym locker, study cube or a pup tent, so be sure yours is packed with books, a bag lunch, water bottles, yoga block, laptop, or whatever else you want in hand. Rugged enough for day hikes and camping trips, it has two large zippered compartments and padded, adjustable shoulder straps.Top handle.Grommet holes.Two-way zippers.H 20\" x W 14\" x D 12\".Weight: 2 lbs, 8 oz. Volume: 29 L.",
-    "@id": "https://main--aem-commerce-ssg-storefront--adobe-rnd.aem.live/products/crown-summit-backpack/24-MB03",
+    "description": "Bezier tee",
+    "@id": "https://main--aem-boilerplate-commerce-staging--hlxsites.aem.live/products-ssg/bezier-tee/ADB177",
     "offers": [
       {
         "@type": "Offer",
-        "sku": "24-MB03",
-        "url": "https://main--aem-commerce-ssg-storefront--adobe-rnd.aem.live/products/crown-summit-backpack/24-MB03",
+        "sku": "ADB177",
+        "url": "https://main--aem-boilerplate-commerce-staging--hlxsites.aem.live/products-ssg/bezier-tee/ADB177",
         "availability": "https://schema.org/InStock",
-        "price": 38,
+        "price": 23,
         "priceCurrency": "USD",
         "itemCondition": "https://schema.org/NewCondition"
       }
     ],
-    "image": "http://www.aemshop.net/media/catalog/product/m/b/mb03-black-0.jpg"
+    "image": "http://www.aemshop.net/media/catalog/product/adobestoredata/ADB177.jpg"
   };
   expect(ldJson).toEqual(expected);
 });
 
 test('complex product markup', async () => {
-  const res = await fetch(`${actionUrl}/products/hollister-backyard-sweatshirt/mh05`);
+  const res = await fetch(`${actionUrl}/products-ssg/ssg-configurable-product/ssgconfig123`);
   const content = await res.text();
 
   // Parse markup and compare
   const $ = cheerio.load(content);
 
   // Validate H1
-  expect($('h1').text()).toEqual('Hollister Backyard Sweatshirt');
+  expect($('h1').text()).toEqual('BYOM Configurable Product');
 
   // Validate price
-  expect($('.product-details > div > div:contains("Price")').next().text()).toEqual('$2.00-$52.00');
+  expect($('.product-details > div > div:contains("Price")').next().text()).toEqual('$40.00-$80.00');
 
   // Validate images
   expect($('.product-details > div > div:contains("Images")').next().find('img').map((_, e) => $(e).prop('outerHTML')).toArray()).toMatchInlineSnapshot(`
@@ -104,8 +96,9 @@ test('complex product markup', async () => {
 
   // Validate options
   expect($('.product-details > div > div:contains("Options")')).toHaveLength(1);
-  expect($('.product-details > div > div:contains("Options")').next().html().trim()).toMatchInlineSnapshot(`
-"<ul>
+  const optionsHtml = $('.product-details > div > div:contains("Options")').next().html().trim();
+
+  expect(optionsHtml).toEqual(`<ul>
               <li>
                 <h3>Color</h3>
                 option id <em>color</em>
@@ -122,84 +115,77 @@ test('complex product markup', async () => {
                   </li>
                 </ul>
               </li>
-            </ul>"
-`);
+            </ul>`);
 
   // Validate description
-  expect($('.product-details > div > div:contains("Description")').next().html().trim()).toMatchInlineSnapshot(`
-"<p>Kick off your weekend in the Hollister Backyard Sweatshirt. Whether you're raking leaves or flipping burgers, this comfy layer blocks the bite of the crisp autumn air. Puffy thick from hood to hem, it traps heat against your core.</p>
-      <p>• Cream crewneck sweatshirt with navy sleeves/trim.<br>• Relaxed fit. <br>• Ribbed cuffs and hem. <br>• Machine wash/dry.</p>"
-`);
+  expect($('meta[name="description"]').attr('content')).toEqual('SSG Configurable Product');
 
   // Validate LD-JSON
   const ldJson = JSON.parse($('script[type="application/ld+json"]').html());
   const expected = {
     "@context": "http://schema.org",
     "@type": "ProductGroup",
-    "sku": "MH05",
-    "productGroupId": "MH05",
-    "name": "Hollister Backyard Sweatshirt",
+    "sku": "SSGCONFIG123",
+    "productGroupId": "SSGCONFIG123",
+    "name": "BYOM Configurable Product",
     "gtin": "",
     "variesBy": [
-      "https://schema.org/size",
       "https://schema.org/color"
     ],
-    "description": "Kick off your weekend in the Hollister Backyard Sweatshirt. Whether you're raking leaves or flipping burgers, this comfy layer blocks the bite of the crisp autumn air. Puffy thick from hood to hem, it traps heat against your core.&bull; Cream crewneck sweatshirt with navy sleeves/trim.&bull; Relaxed fit. &bull; Ribbed cuffs and hem. &bull; Machine wash/dry.",
-    "@id": "https://main--aem-commerce-ssg-storefront--adobe-rnd.aem.live/products/hollister-backyard-sweatshirt/MH05",
+    "description": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
+    "@id": "https://main--aem-boilerplate-commerce-staging--hlxsites.aem.live/products-ssg/ssg-configurable-product/SSGCONFIG123",
     "hasVariant": [
       {
         "@type": "Product",
-        "sku": "MH05-L-Green",
-        "name": "Hollister Backyard Sweatshirt-L-Green",
+        "sku": "SSGCONFIG123-blue",
+        "name": "BYOM Configurable Product-blue",
         "gtin": "",
-        "image": "http://www.aemshop.net/media/catalog/product/m/h/mh05-green_main_1.jpg",
+        "image": "http://www.aemshop.net/media/catalog/product/a/d/adb402_1.jpg",
         "offers": [
           {
             "@type": "Offer",
-            "sku": "MH05-L-Green",
-            "url": "https://main--aem-commerce-ssg-storefront--adobe-rnd.aem.live/products/hollister-backyard-sweatshirt/MH05?optionsUIDs=Y29uZmlndXJhYmxlLzI3Ny8xODQ%3D%2CY29uZmlndXJhYmxlLzU1Ni81MzI%3D",
+            "sku": "SSGCONFIG123-blue",
+            "url": "https://main--aem-boilerplate-commerce-staging--hlxsites.aem.live/products-ssg/ssg-configurable-product/SSGCONFIG123?optionsUIDs=Y29uZmlndXJhYmxlLzI3OS80NQ%3D%3D",
             "availability": "https://schema.org/InStock",
-            "price": 52,
+            "price": 60,
             "priceCurrency": "USD",
             "itemCondition": "https://schema.org/NewCondition"
           }
         ],
-        "size": "L",
-        "color": "Green"
+        "color": "blue"
       },
       {
         "@type": "Product",
-        "sku": "MH05-L-Red",
-        "name": "Hollister Backyard Sweatshirt-L-Red",
+        "sku": "SSGCONFIG123-green",
+        "name": "BYOM Configurable Product-green",
         "gtin": "",
-        "image": "http://www.aemshop.net/media/catalog/product/m/h/mh05-red_main_1.jpg",
+        "image": "http://www.aemshop.net/media/catalog/product/a/d/adb412_1.jpg",
         "offers": [
           {
             "@type": "Offer",
-            "sku": "MH05-L-Red",
-            "url": "https://main--aem-commerce-ssg-storefront--adobe-rnd.aem.live/products/hollister-backyard-sweatshirt/MH05?optionsUIDs=Y29uZmlndXJhYmxlLzI3Ny8xOTk%3D%2CY29uZmlndXJhYmxlLzU1Ni81MzI%3D",
+            "sku": "SSGCONFIG123-green",
+            "url": "https://main--aem-boilerplate-commerce-staging--hlxsites.aem.live/products-ssg/ssg-configurable-product/SSGCONFIG123?optionsUIDs=Y29uZmlndXJhYmxlLzI3OS80Mg%3D%3D",
             "availability": "https://schema.org/InStock",
-            "price": 52,
+            "price": 80,
             "priceCurrency": "USD",
             "itemCondition": "https://schema.org/NewCondition"
           }
         ],
-        "size": "L",
-        "color": "Red"
+        "color": "green"
       },
       {
         "@type": "Product",
-        "sku": "MH05-L-White",
-        "name": "Hollister Backyard Sweatshirt-L-White",
+        "sku": "SSGCONFIG123-red",
+        "name": "BYOM Configurable Product-red",
         "gtin": "",
-        "image": "http://www.aemshop.net/media/catalog/product/m/h/mh05-white_main_1.jpg",
+        "image": "http://www.aemshop.net/media/catalog/product/a/d/adb187_1.jpg",
         "offers": [
           {
             "@type": "Offer",
-            "sku": "MH05-L-White",
-            "url": "https://main--aem-commerce-ssg-storefront--adobe-rnd.aem.live/products/hollister-backyard-sweatshirt/MH05?optionsUIDs=Y29uZmlndXJhYmxlLzI3Ny8yMDI%3D%2CY29uZmlndXJhYmxlLzU1Ni81MzI%3D",
+            "sku": "SSGCONFIG123-red",
+            "url": "https://main--aem-boilerplate-commerce-staging--hlxsites.aem.live/products-ssg/ssg-configurable-product/SSGCONFIG123?optionsUIDs=Y29uZmlndXJhYmxlLzI3OS8zOQ%3D%3D",
             "availability": "https://schema.org/InStock",
-            "price": 52,
+            "price": 40,
             "priceCurrency": "USD",
             "itemCondition": "https://schema.org/NewCondition"
           }
@@ -454,12 +440,12 @@ test('complex product markup', async () => {
 });
 
 test('product by urlKey', async () => {
-  const res = await fetch(`${actionUrl}/crown-summit-backpack?pathFormat=/{urlKey}`);
+  const res = await fetch(`${actionUrl}/bezier-tee?pathFormat=/{urlKey}`);
   const content = await res.text();
 
   // Parse markup and compare
   const $ = cheerio.load(content);
 
   // Validate H1
-  expect($('h1').text()).toEqual('Crown Summit Backpack');
+  expect($('h1').text()).toEqual('Bezier tee');
 })

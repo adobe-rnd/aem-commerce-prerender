@@ -13,16 +13,27 @@ governing permissions and limitations under the License.
 const { Core, State, Files } = require('@adobe/aio-sdk');
 const { poll } = require('./poller');
 const { StateManager } = require('../lib/state');
+const { ObservabilityClient } = require('../lib/observability');
 
 async function main(params) {
   const logger = Core.Logger('main', { level: params.LOG_LEVEL || 'info' });
+  const observabilityClient = new ObservabilityClient(logger, { 
+    token: params.AEM_ADMIN_AUTH_TOKEN, 
+    endpoint: params.LOG_INGESTOR_ENDPOINT,
+    org: params.ORG,
+    site: params.SITE
+  });
   const stateLib = await State.init(params.libInit || {});
   const filesLib = await Files.init(params.libInit || {});
   const stateMgr = new StateManager(stateLib, { logger });
 
+  let activationResult = null;
+
   const running = await stateMgr.get('running');
   if (running?.value === 'true') {
-    return { state: 'skipped' };
+    activationResult = { state: 'skipped' };
+    await observabilityClient.sendActivationResult(activationResult);
+    return activationResult;
   }
 
   try {
@@ -30,10 +41,13 @@ async function main(params) {
     // this might not be updated and action execution could be permanently skipped
     // a ttl == function timeout is a mitigation for this risk
     await stateMgr.put('running', 'true', { ttl: 3600 });
-    return await poll(params, { stateLib: stateMgr, filesLib });
+    activationResult = await poll(params, { stateLib: stateMgr, filesLib }, logger);
   } finally {
     await stateMgr.put('running', 'false');
   }
+
+  await observabilityClient.sendActivationResult(activationResult);
+  return activationResult;
 }
 
 exports.main = main

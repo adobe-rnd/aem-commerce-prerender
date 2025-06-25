@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AEM Commerce BYOM UI</title>
+    <script async src="https://unpkg.com/es-module-shims@1.10.0/dist/es-module-shims.js"></script>
+    <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/languages/html.min.js"></script>
+    <!-- CSS -->
+    <link rel="stylesheet" type="text/css"
+        href="https://cdn.jsdelivr.net/npm/diff2html/bundles/css/diff2html.min.css" />
+
+    <!-- Javascripts -->
+    <script type="importmap">
+    {
+        "imports": {
+            "lit": "https://esm.sh/lit@3.1.2",
+            "lit/": "https://esm.sh/lit@3.1.2/",
+            "@lit/reactive-element": "https://esm.sh/@lit/reactive-element@2.0.4",
+            "@lit/reactive-element/": "https://esm.sh/@lit/reactive-element@2.0.4/",
+            "@spectrum-web-components/base/": "https://unpkg.com/@spectrum-web-components/base@1.6.0/",
+            "@spectrum-web-components/button/": "https://unpkg.com/@spectrum-web-components/button@1.6.0/",
+            "@spectrum-web-components/theme/": "https://unpkg.com/@spectrum-web-components/theme@1.6.0/",
+            "@spectrum-web-components/textfield/": "https://unpkg.com/@spectrum-web-components/textfield@1.6.0/",
+            "@spectrum-web-components/tooltip/": "https://unpkg.com/@spectrum-web-components/tooltip@1.6.0/",
+            "@spectrum-web-components/status-light/": "https://unpkg.com/@spectrum-web-components/status-light@1.6.0/",
+            "@spectrum-web-components/field-label/": "https://unpkg.com/@spectrum-web-components/field-label@1.6.0/",
+            "@spectrum-web-components/progress-circle/": "https://unpkg.com/@spectrum-web-components/progress-circle@1.6.0/",
+            "@spectrum-web-components/dropzone/": "https://unpkg.com/@spectrum-web-components/dropzone@1.6.0/",
+            "@spectrum-web-components/illustrated-message/": "https://unpkg.com/@spectrum-web-components/illustrated-message@1.6.0/",
+            "@spectrum-web-components/link/": "https://unpkg.com/@spectrum-web-components/link@1.6.0/",
+            "@spectrum-web-components/accordion/": "https://unpkg.com/@spectrum-web-components/accordion@1.6.0/",
+            "@spectrum-web-components/overlay/": "https://unpkg.com/@spectrum-web-components/overlay@1.6.0/",
+            "@spectrum-web-components/picker/": "https://unpkg.com/@spectrum-web-components/picker@1.6.0/",
+            "@spectrum-web-components/menu/": "https://unpkg.com/@spectrum-web-components/menu@1.6.0/"
+        }
+    }
+    </script>
+</head>
+
+<style>
+    body {
+        background-color: #1a1a1a;
+        margin: 0;
+        padding: 0;
+    }
+</style>
+
+
+<body>
+    <app-main></app-main>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/diff2html/bundles/js/diff2html.min.js"></script>
+    <script>
+        // Ensure Diff2Html is available globally for components
+        window.addEventListener('load', function() {
+            if (typeof window.Diff2Html === 'undefined') {
+                console.warn('Diff2Html library not loaded');
+            } else {
+                console.log('Diff2Html library loaded successfully');
+            }
+        });
+    </script>
+    <script src="https://jspm.dev/@spectrum-web-components/bundle/elements.js" type="module"></script>
+    <script type="module" src="app-main.js"></script>
+</body>
+
+</html>

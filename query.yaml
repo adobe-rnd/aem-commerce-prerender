@@ -1,0 +1,17 @@
+version: 1
+indices:
+  index-published-products:
+    target: s3://published-products-index.json
+    include:
+      - products/**
+    properties:
+      sku:
+        select: head > meta[name="sku"]
+        value: attribute(el, "content")
+      last-modified:
+        select: none
+        value: >-
+          parseTimestamp(headers["last-modified"], "ddd, DD MMM YYYY hh:mm:ss GMT")
+      product-last-modified:
+        select: head > meta[name="x-cs-lastModifiedAt"]
+        value: parseTimestamp(attribute(el, "content"), "YYYY-MM-DDTHH:mm:ss.SSSZ")

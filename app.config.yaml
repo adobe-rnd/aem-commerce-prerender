@@ -1,77 +1,67 @@
 application:
-  actions: actions
+  actions: "actions"
   runtimeManifest:
     packages:
       aem-commerce-ssg:
-        license: Apache-2.0
+        license: "Apache-2.0"
         inputs:
-          LOG_LEVEL: debug
-          HLX_CONTENT_URL: "https://main--aem-boilerplate-commerce-staging--hlxsites.aem.live"
-          HLX_PRODUCTS_TEMPLATE: "https://main--aem-boilerplate-commerce-staging--hlxsites.aem.live/products/default"
-          HLX_ORG_NAME: "hlxsites"
-          HLX_SITE_NAME: "aem-boilerplate-commerce-staging"
-          HLX_STORE_URL: "https://main--aem-boilerplate-commerce-staging--hlxsites.aem.live"
-          HLX_CONFIG_NAME: "config"
-          HLX_PATH_FORMAT: "/products-ssg/{urlKey}/{sku}"
-          # HLX_LOCALES: comma-seprated list of allowed locales.
-          # i.e. us,uk,it,de,fr,es - or just one
-          # null if there is a single store and no
-          # URI prefixes are used
-          HLX_LOCALES: null
+          ORG: "hlxsites"
+          SITE: "aem-boilerplate-commerce-staging"
+          PRODUCT_PAGE_URL_FORMAT: "/products-ssg/{urlKey}/{sku}"
+          LOG_LEVEL: "info"
+          LOG_INGESTOR_ENDPOINT: "https://log-ingestor.aem-storefront.com/api/v1/services/change-detector"
+          CONTENT_URL: "https://main--aem-boilerplate-commerce-staging--hlxsites.aem.live"
+          PRODUCTS_TEMPLATE: "https://main--aem-boilerplate-commerce-staging--hlxsites.aem.live/products/default"
+          STORE_URL: "https://main--aem-boilerplate-commerce-staging--hlxsites.aem.live"
+          CONFIG_NAME: "config"
         actions:
           pdp-renderer:
-            function: actions/pdp-renderer/index.js
-            web: 'yes'
-            runtime: nodejs:22
+            function: "actions/pdp-renderer/index.js"
+            web: "yes"
+            runtime: "nodejs:22"
             annotations:
               final: true
             include:
-              - ["actions/pdp-renderer/templates/*.hbs", "templates/"]
+              - - "actions/pdp-renderer/templates/*.hbs"
+                - "templates/"
           check-product-changes:
-            function: actions/check-product-changes/index.js
-            web: 'no'
-            runtime: nodejs:22
+            function: "actions/check-product-changes/index.js"
+            web: "no"
+            runtime: "nodejs:22"
             include:
-              - ["actions/pdp-renderer/templates/*.hbs", "templates/"]
+              - - "actions/pdp-renderer/templates/*.hbs"
+                - "templates/"
             limits:
-              memorySize: 128 # use 256 in case the memory limit is exceeded at runtime
+              memorySize: 256
               timeout: 3600000
             inputs:
-              authToken: ${AEM_ADMIN_API_AUTH_TOKEN}
+              AEM_ADMIN_AUTH_TOKEN: "${AEM_ADMIN_API_AUTH_TOKEN}"
             annotations:
               final: true
           fetch-all-products:
-            function: actions/fetch-all-products/index.js
-            web: 'yes'
-            runtime: nodejs:22
+            function: "actions/fetch-all-products/index.js"
+            web: "yes"
+            runtime: "nodejs:22"
             annotations:
               final: true
           get-overlay-url:
-            function: actions/get-overlay-url/index.js
-            runtime: nodejs:22
+            function: "actions/get-overlay-url/index.js"
+            runtime: "nodejs:22"
             annotations:
               final: true
-
-        # triggers:
-        #   everyMinTrigger:
-        #     feed: /whisk.system/alarms/interval
-        #     inputs:
-        #       minutes: 1
-        #   every60MinsTrigger:
-        #     feed: /whisk.system/alarms/interval
-        #     inputs:
-        #       minutes: 60
-        # rules:
-        #   everyMinRule:
-        #   # When the action is invoked, it first checks
-        #   # that no instances of the same action are already
-        #   # running. If an instance is running, business logic
-        #   # execution is skipped; if no instances are running,
-        #   # it scans the Catalog to check for product changes.
-        #   # The above means that the actual logic is not
-        #   # necessarily executed every minute.
-        #     trigger: everyMinTrigger
-        #     action: check-product-changes
-        #   every60MinsRule:
-        #     trigger: every60MinsTrigger
-        #     action: fetch-all-products
+        triggers:
+          productPollerTrigger:
+            feed: "/whisk.system/alarms/interval"
+            inputs:
+              minutes: 5
+          productScraperTrigger:
+            feed: "/whisk.system/alarms/interval"
+            inputs:
+              minutes: 60
+        rules:
+          productPollerRule:
+            trigger: "productPollerTrigger"
+            action: "check-product-changes"
+          productScraperRule:
+            trigger: "productScraperTrigger"
+            action: "fetch-all-products"

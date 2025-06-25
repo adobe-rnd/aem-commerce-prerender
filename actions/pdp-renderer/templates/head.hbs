@@ -8,6 +8,7 @@
   {{#if externalId ~}}<meta name="id" content="{{externalId}}">{{/if ~}}
   {{#if sku ~}}<meta name="sku" content="{{sku}}">{{/if ~}}
   {{#if lastModifiedAt ~}}<meta name="x-cs-lastModifiedAt" content="{{lastModifiedAt}}">{{/if ~}}
+  {{#if __typename ~}}<meta name="__typename" content="{{__typename}}">{{/if ~}}
   <meta property="og:type" content="og:product">
 
   <script type="application/ld+json">{{{ ldJson }}}</script>

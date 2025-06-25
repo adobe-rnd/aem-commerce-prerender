@@ -40,3 +40,7 @@ coverage
 # logs folder for aio-run-detached
 logs
 
+# aem-commerce-prerender related
+*.env
+*.aio.json
+.aem-commerce-prerender.json

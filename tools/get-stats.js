@@ -202,11 +202,16 @@ const previewedURLs = [];
 
 const {
   AIO_RUNTIME_NAMESPACE,
+  AIO_runtime_namespace,
   AIO_RUNTIME_AUTH,
+  AIO_runtime_auth,
 } = env;
 
+const namespace = AIO_RUNTIME_NAMESPACE || AIO_runtime_namespace;
+const auth = AIO_RUNTIME_AUTH || AIO_runtime_auth;
+
 // Check only required env vars
-if (!AIO_RUNTIME_NAMESPACE || !AIO_RUNTIME_AUTH) {
+if (!namespace || !auth) {
   console.log('Missing required environment variables');
   exit(1);
 }
@@ -296,7 +301,7 @@ End: ${endTime.toISOString()}`);
 
         // At this point, we know the activation is within our target day
         // Now we can apply other filters
-        if (activation.name === 'poller') {
+        if (activation.name === 'check-product-changes') {
           yield activation;
         }
       }
@@ -375,7 +380,7 @@ async function checkNewActivations(targetDate) {
       totalChecked++;
       const activationDate = new Date(activation.start);
 
-      if (activation.name === 'poller') {
+      if (activation.name === 'check-product-changes') {
         console.log(`plotting activation ${activation.activationId} [${activationDate.toLocaleString()} ${Intl.DateTimeFormat().resolvedOptions().timeZone }]`);
 
         const execution = await runtime.activations.get({ activationId: activation.activationId });
@@ -550,8 +555,8 @@ async function main() {
   try {
     runtime = await aioRuntime.init({
       apihost: "https://adobeioruntime.net",
-      api_key: AIO_RUNTIME_AUTH,
-      namespace: AIO_RUNTIME_NAMESPACE,
+      api_key: auth,
+      namespace,
       debug: true,
     });
   } catch (error) {

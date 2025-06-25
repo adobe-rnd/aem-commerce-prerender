@@ -11,7 +11,7 @@ governing permissions and limitations under the License.
 */
 
 const { Core } = require('@adobe/aio-sdk')
-const { errorResponse, stringParameters, mapLocale } = require('../utils');
+const { errorResponse, stringParameters } = require('../utils');
 const { extractPathDetails } = require('./lib');
 const { generateProductHtml } = require('./render');
 
@@ -19,16 +19,15 @@ const { generateProductHtml } = require('./render');
  * Parameters
  * @param {Object} params The parameters object
  * @param {string} params.__ow_path The path of the request
- * @param {string} params.configName Overwrite for HLX_CONFIG_NAME using query parameter
- * @param {string} params.contentUrl Overwrite for HLX_CONTENT_URL using query parameter
- * @param {string} params.storeUrl Overwrite for HLX_STORE_URL using query parameter
- * @param {string} params.productsTemplate Overwrite for HLX_PRODUCTS_TEMPLATE using query parameter
- * @param {string} params.pathFormat Overwrite for HLX_PATH_FORMAT using query parameter
- * @param {string} params.HLX_CONFIG_NAME The config sheet to use (e.g. configs for prod, configs-dev for dev)
- * @param {string} params.HLX_CONTENT_URL Edge Delivery URL of the store (e.g. aem.live)
- * @param {string} params.HLX_STORE_URL Public facing URL of the store
- * @param {string} params.HLX_PRODUCTS_TEMPLATE URL to the products template page
- * @param {string} params.HLX_PATH_FORMAT The path format to use for parsing
+ * @param {string} params.configName Overwrite for CONFIG_NAME using query parameter
+ * @param {string} params.contentUrl Overwrite for CONTENT_URL using query parameter
+ * @param {string} params.productsTemplate Overwrite for PRODUCTS_TEMPLATE using query parameter
+ * @param {string} params.pathFormat Overwrite for PRODUCT_PAGE_URL_FORMAT using query parameter
+ * @param {string} params.CONFIG_NAME The config sheet to use (e.g. configs for prod, configs-dev for dev)
+ * @param {string} params.CONTENT_URL Edge Delivery URL of the store (e.g. aem.live)
+ * @param {string} params.STORE_URL Public facing URL of the store
+ * @param {string} params.PRODUCTS_TEMPLATE URL to the products template page
+ * @param {string} params.PRODUCT_PAGE_URL_FORMAT The path format to use for parsing
  */
 async function main (params) {
   const logger = Core.Logger('main', { level: params.LOG_LEVEL || 'info' })
@@ -39,24 +38,28 @@ async function main (params) {
       __ow_path,
       pathFormat : pathFormatQuery,
       configName : configNameQuery,
+      configSheet : configSheetQuery,
       contentUrl : contentUrlQuery,
       storeUrl : storeUrlQuery,
       productsTemplate : productsTemplateQuery,
-      HLX_STORE_URL,
-      HLX_CONTENT_URL,
-      HLX_CONFIG_NAME,
-      HLX_PRODUCTS_TEMPLATE,
-      HLX_PATH_FORMAT,
-      HLX_LOCALES,
+      STORE_URL,
+      CONTENT_URL,
+      CONFIG_NAME,
+      CONFIG_SHEET,
+      PRODUCTS_TEMPLATE,
+      PRODUCT_PAGE_URL_FORMAT,
+      LOCALES,
     } = params;
 
-    const pathFormat = pathFormatQuery || HLX_PATH_FORMAT || '/products/{urlKey}/{sku}';
-    const configName = configNameQuery || HLX_CONFIG_NAME;
-    const contentUrl = contentUrlQuery || HLX_CONTENT_URL;
-    const storeUrl = storeUrlQuery || HLX_STORE_URL || contentUrl;
-    const allowedLocales = HLX_LOCALES ? HLX_LOCALES.split(',').map(a => a.trim()) : [];
-    let context = { contentUrl, storeUrl, configName, logger, pathFormat, allowedLocales };
-    context.productsTemplate = productsTemplateQuery || HLX_PRODUCTS_TEMPLATE;
+    const pathFormat = pathFormatQuery || PRODUCT_PAGE_URL_FORMAT;
+    const configName = configNameQuery || CONFIG_NAME;
+    const configSheet = configSheetQuery || CONFIG_SHEET;
+    const contentUrl = contentUrlQuery || CONTENT_URL;
+    const storeUrl = storeUrlQuery || STORE_URL;
+    const allowedLocales = LOCALES ? LOCALES.split(',').map(a => a.trim()) : [];
+    let context = { contentUrl, storeUrl, configName, configSheet, logger, pathFormat, allowedLocales };
+    context.productsTemplate = productsTemplateQuery || PRODUCTS_TEMPLATE;
+    context.productsTemplate = productsTemplateQuery || PRODUCTS_TEMPLATE;
 
     const result = extractPathDetails(__ow_path, pathFormat);
     logger.debug('Path parse results', JSON.stringify(result, null, 4));
@@ -68,12 +71,7 @@ async function main (params) {
 
     // Map locale to context
     if (locale) {
-      try {
-      context = { ...context, ...mapLocale(locale, context) };
-      // eslint-disable-next-line no-unused-vars
-      } catch(e) {
-        return errorResponse(400, 'Invalid locale', logger);
-      }
+      context = { ...context, locale };
     }
 
     // Retrieve base product

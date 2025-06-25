@@ -11,13 +11,18 @@ const { main } = require('../actions/check-product-changes/index');
                     auth: process.env.AIO_runtime_auth,
                 }
             },
-            authToken: process.env.EDS_API_KEY,
-            HLX_SITE_NAME: process.env.HLX_SITE_NAME,
-            HLX_PATH_FORMAT: process.env.HLX_PATH_FORMAT,
-            HLX_ORG_NAME: process.env.HLX_ORG_NAME,
-            HLX_CONTENT_URL: process.env.HLX_CONTENT_URL,
-            HLX_CONFIG_NAME: process.env.HLX_CONFIG_NAME,
+            AEM_ADMIN_AUTH_TOKEN: process.env.AEM_ADMIN_AUTH_TOKEN,
+            SITE: process.env.SITE,
+            ORG: process.env.ORG,
+            STORE_URL: process.env.STORE_URL,
+            CONTENT_URL: process.env.CONTENT_URL,
+            CONFIG_NAME: process.env.CONFIG_NAME,
+            CONFIG_SHEET: process.env.CONFIG_SHEET,
             LOG_LEVEL: 'info',
+            LOG_INGESTOR_ENDPOINT: process.env.LOG_INGESTOR_ENDPOINT,
+            PRODUCT_PAGE_URL_FORMAT: process.env.PRODUCT_PAGE_URL_FORMAT,
+            PRODUCTS_TEMPLATE: process.env.PRODUCTS_TEMPLATE,
+            LOCALES: process.env.LOCALES,
         });
         console.log(JSON.stringify(resp, null, 2));
     } catch (error) {

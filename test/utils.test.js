@@ -28,7 +28,7 @@ const SAMPLE_CONFIGBUS_RESPONSE = {
 					"Magento-Environment-Id": "environment-id"
 				}
 			},
-		},
+		}
 	}
 };
 
@@ -155,8 +155,19 @@ describe('request', () => {
     expect(config).toEqual({ testKey: 'testValue', __hasLegacyFormat: true });
   });
 
+  test('getConfig (legacy) with subpath', async () => {
+    server.use(http.get('https://content.com/en/configs.json', async () => {
+      return HttpResponse.json({ data: [{ key: 'testKey', value: 'testValue' }] });
+    }));
+
+    const context = { configName: 'en/configs', contentUrl: 'https://content.com', logger: { debug: jest.fn() } };
+    const config = await getConfig(context);
+    expect(config).toEqual({ testKey: 'testValue', __hasLegacyFormat: true });
+  });
+
+
   test('getConfig (ConfigBus)', async () => {
-    server.use(http.get('https://content.com/configs.json', async () => {
+    server.use(http.get('https://content.com/config.json', async () => {
       return HttpResponse.json(SAMPLE_CONFIGBUS_RESPONSE);
     }));
 
@@ -165,14 +176,43 @@ describe('request', () => {
     expect(config).toEqual(SAMPLE_CONFIGBUS_RESPONSE.public.default);
   });
 
-  test('getConfig with subpath', async () => {
-    server.use(http.get('https://content.com/en/configs.json', async () => {
-      return HttpResponse.json({ data: [{ key: 'testKey', value: 'testValue' }] });
+  test('getConfig (ConfigBus) with subpath', async () => {
+    server.use(http.get('https://content.com/config.json', async () => {
+      return HttpResponse.json({
+        public: {
+          ...SAMPLE_CONFIGBUS_RESPONSE.public,
+          '/en/': {
+            "headers": {
+              "cs": {
+                "Magento-Store-Code": "en",
+                "Magento-Store-View-Code": "en",
+                "Magento-Website-Code": "en",
+              }
+            },
+          }
+        }
+      });
     }));
 
-    const context = { configName: 'en/configs', contentUrl: 'https://content.com', logger: { debug: jest.fn() } };
+    const context = { contentUrl: 'https://content.com', storeUrl: 'https://content.com', locale: 'en', pathFormat: '/{locale}/products/{urlKey}/{sku}', logger: { debug: jest.fn() } };
     const config = await getConfig(context);
-    expect(config).toEqual({ testKey: 'testValue', __hasLegacyFormat: true });
+    expect(config).toEqual({
+			"commerce-core-endpoint": "https://www.aemshop.net/graphql",
+			"commerce-endpoint": "https://www.aemshop.net/cs-graphql",
+			"headers": {
+				"all": {
+					"Store": "default"
+				},
+				"cs": {
+					"Magento-Customer-Group": "customer-group",
+					"Magento-Store-Code": "en",
+					"Magento-Store-View-Code": "en",
+					"Magento-Website-Code": "en",
+					"x-api-key": "api-key",
+					"Magento-Environment-Id": "environment-id"
+				}
+			},
+		});
   });
 
   test('requestSaaS', async () => {
@@ -302,6 +342,22 @@ describe('request', () => {
 });
 
 describe('getProductUrl', () => {
+  
+  test('getProductUrl with no product, with products prefix, with locale', () => {
+    const context = { storeUrl: 'https://example.com', pathFormat: '/{locale}/products/{urlKey}/{sku}', locale: 'en' };
+    expect(getProductUrl({ }, context, false)).toBe('/en/products');
+  });
+
+  test('getProductUrl with no product, with products prefix, without locale', () => {
+    const context = { storeUrl: 'https://example.com', pathFormat: '/products/{urlKey}/{sku}'};
+    expect(getProductUrl({ }, context, false)).toBe('/products');
+  });
+
+  test('getProductUrl with no product, without products prefix, without locale', () => {
+    const context = { storeUrl: 'https://example.com', pathFormat: '/{urlKey}/{sku}'};
+    expect(getProductUrl({ }, context, false)).toBe('/');
+  });
+
   test('getProductUrl with urlKey and sku', () => {
       const context = { storeUrl: 'https://example.com', pathFormat: '/products/{urlKey}/{sku}' };
       expect(getProductUrl({ urlKey: 'my-url-key', sku: 'my-sku' }, context)).toBe('https://example.com/products/my-url-key/my-sku');

@@ -74,13 +74,17 @@ describe('pdp-renderer', () => {
       server.use(handlers.defaultProduct());
 
       const response = await action.main({
-        HLX_STORE_URL: 'https://store.com',
-        HLX_CONTENT_URL: 'https://content.com',
-        HLX_CONFIG_NAME: 'config',
-        HLX_PRODUCTS_TEMPLATE: "https://content.com/products/default",
+        STORE_URL: 'https://store.com',
+        CONTENT_URL: 'https://content.com',
+        CONFIG_NAME: 'config',
+        PRODUCTS_TEMPLATE: "https://content.com/products/default",
+        PRODUCT_PAGE_URL_FORMAT: '/products/{urlKey}/{sku}',
         __ow_path: `/products/crown-summit-backpack/24-MB03`,
       });
 
+      expect(response.body).toBeDefined();
+      expect(typeof response.body).toBe('string');
+      
       const $ = cheerio.load(response.body);
       expect($('.product-recommendations')).toHaveLength(1);
       expect($('body > main > div')).toHaveLength(2);
@@ -90,9 +94,10 @@ describe('pdp-renderer', () => {
       server.use(handlers.defaultProduct());
 
       const response = await action.main({
-        HLX_STORE_URL: 'https://store.com',
-        HLX_CONTENT_URL: 'https://content.com',
-        HLX_CONFIG_NAME: 'config',
+        STORE_URL: 'https://store.com',
+        CONTENT_URL: 'https://content.com',
+        CONFIG_NAME: 'config',
+        PRODUCT_PAGE_URL_FORMAT: '/products/{urlKey}/{sku}',
         __ow_path: `/products/crown-summit-backpack/24-MB03`,
       });
 
@@ -106,10 +111,10 @@ describe('pdp-renderer', () => {
       server.use(handlers.defaultProduct());
 
       const response = await action.main({
-        HLX_STORE_URL: 'https://store.com',
-        HLX_CONTENT_URL: 'https://content.com',
-        HLX_CONFIG_NAME: 'config',
-        HLX_PATH_FORMAT: '/products/{sku}',
+        STORE_URL: 'https://store.com',
+        CONTENT_URL: 'https://content.com',
+        CONFIG_NAME: 'config',
+        PRODUCT_PAGE_URL_FORMAT: '/products/{sku}',
         __ow_path: `/products/24-MB03`,
       });
 
@@ -121,10 +126,10 @@ describe('pdp-renderer', () => {
       server.use(handlers.defaultProductLiveSearch());
 
       const response = await action.main({
-        HLX_STORE_URL: 'https://store.com',
-        HLX_CONTENT_URL: 'https://content.com',
-        HLX_CONFIG_NAME: 'config',
-        HLX_PATH_FORMAT: '/{urlKey}',
+        STORE_URL: 'https://store.com',
+        CONTENT_URL: 'https://content.com',
+        CONFIG_NAME: 'config',
+        PRODUCT_PAGE_URL_FORMAT: '/{urlKey}',
         __ow_path: `/crown-summit-backpack`,
       });
      
@@ -145,10 +150,10 @@ describe('pdp-renderer', () => {
       }));
 
       const response = await action.main({
-        HLX_STORE_URL: 'https://store.com',
-        HLX_CONTENT_URL: 'https://content.com',
-        HLX_CONFIG_NAME: 'config',
-        HLX_PATH_FORMAT: '/{locale}/products/{sku}',
+        STORE_URL: 'https://store.com',
+        CONTENT_URL: 'https://content.com',
+        CONFIG_NAME: 'config',
+        PRODUCT_PAGE_URL_FORMAT: '/{locale}/products/{sku}',
         __ow_path: `/en/products/24-MB03`,
       });
 
@@ -162,27 +167,15 @@ describe('pdp-renderer', () => {
       const ldJson = JSON.parse($('head > script[type="application/ld+json"]').html());
       expect(ldJson.offers[0].url).toEqual('https://store.com/en/products/24-MB03');
     });
-
-    test('return 400 if locale is not supported', async () => {
-      const response = await action.main({
-        HLX_STORE_URL: 'https://store.com',
-        HLX_CONTENT_URL: 'https://content.com',
-        HLX_CONFIG_NAME: 'config',
-        HLX_PATH_FORMAT: '/{locale}/products/{sku}',
-        __ow_path: `/test/products/24-MB03`,
-      });
-
-      expect(response.error.statusCode).toEqual(400);
-    });
   })
 
   describe('error handling', () => {
     test('return 400 if neither sku nor urlKey are provided', async () => {
       const response = await action.main({
-        HLX_STORE_URL: 'https://store.com',
-        HLX_CONTENT_URL: 'https://content.com',
-        HLX_CONFIG_NAME: 'config',
-        HLX_PATH_FORMAT: '/{urlPath}',
+        STORE_URL: 'https://store.com',
+        CONTENT_URL: 'https://content.com',
+        CONFIG_NAME: 'config',
+        PRODUCT_PAGE_URL_FORMAT: '/{urlPath}',
         __ow_path: `/crown-summit-backpack`,
       });
 
@@ -193,9 +186,10 @@ describe('pdp-renderer', () => {
       server.use(handlers.return404());
 
       const response = await action.main({
-        HLX_STORE_URL: 'https://aemstore.net',
-        HLX_CONTENT_URL: 'https://content.com',
-        HLX_CONFIG_NAME: 'config',
+        STORE_URL: 'https://aemstore.net',
+        CONTENT_URL: 'https://content.com',
+        CONFIG_NAME: 'config',
+        PRODUCT_PAGE_URL_FORMAT: '/products/{urlKey}/{sku}',
         __ow_path: '/products/crown-summit-backpack/sku-is-404',
       });
 
@@ -210,25 +204,28 @@ describe('pdp-renderer', () => {
 
     const getProductResponse = async () => {
       return action.main({
-        HLX_STORE_URL: 'https://store.com',
-        HLX_CONTENT_URL: 'https://content.com',
-        HLX_CONFIG_NAME: 'config',
+        STORE_URL: 'https://store.com',
+        CONTENT_URL: 'https://content.com',
+        CONFIG_NAME: 'config',
+        PRODUCT_PAGE_URL_FORMAT: '/products/{urlKey}/{sku}',
         __ow_path: `/products/crown-summit-backpack/24-MB03`,
       });
     };
 
     test('render images', async () => {
       const response = await getProductResponse();
+      
       const $ = cheerio.load(response.body);
       
-      expect($('body > main > div.product-details > div > div:contains("Images")').next().find('a').map((_,e) => $(e).prop('outerHTML')).toArray()).toEqual([
-        '<a href="http://www.aemshop.net/media/catalog/product/m/b/mb03-black-0.jpg">http://www.aemshop.net/media/catalog/product/m/b/mb03-black-0.jpg</a>',
-        '<a href="http://www.aemshop.net/media/catalog/product/m/b/mb03-black-0_alt1.jpg">http://www.aemshop.net/media/catalog/product/m/b/mb03-black-0_alt1.jpg</a>'
+      expect($('body > main > div.product-details > div > div:contains("Images")').next().find('img').map((_,e) => $(e).prop('outerHTML')).toArray()).toEqual([
+        '<img src="http://www.aemshop.net/media/catalog/product/m/b/mb03-black-0.jpg">',
+        '<img src="http://www.aemshop.net/media/catalog/product/m/b/mb03-black-0_alt1.jpg">'
       ]);
     });
 
     test('render description', async () => {
       const response = await getProductResponse();
+      
       const $ = cheerio.load(response.body);
       
       expect($('body > main > div.product-details > div > div:contains("Description")').next().html().trim()).toMatchInlineSnapshot(`
@@ -245,13 +242,16 @@ describe('pdp-renderer', () => {
 
     test('render price', async () => {
       const response = await getProductResponse();
+      
       const $ = cheerio.load(response.body);
+
       
       expect($('body > main > div.product-details > div > div:contains("Price")').next().text()).toBe('$38.00');
     });
 
     test('render title', async () => {
       const response = await getProductResponse();
+      
       const $ = cheerio.load(response.body);
       
       expect($('body > main > div.product-details > div > div > h1').text()).toEqual('Crown Summit Backpack');
@@ -263,9 +263,10 @@ describe('pdp-renderer', () => {
       server.use(handlers.defaultProduct());
 
       const response = await action.main({
-        HLX_STORE_URL: 'https://store.com',
-        HLX_CONTENT_URL: 'https://content.com',
-        HLX_CONFIG_NAME: 'config',
+        STORE_URL: 'https://store.com',
+        CONTENT_URL: 'https://content.com',
+        CONFIG_NAME: 'config',
+        PRODUCT_PAGE_URL_FORMAT: '/products/{urlKey}/{sku}',
         __ow_path: `/products/crown-summit-backpack/24-MB03`,
       });
 
@@ -278,32 +279,54 @@ describe('pdp-renderer', () => {
       server.use(handlers.defaultVariant());
 
       const response = await action.main({
-        HLX_STORE_URL: 'https://store.com',
-        HLX_CONTENT_URL: 'https://content.com',
-        HLX_CONFIG_NAME: 'config',
+        STORE_URL: 'https://store.com',
+        CONTENT_URL: 'https://content.com',
+        CONFIG_NAME: 'config',
+        PRODUCT_PAGE_URL_FORMAT: '/products/{urlKey}/{sku}',
         __ow_path: `/products/crown-summit-backpack/24-MB03`,
       });
 
       const $ = cheerio.load(response.body);
+      console.log($('body > main > div.product-details > div > div:contains("Options")').next().html().trim()); 
       expect($('body > main > div.product-details > div > div:contains("Options")')).toHaveLength(1);
       expect($('body > main > div.product-details > div > div:contains("Options")').next().html().trim()).toMatchInlineSnapshot(`
 "<ul>
             <li>
-              Size
+              <h3>Size</h3>
+              option id <em>size</em>
+              required <em>false</em>
               <ul>
-                <li>XS</li>
-                <li>S</li>
-                <li>M</li>
-                <li>L</li>
-                <li>XL</li>
+                <li>
+                  <a href="https://store.com/products/hollister-backyard-sweatshirt/mh05?optionsUIDs=Y29uZmlndXJhYmxlLzU1Ni81MzI=">L <em>in stock</em></a>
+                </li>
+                <li>
+                  <a href="https://store.com/products/hollister-backyard-sweatshirt/mh05?optionsUIDs=Y29uZmlndXJhYmxlLzU1Ni81Mjk=">M <em>in stock</em></a>
+                </li>
+                <li>
+                  <a href="https://store.com/products/hollister-backyard-sweatshirt/mh05?optionsUIDs=Y29uZmlndXJhYmxlLzU1Ni81MjY=">S <em>in stock</em></a>
+                </li>
+                <li>
+                  <a href="https://store.com/products/hollister-backyard-sweatshirt/mh05?optionsUIDs=Y29uZmlndXJhYmxlLzU1Ni81MzU=">XL <em>in stock</em></a>
+                </li>
+                <li>
+                  <a href="https://store.com/products/hollister-backyard-sweatshirt/mh05?optionsUIDs=Y29uZmlndXJhYmxlLzU1Ni81MjM=">XS <em>in stock</em></a>
+                </li>
               </ul>
             </li>
             <li>
-              Color
+              <h3>Color</h3>
+              option id <em>color</em>
+              required <em>false</em>
               <ul>
-                <li>Green</li>
-                <li>Red</li>
-                <li>White</li>
+                <li>
+                  <a href="https://store.com/products/hollister-backyard-sweatshirt/mh05?optionsUIDs=Y29uZmlndXJhYmxlLzI3Ny8xODQ=">Green <em>in stock</em></a>
+                </li>
+                <li>
+                  <a href="https://store.com/products/hollister-backyard-sweatshirt/mh05?optionsUIDs=Y29uZmlndXJhYmxlLzI3Ny8xOTk=">Red <em>in stock</em></a>
+                </li>
+                <li>
+                  <a href="https://store.com/products/hollister-backyard-sweatshirt/mh05?optionsUIDs=Y29uZmlndXJhYmxlLzI3Ny8yMDI=">White <em>in stock</em></a>
+                </li>
               </ul>
             </li>
           </ul>"
@@ -316,19 +339,21 @@ describe('pdp-renderer', () => {
       server.use(handlers.defaultProduct());
 
       const response = await action.main({
-        HLX_STORE_URL: 'https://store.com',
-        HLX_CONTENT_URL: 'https://content.com',
-        HLX_CONFIG_NAME: 'config',
+        STORE_URL: 'https://store.com',
+        CONTENT_URL: 'https://content.com',
+        CONFIG_NAME: 'config',
+        PRODUCT_PAGE_URL_FORMAT: '/products/{urlKey}/{sku}',
         __ow_path: `/products/crown-summit-backpack/24-MB03`,
       });
 
       const $ = cheerio.load(response.body);
-      expect($('head > meta')).toHaveLength(8);
+      expect($('head > meta')).toHaveLength(9);
       expect($('head > meta[name="description"]').attr('content')).toMatchInlineSnapshot(`"The Crown Summit Backpack is equally at home in a gym locker, study cube or a pup tent, so be sure yours is packed with books, a bag lunch, water bottles, yoga block, laptop, or whatever else you want in hand. Rugged enough for day hikes and camping trips, it has two large zippered compartments and padded, adjustable shoulder straps.Top handle.Grommet holes.Two-way zippers.H 20" x W 14" x D 12".Weight: 2 lbs, 8 oz. Volume: 29 L."`);
       expect($('head > meta[name="keywords"]').attr('content')).toEqual('backpack, hiking, camping');
       expect($('head > meta[name="image"]').attr('content')).toEqual('http://www.aemshop.net/media/catalog/product/m/b/mb03-black-0.jpg');
       expect($('head > meta[name="id"]').attr('content')).toEqual('7');
       expect($('head > meta[name="sku"]').attr('content')).toEqual('24-MB03');
+      expect($('head > meta[name="__typename"]').attr('content')).toEqual('SimpleProductView');
       expect($('head > meta[name="x-cs-lastModifiedAt"]').attr('content')).toEqual('2024-10-03T15:26:48.850Z');
       expect($('head > meta[property="og:type"]').attr('content')).toEqual('og:product');
     });
@@ -337,14 +362,15 @@ describe('pdp-renderer', () => {
       server.use(handlers.defaultProduct());
 
       const response = await action.main({
-        HLX_STORE_URL: 'https://store.com',
-        HLX_CONTENT_URL: 'https://content.com',
-        HLX_CONFIG_NAME: 'config',
+        STORE_URL: 'https://store.com',
+        CONTENT_URL: 'https://content.com',
+        CONFIG_NAME: 'config',
+        PRODUCT_PAGE_URL_FORMAT: '/products/{urlKey}/{sku}',
         __ow_path: `/products/crown-summit-backpack/24-MB03`,
       });
 
       const $ = cheerio.load(response.body);
-      const ldJson = JSON.parse($('script[type="application/ld+json"]').html());
+      const ldJson = JSON.parse($('head > script[type="application/ld+json"]').html());
       expect(ldJson).toEqual({
         "@context": "http://schema.org",
         "@id": "https://store.com/products/crown-summit-backpack/24-MB03",

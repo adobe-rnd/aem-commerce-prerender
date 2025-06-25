@@ -3,7 +3,7 @@ const path = require('path');
 const Handlebars = require('handlebars');
 const { findDescription, prepareBaseTemplate, getPrimaryImage, generatePriceString, getImageList } = require('./lib');
 const { generateLdJson } = require('./ldJson');
-const { requestSaaS } = require('../utils');
+const { requestSaaS, getProductUrl } = require('../utils');
 const { ProductQuery, ProductByUrlKeyQuery } = require('../queries');
 
 function toTemplateProductData(baseProduct) {
@@ -47,6 +47,20 @@ async function generateProductHtml(sku, urlKey, context) {
     baseProduct = baseProductData.data.productSearch.items[0].productView;
   }
   logger.debug('Retrieved base product', JSON.stringify(baseProduct, null, 4));
+
+  if (baseProduct.options && baseProduct.options.length > 0) {
+    baseProduct.options = baseProduct.options.map((option) => {
+      const baseUrl = getProductUrl(baseProduct, context);
+      if (Array.isArray(option.values)) {
+        option.values = option.values.map((value) => ({
+          ...value,
+          url: baseUrl.toLowerCase() + '?optionsUIDs=' + value.id,
+        }));
+        option.values.sort((a, b) => a.title.localeCompare(b.title));
+      } 
+      return option;
+    });
+  }
 
   // Assign meta tag data for template
   const templateProductData = toTemplateProductData(baseProduct);

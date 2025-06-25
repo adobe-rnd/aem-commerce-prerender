@@ -11,10 +11,10 @@ governing permissions and limitations under the License.
 */
 
 const assert = require('node:assert/strict');
-const { loadState, saveState, getStateFileLocation, poll } = require('../actions/check-product-changes/poller');
+const { loadState, saveState, getFileLocation, poll } = require('../actions/check-product-changes/poller');
 const Files = require('./__mocks__/files');
 const { AdminAPI } = require('../actions/lib/aem');
-const { requestSaaS, requestSpreadsheet, isValidUrl} = require('../actions/utils');
+const { requestSaaS, requestSpreadsheet, isValidUrl } = require('../actions/utils');
 const { MockState } = require('./__mocks__/state');
 
 const EXAMPLE_STATE = 'sku1,1,\nsku2,2,\nsku3,3,';
@@ -37,12 +37,22 @@ const EXAMPLE_EXPECTED_STATE = {
   },
 };
 
+const mockLogger = {
+  info: jest.fn(),
+  error: jest.fn(),
+  debug: jest.fn(),
+};
+
 jest.mock('../actions/utils', () => ({
   requestSaaS: jest.fn(),
   requestSpreadsheet: jest.fn(),
   isValidUrl: jest.fn(() => true),
   getProductUrl: jest.fn(({ urlKey, sku }) => `/${urlKey || sku}`),
-  mapLocale: jest.fn((locale) => ({ locale })),
+  getDefaultStoreURL: jest.fn(() => 'https://content.com'),
+  formatMemoryUsage: jest.fn(() => '100MB'),
+  FILE_PREFIX: 'check-product-changes',
+  STATE_FILE_EXT: 'csv',
+  PDP_FILE_EXT: 'html',
 }));
 
 jest.spyOn(AdminAPI.prototype, 'startProcessing').mockImplementation(jest.fn());
@@ -105,12 +115,14 @@ describe('Poller', () => {
   });
 
   const defaultParams = {
-    HLX_SITE_NAME: 'siteName',
-    HLX_PATH_FORMAT: 'pathFormat',
-    PLPURIPrefix: 'prefix',
-    HLX_ORG_NAME: 'orgName',
-    HLX_CONFIG_NAME: 'configName',
-    authToken: 'token',
+    ORG: 'orgName',
+    SITE: 'siteName',
+    CONTENT_URL: 'https://content.com',
+    STORE_URL: 'https://store.com',
+    PRODUCTS_TEMPLATE: 'https://store.com/products/default',
+    PRODUCT_PAGE_URL_FORMAT: 'products/{urlKey}/{sku}',
+    CONFIG_NAME: 'configName',
+    AEM_ADMIN_AUTH_TOKEN: 'token',
   };
 
   const setupSkuData = (filesLib, stateLib, skuData, lastQueriedAt) => {
@@ -157,6 +169,8 @@ describe('Poller', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    // Reset isValidUrl mock to default behavior
+    isValidUrl.mockReturnValue(true);
   });
 
   it('loadState returns default state', async () => {
@@ -175,7 +189,7 @@ describe('Poller', () => {
   it('loadState returns parsed state', async () => {
     const filesLib = new Files(0);
     const stateLib = new MockState(0);
-    await filesLib.write(getStateFileLocation('uk'), EXAMPLE_STATE);
+    await filesLib.write(getFileLocation('uk', 'csv'), EXAMPLE_STATE);
     const state = await loadState('uk', { filesLib, stateLib });
     assert.deepEqual(state, EXAMPLE_EXPECTED_STATE);
   });
@@ -183,7 +197,7 @@ describe('Poller', () => {
   it('loadState after saveState', async () => {
     const filesLib = new Files(0);
     const stateLib = new MockState(0);
-    await filesLib.write(getStateFileLocation('uk'), EXAMPLE_STATE);
+    await filesLib.write(getFileLocation('uk', 'csv'), EXAMPLE_STATE);
     const state = await loadState('uk', { filesLib, stateLib });
     assert.deepEqual(state, EXAMPLE_EXPECTED_STATE);
     state.skus['sku1'] = {
@@ -196,7 +210,7 @@ describe('Poller', () => {
     };
     await saveState(state, { filesLib, stateLib });
 
-    const serializedState = await filesLib.read(getStateFileLocation('uk'));
+    const serializedState = await filesLib.read(getFileLocation('uk', 'csv'));
     assert.equal(serializedState, 'sku1,4,hash1\nsku2,5,hash2\nsku3,3,');
 
     const newState = await loadState('uk', { filesLib, stateLib });
@@ -206,7 +220,7 @@ describe('Poller', () => {
   it('loadState after saveState with null storeCode', async () => {
     const filesLib = new Files(0);
     const stateLib = new MockState(0);
-    await filesLib.write(getStateFileLocation('default'), EXAMPLE_STATE);
+    await filesLib.write(getFileLocation('default', 'csv'), EXAMPLE_STATE);
     const state = await loadState('default', { filesLib, stateLib });
     const expectedState = {
       ...EXAMPLE_EXPECTED_STATE,
@@ -223,33 +237,33 @@ describe('Poller', () => {
     };
     await saveState(state, { filesLib, stateLib });
 
-    const serializedState = await filesLib.read(getStateFileLocation('default'));
+    const serializedState = await filesLib.read(getFileLocation('default', 'csv'));
     assert.equal(serializedState, 'sku1,4,hash1\nsku2,5,hash2\nsku3,3,');
   });
 
   describe('Parameter validation', () => {
     it('should throw an error if required parameters are missing', async () => {
       const params = { ...defaultParams };
-      delete params.HLX_CONFIG_NAME;
+      delete params.CONFIG_NAME;
       
       const filesLib = mockFiles();
       const stateLib = mockState();
 
-      await expect(poll(params, { filesLib, stateLib }))
-        .rejects.toThrow('Missing required parameters: HLX_CONFIG_NAME');
+      await expect(poll(params, { filesLib, stateLib }, mockLogger))
+        .rejects.toThrow('Missing required parameters: CONFIG_NAME');
     });
 
-    it('should throw an error if HLX_STORE_URL is invalid', async () => {
+    it('should throw an error if STORE_URL is invalid', async () => {
       isValidUrl.mockReturnValue(false);
       const params = {
         ...defaultParams,
-        HLX_STORE_URL: 'invalid-url',
+        STORE_URL: 'invalid-url',
       };
       
       const filesLib = mockFiles();
       const stateLib = mockState();
 
-      await expect(poll(params, { filesLib, stateLib }))
+      await expect(poll(params, { filesLib, stateLib }, mockLogger))
         .rejects.toThrow('Invalid storeUrl');
     });
   });
@@ -273,7 +287,7 @@ describe('Poller', () => {
       // Mock catalog service responses
       mockSaaSResponse(['sku-123'], 5000);
 
-      const result = await poll(defaultParams, { filesLib, stateLib });
+      const result = await poll(defaultParams, { filesLib, stateLib }, mockLogger);
 
       // Verify results
       expect(result.state).toBe('completed');
@@ -288,7 +302,7 @@ describe('Poller', () => {
 
       // Verify HTML file was saved
       expect(filesLib.write).toHaveBeenCalledWith(
-        '/public/pdps/url-sku-123',
+        '/public/pdps/url-sku-123.html',
         '<html>Product 123</html>'
       );
 
@@ -322,7 +336,7 @@ describe('Poller', () => {
       // Mock catalog service responses
       mockSaaSResponse(['sku-456'], 5000);
       
-      const result = await poll(defaultParams, { filesLib, stateLib });
+      const result = await poll(defaultParams, { filesLib, stateLib }, mockLogger);
 
       // Verify results
       expect(result.state).toBe('completed');
@@ -352,7 +366,7 @@ describe('Poller', () => {
       // Mock catalog service responses
       mockSaaSResponse(['sku-failed-due-preview', 'sku-failed-due-publishing'], 20000);
       
-      const result = await poll(defaultParams, { filesLib, stateLib });
+      const result = await poll(defaultParams, { filesLib, stateLib }, mockLogger);
 
       // Verify results
       expect(result.state).toBe('completed');
@@ -396,7 +410,7 @@ describe('Poller', () => {
         return Promise.resolve({});
       });
       
-      const result = await poll(defaultParams, { filesLib, stateLib });
+      const result = await poll(defaultParams, { filesLib, stateLib }, mockLogger);
 
       // Verify results
       expect(result.state).toBe('completed');
@@ -462,7 +476,7 @@ describe('Poller', () => {
         });
       });
 
-      const result = await poll(defaultParams, { filesLib, stateLib });
+      const result = await poll(defaultParams, { filesLib, stateLib }, mockLogger);
 
       // Verify results
       expect(result.state).toBe('completed');
@@ -525,7 +539,7 @@ describe('Poller', () => {
         });
       });
 
-      await poll(defaultParams, { filesLib, stateLib });
+      await poll(defaultParams, { filesLib, stateLib }, mockLogger);
 
       // Verify HTML files were deleted
       expect(filesLib.delete).toHaveBeenCalledTimes(2);

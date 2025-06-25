@@ -1,4 +1,4 @@
-name: AIO App CI
+name: Deploy to Production
 
 on:
   release:

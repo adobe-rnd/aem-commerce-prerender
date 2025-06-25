@@ -14,7 +14,7 @@ governing permissions and limitations under the License.
 
 const { CategoriesQuery, ProductCountQuery, ProductsQuery } = require('../queries');
 const { Core, Files } = require('@adobe/aio-sdk')
-const { requestSaaS, FILE_PREFIX, FILE_EXT } = require('../utils');
+const { requestSaaS, FILE_PREFIX } = require('../utils');
 const { Timings } = require('../lib/benchmark');
 
 async function getSkus(categoryPath, context) {
@@ -97,10 +97,11 @@ async function getAllSkus(context) {
 async function main(params) {
   const logger = Core.Logger('main', { level: params.LOG_LEVEL || 'info' })
   const {
-    HLX_SITE_NAME: siteName,
-    HLX_ORG_NAME: orgName,
-    HLX_CONTENT_URL: contentUrl,
-    HLX_CONFIG_NAME: configName = 'configs',
+    SITE: siteName,
+    ORG: orgName,
+    CONTENT_URL: contentUrl,
+    CONFIG_NAME: configName = 'configs',
+    CONFIG_SHEET: configSheet,
   } = params;
   if (!siteName || !orgName || !contentUrl) {
     return {
@@ -111,23 +112,28 @@ async function main(params) {
       }
     }
   }
-  const storeUrl = params.HLX_STORE_URL ? params.HLX_STORE_URL : `https://main--${siteName}--${orgName}.aem.live`;
-  const locales = params.HLX_LOCALES ? params.HLX_LOCALES.split(',') : [null];
-  const context = { 
+  const storeUrl = params.STORE_URL;
+  const locales = params.LOCALES ? params.LOCALES.split(',') : [null];
+  const sharedContext = {
     configName,
+    configSheet,
     storeUrl,
     contentUrl,
     logger: logger,
   };
 
   const results = await Promise.all(locales.map(async (locale) => {
+    const context = { ...sharedContext };
+    if (locale) {
+      context.locale = locale;
+    }
     const timings = new Timings();
     const stateFilePrefix = locale || 'default';
     const allSkus = await getAllSkus(context);
     timings.sample('getAllSkus');
     const filesLib = await Files.init(params.libInit || {});
     timings.sample('saveFile');
-    const productsFileName = `${FILE_PREFIX}/${stateFilePrefix}-products.${FILE_EXT}`;
+    const productsFileName = `${FILE_PREFIX}/${stateFilePrefix}-products.json`;
     await filesLib.write(productsFileName, JSON.stringify(allSkus));
     return timings.measures;
   }));

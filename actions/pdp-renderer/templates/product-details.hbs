@@ -10,7 +10,7 @@
     <div>
       <ul>
         {{#each imageList}}
-        <li><a href="{{this}}">{{this}}</a></li>
+        <li><img src="{{this}}"></li>
         {{/each}}
       </ul>
     </div>
@@ -35,11 +35,15 @@
       <ul>
         {{#each options}}
         <li>
-          {{title}}
+          <h3>{{title}}</h3>
+          option id <em>{{id}}</em>
+          required <em>{{required}}</em>
           {{#if values}}
           <ul>
             {{#each values}}
-            <li>{{title}}</li>
+            <li>
+              <a href="{{url}}">{{title}} <em>{{#if inStock}}in stock{{else}}out of stock{{/if}}</em></a>
+            </li>
             {{/each}}
           </ul>
           {{/if}}
