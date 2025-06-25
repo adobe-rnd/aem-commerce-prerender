@@ -393,6 +393,8 @@ async function poll(params, aioLibs, logger) {
 
   logger.info(`Starting poll from ${storeUrl} for locales ${locales}`);
 
+  let stateText = 'completed';
+
   try {
     // start processing preview and publish queues
     await adminApi.startProcessing();
@@ -473,6 +475,7 @@ async function poll(params, aioLibs, logger) {
     logger.error(e);
     // wait for queues to finish, even in error case
     await adminApi.stopProcessing();
+    stateText = 'failure';
   }
 
   // get memory usage
@@ -490,7 +493,7 @@ async function poll(params, aioLibs, logger) {
   logger.info(`Finished polling, elapsed: ${elapsed}ms`);
 
   return {
-    state: 'completed',
+    state: stateText,
     elapsed,
     status: { ...counts },
     timings: timings.measures,
