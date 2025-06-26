@@ -88,9 +88,9 @@ test('complex product markup', async () => {
   expect($('.product-details > div > div:contains("Price")').next().text()).toEqual('$40.00-$80.00');
 
   // Validate images
-  expect($('.product-details > div > div:contains("Images")').next().find('a').map((_, e) => $(e).prop('outerHTML')).toArray()).toMatchInlineSnapshot(`
+  expect($('.product-details > div > div:contains("Images")').next().find('img').map((_, e) => $(e).prop('outerHTML')).toArray()).toMatchInlineSnapshot(`
 [
-  "<a href="http://www.aemshop.net/media/catalog/product/a/d/adb124.jpg">http://www.aemshop.net/media/catalog/product/a/d/adb124.jpg</a>",
+  "<img src="http://www.aemshop.net/media/catalog/product/a/d/adb124.jpg">",
 ]
 `);
 
@@ -100,24 +100,18 @@ test('complex product markup', async () => {
 
   expect(optionsHtml).toEqual(`<ul>
               <li>
-                <div>Color</div>
-                <div>color</div>
-                <div>false</div>
+                <h3>Color</h3>
+                option id <em>color</em>
+                required <em>false</em>
                 <ul>
                   <li>
-                    <div>red</div>
-                    <div>Y29uZmlndXJhYmxlLzI3OS8zOQ==</div>
-                    <div>true</div>
+                    <a href="https://main--aem-boilerplate-commerce-staging--hlxsites.aem.live/products-ssg/ssg-configurable-product/ssgconfig123?optionsUIDs=Y29uZmlndXJhYmxlLzI3OS80NQ==">blue <em>in stock</em></a>
                   </li>
                   <li>
-                    <div>green</div>
-                    <div>Y29uZmlndXJhYmxlLzI3OS80Mg==</div>
-                    <div>true</div>
+                    <a href="https://main--aem-boilerplate-commerce-staging--hlxsites.aem.live/products-ssg/ssg-configurable-product/ssgconfig123?optionsUIDs=Y29uZmlndXJhYmxlLzI3OS80Mg==">green <em>in stock</em></a>
                   </li>
                   <li>
-                    <div>blue</div>
-                    <div>Y29uZmlndXJhYmxlLzI3OS80NQ==</div>
-                    <div>true</div>
+                    <a href="https://main--aem-boilerplate-commerce-staging--hlxsites.aem.live/products-ssg/ssg-configurable-product/ssgconfig123?optionsUIDs=Y29uZmlndXJhYmxlLzI3OS8zOQ==">red <em>in stock</em></a>
                   </li>
                 </ul>
               </li>
