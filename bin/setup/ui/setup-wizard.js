@@ -1155,7 +1155,7 @@ export class SetupWizard extends LitElement {
                 <!-- Advanced Settings Accordion -->
                 <div style="margin-top: 24px;">
                     <sp-accordion allow-multiple>
-                        <sp-accordion-item label="Advanced Settings" ?open=${false}>
+                        <sp-accordion-item label="Advanced Settings" ?open=${this.aioOrg === '*' || this.aioSite === '*' || !this.aioOrg || !this.aioSite || this.aioOrg === '' || this.aioSite === ''}>
                             <div class="form-grid" style="padding: 16px 0;">
                                 <sp-field-label for="content-url" required>Content URL</sp-field-label>
                                 <sp-textfield 
