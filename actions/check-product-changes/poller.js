@@ -357,7 +357,7 @@ async function poll(params, aioLibs, logger) {
 
   const {
     // required
-    ORG_NAME: orgName,
+    ORG: orgName,
     SITE: siteName,
     PRODUCT_PAGE_URL_FORMAT: pathFormat,
 
