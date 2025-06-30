@@ -38,7 +38,7 @@
     "e2e": "node --experimental-vm-modules node_modules/jest/bin/jest.js --collectCoverage=false --testRegex ./e2e",
     "lint": "eslint --ignore-pattern web-src --no-error-on-unmatched-pattern test src actions",
     "lint:fix": "npm run lint -- --fix",
-    "redeploy:poller": "bin/redeploy-poller.sh"
+    "deploy": "tools/deploy.sh"
   },
   "engines": {
     "node": ">=18"

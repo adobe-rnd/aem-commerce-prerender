@@ -20,7 +20,7 @@ Pluggable prerendering stack for ahead-of-time data fetching and embedding in Pr
   1. Then generate a repo with the relevant code in your org by clicking [here](https://github.com/new?template_name=aem-commerce-prerender&template_owner=adobe-rnd). You can now clone the resulting repo from your org, and run `npm i && npx setup`
   1. Follow the steps to perform the initial setup
   1. Customise the code that contains the rendering logic according to your requirements, for [structured data](/actions/pdp-renderer/ldJson.js), [markup](/actions/pdp-renderer/render.js) and [templates](https://github.com/adobe-rnd/aem-commerce-prerender/tree/main/actions/pdp-renderer/templates) - more info [here](/docs/CUSTOMIZE.md)
-  1. Deploy the solution with `aio app deploy`
+  1. Deploy the solution with `npm run deploy`
 
 ### What's next?
  You might want to check out the [instructions and guidelines](/docs/POST-SETUP.md) around operation and maintenance of the solution

@@ -1,5 +1,7 @@
 # Rendering Logic & Customizations
 
+To apply your changes and customizations to the js or templating logic, you have to run the command `npm run deploy` which will take care of delivering the new code and restarting the change detector.
+
 ## Structured data
 
 ### GTIN & Product Codes
