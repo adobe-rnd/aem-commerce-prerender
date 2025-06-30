@@ -34,11 +34,11 @@ test('simple product markup', async () => {
   expect($('.product-details > div > div:contains("Price")').next().text()).toEqual('$23.00');
 
   // Validate images
-  expect($('.product-details > div > div:contains("Images")').next().find('a').map((_, e) => $(e).prop('outerHTML')).toArray()).toMatchInlineSnapshot(`
+  expect($('.product-details > div > div:contains("Images")').next().find('img').map((_, e) => $(e).prop('outerHTML')).toArray()).toMatchInlineSnapshot(`
 [
-  "<a href="http://www.aemshop.net/media/catalog/product/adobestoredata/ADB177.jpg">http://www.aemshop.net/media/catalog/product/adobestoredata/ADB177.jpg</a>",
-  "<a href="http://www.aemshop.net/media/catalog/product/adobestoredata/ADB177-2.jpg">http://www.aemshop.net/media/catalog/product/adobestoredata/ADB177-2.jpg</a>",
-  "<a href="http://www.aemshop.net/media/catalog/product/adobestoredata/ADB177-3.jpg">http://www.aemshop.net/media/catalog/product/adobestoredata/ADB177-3.jpg</a>",
+  "<img src="http://www.aemshop.net/media/catalog/product/adobestoredata/ADB177.jpg">",
+  "<img src="http://www.aemshop.net/media/catalog/product/adobestoredata/ADB177-2.jpg">",
+  "<img src="http://www.aemshop.net/media/catalog/product/adobestoredata/ADB177-3.jpg">",
 ]
 `);
 
