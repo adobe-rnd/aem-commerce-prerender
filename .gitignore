@@ -1,4 +1,3 @@
-
 # package directories
 node_modules
 jspm_packages
@@ -44,3 +43,11 @@ logs
 *.env
 *.aio.json
 .aem-commerce-prerender.json
+
+# New additions
+/node_modules
+/.parcel-cache
+/web-src/src/config.json
+/coverage
+/.npmrc
+/bin/redeploy-poller.sh
