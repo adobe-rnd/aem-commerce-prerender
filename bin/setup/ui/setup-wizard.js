@@ -557,26 +557,39 @@ export class SetupWizard extends LitElement {
     }
 
     async verifyToken(token) {
+        this.loading = true;
+        this.error = '';
         try {
-            const response = await fetch('https://admin.hlx.page/auth/discovery/keys');
-            if (!response.ok) throw new Error('Failed to fetch keys');
-            
-            const [headerB64, payloadB64] = token.split('.');
-            const payload = JSON.parse(atob(payloadB64));
-            this.aioConfigContent = JSON.stringify(payload, null, 2);
-            
-            const { sub } = payload;
-            if (sub) {
-                const [org, site] = sub.split('/');
-                this.aioOrg = org;
-                this.aioSite = site;
-                this.tokenValid = true;
-            } else {
-                throw new Error('Invalid token payload');
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            const { sub, exp } = payload;
+
+            if (Date.now() >= exp * 1000) {
+                this.tokenValid = false;
+                this.error = 'Token has expired.';
+                this.showToastNotification('Token has expired.', 'negative');
+                return;
             }
-        } catch (error) {
+
+            const [org, site] = sub.split('/');
+
+            if (org === '*' || site === '*') {
+                this.tokenValid = false;
+                this.error = 'Invalid token type.';
+                this.showToastNotification('Only valid token types (API Keys) are accepted. See https://www.aem.live/docs/admin-apikeys#create to create one.', 'negative');
+                return;
+            }
+
+            this.aioOrg = org;
+            this.aioSite = site;
+            this.tokenValid = true;
+            this.aioConfigContent = JSON.stringify(payload, null, 2);
+        } catch (e) {
             this.tokenValid = false;
-            this.aioConfigContent = 'Invalid token format';
+            this.error = 'Invalid token format.';
+            this.aioConfigContent = 'Invalid token format.';
+            this.showToastNotification('Invalid token format.', 'negative');
+        } finally {
+            this.loading = false;
         }
     }
 
@@ -789,6 +802,9 @@ export class SetupWizard extends LitElement {
                 return;
             }
             await this.handleTokenChange(this.token);
+            if (!this.tokenValid) {
+                return;
+            }
         } else if (this.currentStep === 2) {
             if (!this.validateAdvancedSettings()) {
                 return;
