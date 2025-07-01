@@ -12,6 +12,3 @@ indices:
         select: none
         value: >-
           parseTimestamp(headers["last-modified"], "ddd, DD MMM YYYY hh:mm:ss GMT")
-      product-last-modified:
-        select: head > meta[name="x-cs-lastModifiedAt"]
-        value: parseTimestamp(attribute(el, "content"), "YYYY-MM-DDTHH:mm:ss.SSSZ")
