@@ -5,17 +5,15 @@ application:
       aem-commerce-ssg:
         license: "Apache-2.0"
         inputs:
-          ORG: "${ORG}"
-          SITE: "${SITE}"
-          PRODUCT_PAGE_URL_FORMAT: "${PRODUCT_PAGE_URL_FORMAT}"
+          ORG: "hlxsites"
+          SITE: "aem-boilerplate-commerce-staging"
+          PRODUCT_PAGE_URL_FORMAT: "/products-ssg/{urlKey}/{sku}"
           LOG_LEVEL: "info"
-          LOG_INGESTOR_ENDPOINT: "https://log-ingestor.aem-storefront.com/api/v1/services/change-detector/${ORG}/${SITE}"
-          CONTENT_URL: "${CONTENT_URL}"
-          PRODUCTS_TEMPLATE: "${PRODUCTS_TEMPLATE}"
-          STORE_URL: "${STORE_URL}"
-          CONFIG_NAME: "${CONFIG_NAME}"
-          CONFIG_SHEET: "${CONFIG_SHEET}"
-          LOCALES: "${LOCALES}"
+          LOG_INGESTOR_ENDPOINT: "https://log-ingestor.aem-storefront.com/api/v1/services/change-detector"
+          CONTENT_URL: "https://main--aem-boilerplate-commerce-staging--hlxsites.aem.live"
+          PRODUCTS_TEMPLATE: "https://main--aem-boilerplate-commerce-staging--hlxsites.aem.live/products/default"
+          STORE_URL: "https://main--aem-boilerplate-commerce-staging--hlxsites.aem.live"
+          CONFIG_NAME: "config"
         actions:
           pdp-renderer:
             function: "actions/pdp-renderer/index.js"
