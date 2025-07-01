@@ -298,12 +298,21 @@ class AdminAPI {
             const { logger } = this.context;
             const { records, locale, batchNumber } = batch;
 
+            const paths = route === 'live'
+                ? records.map(record => record.path)
+                : records.filter(record => record.liveUnpublishedAt).map(record => record.path);
+
+            if (paths.length === 0) {
+                logger.warn(`Skipping unpublish for route=${route} in batch id=${batchNumber} for locale=${locale}: no paths to process.`);
+                batch.resolve({ records, locale, batchNumber });
+                complete();
+                return;
+            }
+
             const body = {
                 forceUpdate: true,
-                paths: route === 'live'
-                    ? records.map(record => record.path)
-                    : records.filter(record => record.liveUnpublishedAt).map(record => record.path),
-                delete: true
+                paths,
+                delete: true,
             };
 
             // Try to unpublish live the batch using bulk publish API
