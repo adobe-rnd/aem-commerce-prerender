@@ -287,7 +287,6 @@ describe('pdp-renderer', () => {
       });
 
       const $ = cheerio.load(response.body);
-      console.log($('body > main > div.product-details > div > div:contains("Options")').next().html().trim()); 
       expect($('body > main > div.product-details > div > div:contains("Options")')).toHaveLength(1);
       expect($('body > main > div.product-details > div > div:contains("Options")').next().html().trim()).toMatchInlineSnapshot(`
 "<ul>
@@ -347,14 +346,13 @@ describe('pdp-renderer', () => {
       });
 
       const $ = cheerio.load(response.body);
-      expect($('head > meta')).toHaveLength(9);
+      expect($('head > meta')).toHaveLength(8);
       expect($('head > meta[name="description"]').attr('content')).toMatchInlineSnapshot(`"The Crown Summit Backpack is equally at home in a gym locker, study cube or a pup tent, so be sure yours is packed with books, a bag lunch, water bottles, yoga block, laptop, or whatever else you want in hand. Rugged enough for day hikes and camping trips, it has two large zippered compartments and padded, adjustable shoulder straps.Top handle.Grommet holes.Two-way zippers.H 20" x W 14" x D 12".Weight: 2 lbs, 8 oz. Volume: 29 L."`);
       expect($('head > meta[name="keywords"]').attr('content')).toEqual('backpack, hiking, camping');
       expect($('head > meta[name="image"]').attr('content')).toEqual('http://www.aemshop.net/media/catalog/product/m/b/mb03-black-0.jpg');
       expect($('head > meta[name="id"]').attr('content')).toEqual('7');
       expect($('head > meta[name="sku"]').attr('content')).toEqual('24-MB03');
       expect($('head > meta[name="__typename"]').attr('content')).toEqual('SimpleProductView');
-      expect($('head > meta[name="x-cs-lastModifiedAt"]').attr('content')).toEqual('2024-10-03T15:26:48.850Z');
       expect($('head > meta[property="og:type"]').attr('content')).toEqual('og:product');
     });
 
@@ -539,7 +537,7 @@ describe('Meta Tags Template', () => {
   <meta charset="UTF-8">
   <title></title>
 
-  <meta name="description" content="Product Description"><meta name="keywords" content="foo, bar"><meta name="image" content="https://example.com/image.jpg"><meta name="id" content="67890"><meta name="sku" content="12345"><meta name="x-cs-lastModifiedAt" content="2023-10-01"><meta property="og:type" content="og:product">
+  <meta name="description" content="Product Description"><meta name="keywords" content="foo, bar"><meta name="image" content="https://example.com/image.jpg"><meta name="id" content="67890"><meta name="sku" content="12345"><meta property="og:type" content="og:product">
 
   <script type="application/ld+json"></script>
 </head>
