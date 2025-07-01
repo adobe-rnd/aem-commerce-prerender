@@ -7,7 +7,7 @@ class ObservabilityClient {
       this.org = options.org;
       this.site = options.site;
       this.endpoint = options.endpoint;
-      this. nativeLogger = nativeLogger;
+      this.nativeLogger = nativeLogger;
   }
 
   getEndpoints(type) {

@@ -303,7 +303,7 @@ class AdminAPI {
                 : records.filter(record => record.liveUnpublishedAt).map(record => record.path);
 
             if (paths.length === 0) {
-                logger.warn(`Skipping unpublish for route=${route} in batch id=${batchNumber} for locale=${locale}: no paths to process.`);
+                logger.info(`Skipping unpublish for route=${route} in batch id=${batchNumber} for locale=${locale}: no paths to process.`);
                 batch.resolve({ records, locale, batchNumber });
                 complete();
                 return;
