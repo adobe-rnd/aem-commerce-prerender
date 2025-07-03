@@ -23,15 +23,15 @@ const EXAMPLE_EXPECTED_STATE = {
   locale: 'uk',
   skus: {
     sku1: {
-      lastPreviewedAt: new Date(1),
+      lastRenderedAt: new Date(1),
       hash: '',
     },
     sku2: {
-      lastPreviewedAt: new Date(2),
+      lastRenderedAt: new Date(2),
       hash: '',
     },
     sku3: {
-      lastPreviewedAt: new Date(3),
+      lastRenderedAt: new Date(3),
       hash: '',
     },
   },
@@ -60,10 +60,10 @@ jest.spyOn(AdminAPI.prototype, 'stopProcessing').mockImplementation(jest.fn());
 jest.spyOn(AdminAPI.prototype, 'unpublishAndDelete').mockImplementation(jest.fn());
 jest.spyOn(AdminAPI.prototype, 'previewAndPublish').mockImplementation((batch) => {
   return Promise.resolve({
-    records: batch.map(({ sku }) => ({
-      sku,
-      previewedAt: sku === 'sku-failed-due-preview' ? null : new Date(),
-      publishedAt: sku === 'sku-failed-due-publishing' ? null : new Date(),
+    records: batch.map((record) => ({
+      ...record,
+      previewedAt: record.sku === 'sku-failed-due-preview' ? null : new Date(),
+      publishedAt: record.sku === 'sku-failed-due-publishing' ? null : new Date(),
     }))
   });
 });
@@ -201,11 +201,11 @@ describe('Poller', () => {
     const state = await loadState('uk', { filesLib, stateLib });
     assert.deepEqual(state, EXAMPLE_EXPECTED_STATE);
     state.skus['sku1'] = {
-      lastPreviewedAt: new Date(4),
+      lastRenderedAt: new Date(4),
       hash: 'hash1',
     };
     state.skus['sku2'] = {
-      lastPreviewedAt: new Date(5),
+      lastRenderedAt: new Date(5),
       hash: 'hash2',
     };
     await saveState(state, { filesLib, stateLib });
@@ -228,11 +228,11 @@ describe('Poller', () => {
     };
     assert.deepEqual(state, expectedState);
     state.skus['sku1'] = {
-      lastPreviewedAt: new Date(4),
+      lastRenderedAt: new Date(4),
       hash: 'hash1',
     };
     state.skus['sku2'] = {
-      lastPreviewedAt: new Date(5),
+      lastRenderedAt: new Date(5),
       hash: 'hash2',
     };
     await saveState(state, { filesLib, stateLib });
@@ -473,11 +473,10 @@ describe('Poller', () => {
         });
 
         return Promise.resolve({
-          records: batch.map(({ sku, path }) => ({
-            sku,
-            path,
-            liveUnpublishedAt: sku === 'sku-failed' ? null : new Date(),
-            previewUnpublishedAt: sku === 'sku-failed' ? null : new Date(),
+          records: batch.map((record) => ({
+            ...record,
+            liveUnpublishedAt: record.sku === 'sku-failed' ? null : new Date(),
+            previewUnpublishedAt: record.sku === 'sku-failed' ? null : new Date(),
           })),
         });
       });
