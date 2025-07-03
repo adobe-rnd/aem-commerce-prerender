@@ -47,7 +47,7 @@ jest.mock('../actions/utils', () => ({
   requestSaaS: jest.fn(),
   requestSpreadsheet: jest.fn(),
   isValidUrl: jest.fn(() => true),
-  getProductUrl: jest.fn(({ urlKey, sku }) => `/${urlKey || sku}`),
+  getProductUrl: jest.fn(({ urlKey }) => `/p/${urlKey}`),
   getDefaultStoreURL: jest.fn(() => 'https://content.com'),
   formatMemoryUsage: jest.fn(() => '100MB'),
   FILE_PREFIX: 'check-product-changes',
@@ -302,14 +302,14 @@ describe('Poller', () => {
 
       // Verify HTML file was saved
       expect(filesLib.write).toHaveBeenCalledWith(
-        '/public/pdps/url-sku-123.html',
+        '/public/pdps/p/url-sku-123.html',
         '<html>Product 123</html>'
       );
 
       // Verify API calls
       expect(AdminAPI.prototype.previewAndPublish).toHaveBeenCalledWith(
           expect.arrayContaining([
-            expect.objectContaining({ path: '/url-sku-123', sku: 'sku-123' })
+            expect.objectContaining({ path: '/p/url-sku-123', sku: 'sku-123' })
           ]),
           null,
           1
@@ -528,8 +528,8 @@ describe('Poller', () => {
       requestSpreadsheet.mockImplementation(() => {
         return Promise.resolve({
           data: [
-            { sku: 'sku-123', urlKey: 'url-sku-123' },
-            { sku: 'sku-456', urlKey: 'url-sku-456' }
+            { sku: 'sku-123', path: '/p/url-sku-123' },
+            { sku: 'sku-456', path: '/p/url-sku-456' }
           ],
         });
       });
@@ -537,8 +537,9 @@ describe('Poller', () => {
       // Mock successful unpublish
       AdminAPI.prototype.unpublishAndDelete.mockImplementation((batch) => {
         return Promise.resolve({
-          records: batch.map(({ sku }) => ({
+          records: batch.map(({ sku, path }) => ({
             sku,
+            path,
             liveUnpublishedAt: new Date(),
             previewUnpublishedAt: new Date()
           }))
@@ -549,8 +550,8 @@ describe('Poller', () => {
 
       // Verify HTML files were deleted
       expect(filesLib.delete).toHaveBeenCalledTimes(2);
-      expect(filesLib.delete).toHaveBeenCalledWith('/public/pdps/url-sku-123');
-      expect(filesLib.delete).toHaveBeenCalledWith('/public/pdps/url-sku-456');
+      expect(filesLib.delete).toHaveBeenCalledWith('/public/pdps/p/url-sku-123');
+      expect(filesLib.delete).toHaveBeenCalledWith('/public/pdps/p/url-sku-456');
     });
   });
 });
