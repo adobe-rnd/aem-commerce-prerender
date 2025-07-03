@@ -288,27 +288,18 @@ async function processDeletedProducts(remainingSkus, state, context, adminApi) {
       const batches = createBatches(deletedProducts, context);
       const pendingBatches = [];
       for (let batchNumber = 0; batchNumber < batches.length; batchNumber++) {
-        const records = batches[batchNumber].map((product) => {
-          return {
-            sku: product.sku,
-            path: getProductUrl(product, context, false).toLowerCase(),
-          };
-        });
+        const records = batches[batchNumber];
         const pendingBatch = adminApi.unpublishAndDelete(records, locale, batchNumber + 1)
           .then(({ records }) => {
             records.forEach((record) => {
               if (record.liveUnpublishedAt && record.previewUnpublishedAt) {
                 // Delete the HTML file from public storage
                 try {
-                  const product = deletedProducts.find(p => p.sku === record.sku);
-                  if (product) {
-                    const productUrl = getProductUrl({ urlKey: product.urlKey, sku: product.sku }, context, false).toLowerCase();
-                    const htmlPath = `/public/pdps${productUrl}`;
-                    filesLib.delete(htmlPath);
-                    logger.debug(`Deleted HTML file for product ${record.sku} from ${htmlPath}`);
-                  }
+                  const htmlPath = `/public/pdps${record.path}`;
+                  filesLib.delete(htmlPath);
+                  logger.debug(`Deleted HTML file for product ${record.sku} from ${htmlPath}`);
                 } catch (e) {
-                  logger.error(`Error deleting HTML file for product ${record.sku}:`, e);
+                  logger.warn(`Error deleting HTML file for product ${record.sku}:`, e);
                 }
 
                 delete state.skus[record.sku];
