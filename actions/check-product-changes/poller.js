@@ -288,12 +288,7 @@ async function processDeletedProducts(remainingSkus, state, context, adminApi) {
       const batches = createBatches(deletedProducts, context);
       const pendingBatches = [];
       for (let batchNumber = 0; batchNumber < batches.length; batchNumber++) {
-        const records = batches[batchNumber].map((product) => {
-          return {
-            sku: product.sku,
-            path: getProductUrl(product, context, false).toLowerCase(),
-          };
-        });
+        const records = batches[batchNumber];
         const pendingBatch = adminApi.unpublishAndDelete(records, locale, batchNumber + 1)
           .then(({ records }) => {
             records.forEach((record) => {
