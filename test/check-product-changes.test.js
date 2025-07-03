@@ -425,8 +425,8 @@ describe('Poller', () => {
 
   describe('Product unpublishing', () => {
     it.each([
-        [[{ sku: 'sku-456' }, { sku: 'sku-failed' }], 0, 2],
-        [[{ sku: 'sku-456' }], 1, 0],
+        [[{ sku: 'sku-456', path: '/p/url-sku-456' }, { sku: 'sku-failed', path: '/p/url-sku-failed' }], 1, 1],
+        [[{ sku: 'sku-456', path: '/p/url-sku-456' }], 1, 0],
     ])('should unpublish products that are not in the catalog', async (spreadsheetResponse, unpublished, failed) => {
       const now = new Date().getTime();
       const filesLib = mockFiles();
@@ -467,12 +467,18 @@ describe('Poller', () => {
 
       // Mock unpublish with one success and one failure
       AdminAPI.prototype.unpublishAndDelete.mockImplementation((batch) => {
+        // assert that the path matches our pattern /p/url-{sku}
+        batch.forEach(({ path }) => {
+          expect(path).toMatch(/^\/p\/url-sku-/);
+        });
+
         return Promise.resolve({
-          records: batch.map(({ sku }) => ({
+          records: batch.map(({ sku, path }) => ({
             sku,
-            liveUnpublishedAt: batch.some(({ sku }) => sku === 'sku-failed') ? null : new Date(),
-            previewUnpublishedAt: batch.some(({ sku }) => sku === 'sku-failed') ? null : new Date(),
-          }))
+            path,
+            liveUnpublishedAt: sku === 'sku-failed' ? null : new Date(),
+            previewUnpublishedAt: sku === 'sku-failed' ? null : new Date(),
+          })),
         });
       });
 
