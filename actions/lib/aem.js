@@ -224,9 +224,18 @@ class AdminAPI {
         this.trackInFlight('preview', async (complete) => {
             const { logger } = this.context;
             const { records, locale, batchNumber } = batch;
+            const paths = records.map(record => record.path);
+
+            if (paths.length === 0) {
+                logger.info(`Skipping preview for batch id=${batchNumber} for locale=${locale}: no paths to process.`);
+                batch.resolve({ records, locale, batchNumber });
+                complete();
+                return;
+            }
+
             const body = {
                 forceUpdate: true,
-                paths: records.map(record => record.path),
+                paths,
                 delete: false
             };
             const start = new Date();
@@ -265,14 +274,27 @@ class AdminAPI {
         this.trackInFlight('publish', async (complete) => {
             const { logger } = this.context;
             const { records, locale, batchNumber } = batch;
+            const paths = records.filter(record => record.previewedAt).map(record => record.path);
+
+            if (paths.length === 0) {
+                logger.info(`Skipping publish in batch id=${batchNumber} for locale=${locale}: no paths to process.`);
+                batch.resolve({ records, locale, batchNumber });
+                complete();
+                return;
+            }
             const body = {
                 forceUpdate: true,
-                paths: records.filter(record => record.previewedAt).map(record => record.path),
+                paths,
                 delete: false
             };
 
             // Try to publish the batch using bulk publish API
-            const response = await this.execAdminRequest('POST', 'live', '/*', body);
+            const response = await this.runWithRetry(
+                async () => {
+                    return await this.execAdminRequest('POST', 'live', '/*', body);
+                },
+                `publish batch number ${batchNumber} for locale ${locale}`
+            );
 
             if (response?.job) {
                 logger.info(`Published batch number ${batchNumber} for locale ${locale}`);
