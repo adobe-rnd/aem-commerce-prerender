@@ -322,13 +322,14 @@ describe('Poller', () => {
       const now = new Date().getTime();
       const filesLib = mockFiles();
       const stateLib = mockState();
+      const lastRenderedAt = now - 10000;
       
       // Setup initial state with existing products that have current hash
       setupSkuData(
         filesLib, 
         stateLib, 
         {
-          'sku-456': { timestamp: now - 10000, hash: 'current-hash-for-product-456' }
+          'sku-456': { timestamp: lastRenderedAt, hash: 'current-hash-for-product-456' }
         }, 
         now - 700000
       );
@@ -345,6 +346,12 @@ describe('Poller', () => {
       
       // Verify no preview/publish was called
       expect(AdminAPI.prototype.previewAndPublish).not.toHaveBeenCalled();
+
+      // Verify state was updated with the lastRenderedAt
+      expect(filesLib.write).toHaveBeenCalledWith(
+        'check-product-changes/default.csv',
+        expect.not.stringContaining(String(lastRenderedAt))
+      );
     });
 
     it('should handle failed preview and publishing', async () => {

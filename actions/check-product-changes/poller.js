@@ -426,15 +426,18 @@ async function poll(params, aioLibs, logger) {
       // create batches of products to preview and publish
       const pendingBatches = createBatches(products).map((batch, batchNumber) => {
         return Promise.all(batch.map(product => enrichProductWithRenderedHash(product, context)))
-          .then(enrichedProducts => {
+          .then(async (enrichedProducts) => {
             const productsToIgnore = [];
             const productsToPublish = filterProducts(shouldPreviewAndPublish, enrichedProducts, knownSkus, context, productsToIgnore);
 
             // update the lastRenderedAt for the products to ignore anyway, to avoid re-rendering them everytime after
             // the lastModifiedAt changed once
-            productsToIgnore.forEach(product => {
-              state.skus[product.sku].lastRenderedAt = product.renderedAt;
-            });
+            if (productsToIgnore.length) {
+              productsToIgnore.forEach(product => {
+                state.skus[product.sku].lastRenderedAt = product.renderedAt;
+              });
+              await saveState(state, aioLibs);
+            }
 
             return productsToPublish;
           })
