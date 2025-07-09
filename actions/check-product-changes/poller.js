@@ -322,29 +322,32 @@ async function processDeletedProducts(remainingSkus, state, context, adminApi) {
 /**
  * Filters the given products based on the given condition, increments the ignored count if the 
  * condition is not met and removes the sku from the given list of remaining skus.
+ * Returns an object with included and ignored product lists.
  * 
  * @param {*} condition - the condition to filter the products by
  * @param {*} products - the products to filter
  * @param {*} remainingSkus - the list of remaining, known skus the filter logic will splice for every given product
  * @param {*} context - the context object
- * @param {*} ignored - an array the ignored products will be added to
- * @returns 
+ * @returns {{ included: Array, ignored: Array }}
  */
-function filterProducts(condition, products, remainingSkus, context, ignored = []) {
+function filterProducts(condition, products, remainingSkus, context) {
   const { counts } = context;
-  return products.filter(product => {
+  const included = [];
+  const ignored = [];
+  for (const product of products) {
     const { sku } = product;
     // remove the sku from the given list of known skus
     const index = remainingSkus.indexOf(sku);
     if (index !== -1) remainingSkus.splice(index, 1);
     // increment count of ignored products if condition is not met
-    const shouldInclude = condition(product);
-    if (!shouldInclude) {
+    if (condition(product)) {
+      included.push(product);
+    } else {
       counts.ignored += 1;
       ignored.push(product);
     }
-    return shouldInclude;
-  });
+  }
+  return { included, ignored };
 }
 
 async function poll(params, aioLibs, logger) {
@@ -419,7 +422,8 @@ async function poll(params, aioLibs, logger) {
       logger.info(`Fetched last modified date for ${lastModifiedResp.data.products.length} skus, total ${knownSkus.length}`);
       let products = lastModifiedResp.data?.products || [];
       products = products.map(product => enrichProductWithMetadata(product, state, context));
-      products = filterProducts(shouldRender, products, knownSkus, context);
+      const { included: productsToRender } = filterProducts(shouldRender, products, knownSkus, context);
+      products = productsToRender;
       lastModifiedResp = null;
       timings.sample('get-changed-products');
 
@@ -427,8 +431,7 @@ async function poll(params, aioLibs, logger) {
       const pendingBatches = createBatches(products).map((batch, batchNumber) => {
         return Promise.all(batch.map(product => enrichProductWithRenderedHash(product, context)))
           .then(async (enrichedProducts) => {
-            const productsToIgnore = [];
-            const productsToPublish = filterProducts(shouldPreviewAndPublish, enrichedProducts, knownSkus, context, productsToIgnore);
+            const { included: productsToPublish, ignored: productsToIgnore } = filterProducts(shouldPreviewAndPublish, enrichedProducts, knownSkus, context);
 
             // update the lastRenderedAt for the products to ignore anyway, to avoid re-rendering them everytime after
             // the lastModifiedAt changed once
