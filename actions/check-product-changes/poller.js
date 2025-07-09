@@ -67,7 +67,7 @@ async function loadState(locale, aioLibs) {
         // ...
         // each row is a set of SKUs, last previewed timestamp and hash
         const [sku, time, hash] = line.split(',');
-        acc[sku] = { lastPreviewedAt: new Date(parseInt(time)), hash };
+        acc[sku] = { lastRenderedAt: new Date(parseInt(time)), hash };
         return acc;
       }, {});
     } else {
@@ -96,8 +96,8 @@ async function saveState(state, aioLibs) {
   const fileLocation = getFileLocation(stateKey, STATE_FILE_EXT);
   const csvData = [
     ...Object.entries(state.skus)
-      .map(([sku, { lastPreviewedAt, hash }]) => {
-        return `${sku},${lastPreviewedAt.getTime()},${hash || ''}`;
+      .map(([sku, { lastRenderedAt, hash }]) => {
+        return `${sku},${lastRenderedAt.getTime()},${hash || ''}`;
       }),
   ].join('\n');
   return await filesLib.write(fileLocation, csvData);
@@ -179,8 +179,8 @@ function shouldPreviewAndPublish({ currentHash, newHash }) {
  * @param {*} param0 
  * @returns 
  */
-function shouldRender({ urlKey, lastModifiedDate, lastPreviewDate }) {
-  return urlKey?.match(/^[a-zA-Z0-9-]+$/) && lastModifiedDate >= lastPreviewDate;
+function shouldRender({ urlKey, lastModifiedDate, lastRenderedDate }) {
+  return urlKey?.match(/^[a-zA-Z0-9-]+$/) && lastModifiedDate >= lastRenderedDate;
 }
 
 /**
@@ -193,7 +193,7 @@ function shouldRender({ urlKey, lastModifiedDate, lastPreviewDate }) {
  */
 function enrichProductWithMetadata(product, state, context) {
   const { sku, urlKey, lastModifiedAt } = product;
-  const lastPreviewDate = state.skus[sku]?.lastPreviewedAt || new Date(0);
+  const lastRenderedDate = state.skus[sku]?.lastRenderedAt || new Date(0);
   const lastModifiedDate = new Date(lastModifiedAt);
   const productUrl = getProductUrl({ urlKey, sku }, context, false).toLowerCase();
   const currentHash = state.skus[sku]?.hash || null;
@@ -203,7 +203,7 @@ function enrichProductWithMetadata(product, state, context) {
     urlKey,
     path: productUrl,
     lastModifiedDate,
-    lastPreviewDate,
+    lastRenderedDate,
     currentHash,
   };
 }
@@ -259,7 +259,7 @@ async function processPublishedBatch(publishedBatch, state, counts, products, ai
     if (record.previewedAt && record.publishedAt) {
       const product = products.find(p => p.sku === record.sku);
       state.skus[record.sku] = {
-        lastPreviewedAt: record.renderedAt || record.previewedAt,
+        lastRenderedAt: record.renderedAt,
         hash: product?.newHash
       };
       counts.published++;
@@ -323,13 +323,14 @@ async function processDeletedProducts(remainingSkus, state, context, adminApi) {
  * Filters the given products based on the given condition, increments the ignored count if the 
  * condition is not met and removes the sku from the given list of remaining skus.
  * 
- * @param {*} condition 
- * @param {*} products 
- * @param {*} remainingSkus 
- * @param {*} context 
+ * @param {*} condition - the condition to filter the products by
+ * @param {*} products - the products to filter
+ * @param {*} remainingSkus - the list of remaining, known skus the filter logic will splice for every given product
+ * @param {*} context - the context object
+ * @param {*} ignored - an array the ignored products will be added to
  * @returns 
  */
-function filterProducts(condition, products, remainingSkus, context) {
+function filterProducts(condition, products, remainingSkus, context, ignored = []) {
   const { counts } = context;
   return products.filter(product => {
     const { sku } = product;
@@ -338,7 +339,10 @@ function filterProducts(condition, products, remainingSkus, context) {
     if (index !== -1) remainingSkus.splice(index, 1);
     // increment count of ignored products if condition is not met
     const shouldInclude = condition(product);
-    if (!shouldInclude) counts.ignored += 1;
+    if (!shouldInclude) {
+      counts.ignored += 1;
+      ignored.push(product);
+    }
     return shouldInclude;
   });
 }
@@ -404,7 +408,7 @@ async function poll(params, aioLibs, logger) {
       const productsFileName = getFileLocation(`${locale || 'default'}-products`, 'json');
       JSON.parse((await filesLib.read(productsFileName)).toString()).forEach(({ sku }) => {
         if (!state.skus[sku]) {
-          state.skus[sku] = { lastPreviewedAt: new Date(0), hash: null };
+          state.skus[sku] = { lastRenderedAt: new Date(0), hash: null };
         }
       });
       timings.sample('get-discovered-products');
@@ -422,7 +426,21 @@ async function poll(params, aioLibs, logger) {
       // create batches of products to preview and publish
       const pendingBatches = createBatches(products).map((batch, batchNumber) => {
         return Promise.all(batch.map(product => enrichProductWithRenderedHash(product, context)))
-          .then(enrichedProducts => filterProducts(shouldPreviewAndPublish, enrichedProducts, knownSkus, context))
+          .then(async (enrichedProducts) => {
+            const productsToIgnore = [];
+            const productsToPublish = filterProducts(shouldPreviewAndPublish, enrichedProducts, knownSkus, context, productsToIgnore);
+
+            // update the lastRenderedAt for the products to ignore anyway, to avoid re-rendering them everytime after
+            // the lastModifiedAt changed once
+            if (productsToIgnore.length) {
+              productsToIgnore.forEach(product => {
+                state.skus[product.sku].lastRenderedAt = product.renderedAt;
+              });
+              await saveState(state, aioLibs);
+            }
+
+            return productsToPublish;
+          })
           .then(products => {
             if (products.length) {
               const records = products.map(({ sku, path, renderedAt }) => (({ sku, path, renderedAt })));
