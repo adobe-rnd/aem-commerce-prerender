@@ -272,7 +272,12 @@ class AdminAPI {
             };
 
             // Try to publish the batch using bulk publish API
-            const response = await this.execAdminRequest('POST', 'live', '/*', body);
+            const response = await this.runWithRetry(
+                async () => {
+                    return await this.execAdminRequest('POST', 'live', '/*', body);
+                },
+                `publish batch number ${batchNumber} for locale ${locale}`
+            );
 
             if (response?.job) {
                 logger.info(`Published batch number ${batchNumber} for locale ${locale}`);
