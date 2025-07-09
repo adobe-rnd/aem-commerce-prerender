@@ -265,9 +265,17 @@ class AdminAPI {
         this.trackInFlight('publish', async (complete) => {
             const { logger } = this.context;
             const { records, locale, batchNumber } = batch;
+            const paths = records.filter(record => record.previewedAt).map(record => record.path);
+
+            if (paths.length === 0) {
+                logger.info(`Skipping publish in batch id=${batchNumber} for locale=${locale}: no paths to process.`);
+                batch.resolve({ records, locale, batchNumber });
+                complete();
+                return;
+            }
             const body = {
                 forceUpdate: true,
-                paths: records.filter(record => record.previewedAt).map(record => record.path),
+                paths,
                 delete: false
             };
 
