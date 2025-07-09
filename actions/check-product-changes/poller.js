@@ -422,8 +422,7 @@ async function poll(params, aioLibs, logger) {
       logger.info(`Fetched last modified date for ${lastModifiedResp.data.products.length} skus, total ${knownSkus.length}`);
       let products = lastModifiedResp.data?.products || [];
       products = products.map(product => enrichProductWithMetadata(product, state, context));
-      const { included: productsToRender } = filterProducts(shouldRender, products, knownSkus, context);
-      products = productsToRender;
+      ({ included: products } = filterProducts(shouldRender, products, knownSkus, context));
       lastModifiedResp = null;
       timings.sample('get-changed-products');
 
