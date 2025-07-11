@@ -348,7 +348,8 @@ export class SetupWizard extends LitElement {
         showToast: { type: Boolean },
         aioConfigFile: { type: Object },
         aioConfigContent: { type: String },
-        processingAioConfig: { type: Boolean }
+        processingAioConfig: { type: Boolean },
+        locales: { type: String }
     };
 
     static styles = css`
@@ -540,6 +541,7 @@ export class SetupWizard extends LitElement {
         this.aioConfigFile = null;
         this.aioConfigContent = '';
         this.processingAioConfig = false;
+        this.locales = 'en-US';
     }
 
     connectedCallback() {
@@ -613,7 +615,12 @@ export class SetupWizard extends LitElement {
     }
 
     handleAdvancedSettingInput(field, value) {
-        this.advancedSettings[field] = value;
+        if (field === 'locales') {
+            this.locales = value;
+        } else {
+            this.advancedSettings[field] = value;
+        }
+        this.validateAdvancedSettings();
     }
 
     validateAdvancedSettings() {
