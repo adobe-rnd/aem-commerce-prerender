@@ -8,6 +8,11 @@ Pluggable prerendering stack for ahead-of-time data fetching and embedding in Pr
 * ⚙️ Define your custom rendering logic
 * 🧠 Offload intensive computation to the rendering phase
 
+## Architecture
+
+![Architecture](/docs/architecture.jpg)
+
+
 ## Getting started
 
   Setup of prerequisites and Edge Delivery Services is guided and some steps are automated.
