@@ -227,8 +227,16 @@ now, we can see at least one error and a whole batch that failed publish ops
 
 ## Renderer
 
-TBC
+Issues with the rendering process can be found in the logs from above.
 
 ## Product scraper
 
-TBC
+from `aio rt activations list` you might notice the activations of the product scraper action (fetch-all-products)
+
+```bash
+ Datetime        Status   Kind      Version    Activation ID                    Start Wait Init Duration Entity
+ ─────────────── ──────── ───────── ──────── ─ ──────────────────────────────── ───── ──── ──── ──────── ──────────────────────────────────────
+ 07/11 13:26:25  success  nodejs:22 0.0.16     5867c974307c4824a7c974307ce82490 cold  8391 871  7928ms   aem-commerce-ssg/fetch-all-products
+```
+
+here you can inspect di logs in case of any issue, following the same workflow as per the other action. Most issues here are caused by misconfiguration in the project's yaml file or in the catalog service config in SiteConfig.
