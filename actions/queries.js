@@ -185,7 +185,11 @@ const ProductsQuery = `
       phrase: "",
       filter: [ { attribute: "categoryPath", eq: $categoryPath } ],
       page_size: 500,
-      current_page: $currentPage
+      current_page: $currentPage,
+      sort: {
+        attribute: "name"
+        direction: ASC
+      }
     ) {
       items {
         productView {
