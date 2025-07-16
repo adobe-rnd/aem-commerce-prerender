@@ -7,7 +7,7 @@ It runs a cycle every 5 minutes (by default, and this value can be changed in ai
 1. You can check the activations (cycles) from `aio rt activations list` command:
 
 ```bash
-(base) ➜  aem-commerce-prerender-mycompany git:(qual-it) aio rt activation list
+(base) ➜  aem-commerce-prerender-mycompany git:(main) aio rt activation list
 (node:99989) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
 (Use `node --trace-deprecation ...` to show where the warning was created)
  ›   Warning: @adobe/aio-cli update available from 10.3.3 to 10.3.4.
