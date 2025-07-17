@@ -104,6 +104,35 @@ describe('pdp-renderer', () => {
       const $ = cheerio.load(response.body);
       expect($('body > main > div')).toHaveLength(1);
     });
+
+    test('render with localized product template', async () => {
+      server.use(handlers.localizedProductTemplate);
+      server.use(handlers.defaultProduct());
+
+      let configRequestUrl;
+      const mockConfig = require('./mock-responses/mock-config.json');
+      server.use(http.get('https://content.com/en/config.json', async (req) => {
+        configRequestUrl = req.request.url;
+        return HttpResponse.json(mockConfig);
+      }));
+
+      const response = await action.main({
+        STORE_URL: 'https://store.com',
+        CONTENT_URL: 'https://content.com',
+        CONFIG_NAME: 'config',
+        PRODUCTS_TEMPLATE: "https://content.com/{locale}/products/default",
+        PRODUCT_PAGE_URL_FORMAT: '/{locale}/products/{urlKey}/{sku}',
+        __ow_path: `/en/products/crown-summit-backpack/24-MB03`,
+      });
+
+      expect(response.body).toBeDefined();
+      expect(typeof response.body).toBe('string');
+
+      const $ = cheerio.load(response.body);
+      expect($('.product-recommendations')).toHaveLength(1);
+      expect($('body > main > div')).toHaveLength(2);
+      expect(configRequestUrl).toBe('https://content.com/en/config.json');
+    });
   })
 
   describe('product lookup methods', () => {

@@ -6,6 +6,8 @@ const { generateLdJson } = require('./ldJson');
 const { requestSaaS, getProductUrl } = require('../utils');
 const { ProductQuery, ProductByUrlKeyQuery } = require('../queries');
 
+const productTemplateCache = {};
+
 function toTemplateProductData(baseProduct) {
   const templateProductData = { ...baseProduct };
   const primaryImage = getPrimaryImage(baseProduct)?.url;
@@ -57,7 +59,7 @@ async function generateProductHtml(sku, urlKey, context) {
           url: baseUrl.toLowerCase() + '?optionsUIDs=' + value.id,
         }));
         option.values.sort((a, b) => a.title.localeCompare(b.title));
-      } 
+      }
       return option;
     });
   }
@@ -74,10 +76,16 @@ async function generateProductHtml(sku, urlKey, context) {
   Handlebars.registerPartial('head', headHbs);
   Handlebars.registerPartial('product-details', productDetailsHbs);
 
+  // Retrieve default product page as template
+  const blocksToReplace = ['product-details'];
+
+  const localeKey = context.locale || 'default';
+
   if (context.productsTemplate) {
-    // Retrieve default product page as template
-    const blocksToReplace = ['product-details'];
-    const baseTemplate = await prepareBaseTemplate(context.productsTemplate, blocksToReplace);
+    const productsTemplateURL = context.productsTemplate.replace(/\s+/g, '').replace('{locale}', localeKey);
+    if (!productTemplateCache[localeKey]) productTemplateCache[localeKey] = {};
+    if (!productTemplateCache[localeKey].baseTemplate) productTemplateCache[localeKey].baseTemplate = prepareBaseTemplate(productsTemplateURL, blocksToReplace);
+    const baseTemplate = await productTemplateCache[localeKey].baseTemplate;
     Handlebars.registerPartial('content', baseTemplate);
   } else {
     // Use product details block as sole content if no products template is defined

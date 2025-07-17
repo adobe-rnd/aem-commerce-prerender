@@ -49,6 +49,9 @@ const handlers = {
   defaultProductTemplate : http.get('https://content.com/products/default.plain.html', () => {
     return HttpResponse.html(mockProductTemplate);
   }),
+  localizedProductTemplate: http.get('https://content.com/en/products/default.plain.html', () => {
+    return HttpResponse.html(mockProductTemplate);
+  }),
 }
 
 function useMockServer() {
