@@ -91,24 +91,26 @@ const RULES_MAP = {
         throw new Error('Failed to read app.config.yaml. Make sure the file exists in the current directory.');
       }
     }
-  
+
     static async buildIndexConfig(currentYamlConfig) {
-      const sampleConfigRequest = await fetch(
-        'https://raw.githubusercontent.com/adobe-rnd/aem-commerce-prerender/refs/heads/main/query.yaml'
-      );
-      const sampleIndexConfigContent = await sampleConfigRequest.text();
-      const existingIndexConfig = currentYamlConfig ? yaml.load(currentYamlConfig) : {};
-      const newConfig = yaml.load(sampleIndexConfigContent);
-  
-      const mergedConfig = {
-        ...existingIndexConfig,
-        indices: {
-          ...existingIndexConfig.indices,
-          'index-published-products': newConfig['indices']['index-published-products']
-        }
-      };
-  
-      return yaml.dump(mergedConfig, { indent: 2 });
+      try {
+        const sampleIndexConfigContent = fs.readFileSync('query.yaml', 'utf8');
+        const existingIndexConfig = currentYamlConfig ? yaml.load(currentYamlConfig) : {};
+        const newConfig = yaml.load(sampleIndexConfigContent);
+
+        const mergedConfig = {
+          ...existingIndexConfig,
+          indices: {
+            ...existingIndexConfig.indices,
+            'index-published-products': newConfig['indices']['index-published-products']
+          }
+        };
+
+        return yaml.dump(mergedConfig, { indent: 2 });
+      } catch (error) {
+        console.error('Error reading query.yaml:', error);
+        throw new Error('Failed to read query.yaml. Make sure the file exists in the current directory.');
+      }
     }
   }
   
