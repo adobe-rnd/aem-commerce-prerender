@@ -3,7 +3,7 @@ indices:
   index-published-products:
     target: s3://published-products-index.json
     include:
-      - products/**
+      - /products/**
     properties:
       sku:
         select: head > meta[name="sku"]
