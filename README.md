@@ -25,7 +25,7 @@ Pluggable prerendering stack for ahead-of-time data fetching and embedding in Pr
   1. Create a repo from template in your org by clicking [here](https://github.com/new?template_name=aem-commerce-prerender&template_owner=adobe-rnd). You can now clone the resulting repo from your org
   1. Prepare your AppBuilder project JSON file, you will use it to perform the initial setup wizard that will show up in the browser
   1. Customize the `query.yaml` file in the repo. Here you will find the definition of the index that will maintain a list of the products for the purpose of automatically unpublishing those who are deleted. You would very likely customize the `include` property adding all the path patterns (* and ** supported) that might represent a product page:
-    ```yaml
+  ```yaml
   version: 1
   indices:
     index-published-products:
@@ -41,7 +41,7 @@ Pluggable prerendering stack for ahead-of-time data fetching and embedding in Pr
           select: none
           value: >-
             parseTimestamp(headers["last-modified"], "ddd, DD MMM YYYY hh:mm:ss GMT")
-    ```
+  ```
   See more about [indexing](https://www.aem.live/docs/indexing-reference)
   1. Run `npm run setup` to onboard and configure your environment. At the end of the process a context will be created and stored i your localStorage: this will be the authentication medium required to operate the https://prerender.aem-storefront.com management interface (you will be redirected to this address).
   1. Customise the code that contains the rendering logic according to your requirements, for [structured data](/actions/pdp-renderer/ldJson.js), [markup](/actions/pdp-renderer/render.js) and [templates](https://github.com/adobe-rnd/aem-commerce-prerender/tree/main/actions/pdp-renderer/templates) - more info [here](/docs/CUSTOMIZE.md)
