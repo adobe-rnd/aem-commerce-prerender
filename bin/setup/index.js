@@ -202,6 +202,81 @@ const RULES_MAP = {
   
   // Route Handlers
   class ApiRoutes {
+    static async getGitInfo(request) {
+      try {
+        // Get git remote URL
+        const { stdout } = await execAsync('git remote get-url origin');
+        const remoteUrl = stdout.trim();
+        
+        // Extract org and site from GitHub URL
+        // Handles both SSH and HTTPS URLs
+        let match = remoteUrl.match(/github\.com[:/]([^/]+)\/([^/]+?)(?:\.git)?$/);
+        
+        if (!match) {
+          return RequestHelper.errorResponse('Could not extract org/site from git remote URL: ' + remoteUrl);
+        }
+        
+        const [, org, site] = match;
+        
+        return RequestHelper.jsonResponse({
+          org,
+          site,
+          remoteUrl
+        });
+      } catch (error) {
+        console.error('Error getting git info:', error);
+        return RequestHelper.errorResponse('Failed to get git repository information: ' + error.message, 500);
+      }
+    }
+
+    static async createApiKey(request) {
+      try {
+        const { accessToken, org, site } = await request.json();
+        
+        if (!accessToken || !org || !site) {
+          return RequestHelper.errorResponse('accessToken, org, and site are required');
+        }
+
+        const apiKeyEndpoint = `https://admin.hlx.page/config/${org}/profiles/${site}/apiKeys.json`;
+        const body = {
+          description: `Key used by PDP Prerender components [${org}/${site}]`,
+          roles: [
+            "preview",
+            "publish", 
+            "config_admin"
+          ]
+        };
+
+        console.log(`Creating API key at ${apiKeyEndpoint}`);
+        
+        const response = await fetch(apiKeyEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-auth-token': accessToken
+          },
+          body: JSON.stringify(body)
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          return RequestHelper.errorResponse(`Failed to create API key: ${response.status} ${response.statusText} - ${errorText}`, response.status);
+        }
+
+        const result = await response.json();
+        
+        return RequestHelper.jsonResponse({
+          success: true,
+          apiKey: result,
+          message: 'API key created successfully'
+        });
+        
+      } catch (error) {
+        console.error('Error creating API key:', error);
+        return RequestHelper.errorResponse('Failed to create API key: ' + error.message, 500);
+      }
+    }
+
     static async wizardDone(request) {
         console.log("Wizard completed, shutting down server.");
         setTimeout(() => process.exit(0), 1000); // Delay to allow response to be sent
@@ -572,7 +647,9 @@ class Server {
         .get('/', () => StaticFileServer.serve('index.html'))
         .get('/api/files', ApiRoutes.getFiles)
         .get('/api/rules', ApiRoutes.getRules)
+        .get('/api/git-info', ApiRoutes.getGitInfo)
         .post('/api/aio-config', ApiRoutes.aioConfig)
+        .post('/api/create-api-key', ApiRoutes.createApiKey)
         .post('/api/external-submit', ApiRoutes.handleExternalSubmission)
         .post('/api/change-detector/rule', ApiRoutes.changeDetectorRule)
         .post('/api/wizard/done', ApiRoutes.wizardDone)
