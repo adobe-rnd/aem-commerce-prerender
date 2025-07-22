@@ -39,7 +39,8 @@ _For the following steps, you need the "Developer" role [in the Admin Console](h
   1. In the top-right click "Download All": this will download a JSON file that will be used in the setup process.
 
 ### Frontend & PDP Drop-in
-  
+ In general, any changes to the frontend code are outside the scope of this guide. One requirement could be to hide the prerendered semantic markup (the one coming from the templates and in general, the pdp-renderer action) and the advised way to do it is to simply replace the contents of `.product-details` block with the decorated html hosting the PDP drop-in.
+ In fact, this semantic HTML provides rich information and context to LLM crawlers as well as search engine crawlers not supporting javascript: having js replace that code with the UI meant for client side rendering, means that if no js is available the semantic html operates as a natural fallback.
 
 ### What's next?
  You might want to check out the [instructions and guidelines](/docs/POST-SETUP.md) around operation and maintenance of the solution
