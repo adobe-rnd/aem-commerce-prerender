@@ -355,17 +355,24 @@ const RULES_MAP = {
       }
   
       const { filesBase } = await RequestHelper.initServices(headers);
-      const { sub } = jwtBody.payload;
-      const [org, site] = sub.split('/');
+      
+      // Get org and site from URL parameters
+      const url = new URL(request.url);
+      const org = url.searchParams.get('org');
+      const site = url.searchParams.get('site');
+      
+      if (!org || !site) {
+        return RequestHelper.errorResponse('org and site parameters are required in URL');
+      }
   
       const reqBody = await request.json();
-      const { productPageUrlFormat, contentUrl, productsTemplate, storeUrl, org: userInputOrg, site: userInputSite } = reqBody;
+      const { productPageUrlFormat, contentUrl, productsTemplate, storeUrl } = reqBody;
       let { locales } = reqBody;
   
       if (locales?.trim() === '') locales = null;
   
-      if (!contentUrl || !productsTemplate || !productPageUrlFormat || !userInputOrg || !userInputSite || !storeUrl) {
-        return RequestHelper.errorResponse('Missing required parameters. Please provide: locales, contentUrl, productsTemplate, productPageUrlFormat, org, site, and storeUrl');
+      if (!contentUrl || !productsTemplate || !productPageUrlFormat || !storeUrl) {
+        return RequestHelper.errorResponse('Missing required parameters. Please provide: contentUrl, productsTemplate, productPageUrlFormat, and storeUrl');
       }
   
       const siteConfigEndpoint = `https://admin.hlx.page/config/${org}/sites/${site}.json`;
@@ -400,7 +407,7 @@ const RULES_MAP = {
   
       const [newIndexConfig, { newConfig: newAppConfig, currentConfig: currentAppConfig }] = await Promise.all([
         ConfigService.buildIndexConfig(currentIndexConfig),
-        ConfigService.buildAppConfig({ org: userInputOrg, site: userInputSite, locales, contentUrl, productsTemplate, productPageUrlFormat, storeUrl })
+        ConfigService.buildAppConfig({ org, site, locales, contentUrl, productsTemplate, productPageUrlFormat, storeUrl })
       ]);
   
       console.log("fetched all configs");
@@ -524,13 +531,19 @@ const RULES_MAP = {
         return RequestHelper.errorResponse('Invalid token', 401);
       }
 
+      // Get org and site from URL parameters
+      const url = new URL(request.url);
+      const org = url.searchParams.get('org');
+      const site = url.searchParams.get('site');
+      
+      if (!org || !site) {
+        return RequestHelper.errorResponse('org and site parameters are required in URL');
+      }
+
       const { newIndexConfig, newSiteConfig, appConfigParams, aioNamespace, aioAuth } = await request.json();
       if (!newIndexConfig || !newSiteConfig || !appConfigParams) {
         return RequestHelper.errorResponse('newIndexConfig, newSiteConfig, and appConfigParams are required');
       }
-
-      const { sub } = jwtBody.payload;
-      const [org, site] = sub.split('/');
 
       // Generate and write app.config.yaml locally
       try {

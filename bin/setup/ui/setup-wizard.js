@@ -692,6 +692,9 @@ export class SetupWizard extends LitElement {
             this.generatedApiKey = result;
             // Auto-populate the AEM admin token with the generated API key value
             this.token = result.value;
+            // Set org/site for backward compatibility
+            this.aioOrg = this.org;
+            this.aioSite = this.site;
             // Auto-validate the token
             await this.handleTokenChange(this.token);
             this.showToastNotification('API key created successfully!', 'positive');
@@ -992,14 +995,8 @@ export class SetupWizard extends LitElement {
                 return;
             }
         } else if (this.currentStep === 2) {
-            if (!this.token) {
-                this.showToastNotification('Please enter a token', 'negative');
-                return;
-            }
-            await this.handleTokenChange(this.token);
-            if (!this.tokenValid) {
-                return;
-            }
+            // No additional validation needed for step 2 - just proceed
+            // The generated API key from step 1 will be used
         } else if (this.currentStep === 3) {
             if (!this.validateAdvancedSettings()) {
                 return;
@@ -1022,17 +1019,15 @@ export class SetupWizard extends LitElement {
         if (diffViewer) diffViewer.loading = true;
 
         try {
-            const response = await fetch('/api/setup', {
+            const response = await fetch(`/api/setup?org=${encodeURIComponent(this.org)}&site=${encodeURIComponent(this.site)}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-AIO-auth': this.aioAuth,
                     'X-AIO-namespace': this.aioNamespace,
-                    'X-AEM-admin-token': this.token
+                    'X-AEM-admin-token': this.accessToken
                 },
                 body: JSON.stringify({
-                    org: this.aioOrg,
-                    site: this.aioSite,
                     contentUrl: this.advancedSettings.contentUrl,
                     productsTemplate: this.advancedSettings.productsTemplate,
                     productPageUrlFormat: this.advancedSettings.productPageUrlFormat,
@@ -1072,14 +1067,14 @@ export class SetupWizard extends LitElement {
         
         // Download aem-commerce-prerender-org--site.json
         const commerceConfig = {
-            aemAdminToken: this.token,
-            org: this.aioOrg,
-            site: this.aioSite,
+            aemAdminToken: this.accessToken,
+            org: this.org,
+            site: this.site,
             aioAuth: this.aioAuth,
             aioNamespace: this.aioNamespace
         };
         
-        const fileName = `aem-commerce-prerender-${this.aioOrg}--${this.aioSite}.json`;
+        const fileName = `aem-commerce-prerender-${this.org}--${this.site}.json`;
         const jsonContent = JSON.stringify(commerceConfig, null, 2);
         
         const a = document.createElement('a');
@@ -1095,18 +1090,18 @@ export class SetupWizard extends LitElement {
     async applyConfig() {
         this.loading = true;
         try {
-            const response = await fetch('/api/helix-config', {
+            const response = await fetch(`/api/helix-config?org=${encodeURIComponent(this.org)}&site=${encodeURIComponent(this.site)}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-AEM-admin-token': this.token
+                    'X-AEM-admin-token': this.accessToken
                 },
                 body: JSON.stringify({
                     newIndexConfig: this.previewData.newIndexConfig,
                     newSiteConfig: this.previewData.newSiteConfig,
                     appConfigParams: {
-                        org: this.aioOrg,
-                        site: this.aioSite,
+                        org: this.org,
+                        site: this.site,
                         ...this.advancedSettings
                     },
                     aioNamespace: this.aioNamespace,
@@ -1212,8 +1207,7 @@ export class SetupWizard extends LitElement {
                         }
                     }
                 },
-                aemAdminJWT: this.token,
-                prerenderApiKey: this.generatedApiKey,
+                aemAdminJWT: this.generatedApiKey,
                 annotations: []
             };
 
@@ -1353,9 +1347,9 @@ export class SetupWizard extends LitElement {
 
     renderStep2Token() {
         return html`<div class="step-content">
-            <h3>Step 2: AEM Admin Token & AIO Configuration</h3>
+            <h3>Step 2: AIO Configuration</h3>
             
-            <!-- AEM Admin Token Section - Full Width Row -->
+            <!-- Generated API Key Display -->
             <div class="full-width-section">
                 <div class="centered-content">
                     ${this.generatedApiKey ? html`
@@ -1370,33 +1364,16 @@ export class SetupWizard extends LitElement {
                                 <span style="color: #f0f6fc;">${new Date(this.generatedApiKey.expiration).toLocaleString()}</span>
                             </div>
                             <p style="margin: 0; color: #7d8590; font-size: 12px;">
-                                This API key will be used as the AEM Admin Token below.
+                                This API key will be used for the prerender service configuration.
                             </p>
                         </div>
-                    ` : ''}
-                    
-                    <div class="token-field-container">
-                        <sp-field-label for="aem-token" required>AEM Admin Token</sp-field-label>
-                        <sp-textfield
-                            id="aem-token"
-                            type="password"
-                            placeholder=${this.generatedApiKey ? "Auto-populated from generated API key" : "Paste your AEM admin token here"}
-                            .value=${this.token}
-                            @input=${e => this.handleTokenChange(e.target.value)}
-                            ?readonly=${!!this.generatedApiKey}
-                            style="width: 100%; ${this.generatedApiKey ? 'background-color: #2a2a2a;' : ''}"
-                        ></sp-textfield>
-                        ${this.generatedApiKey ? html`
-                            <p style="text-align: center; margin-top: 8px; color: #7d8590; font-size: 12px;">
-                                Token automatically populated from the API key generated in Step 1
+                    ` : html`
+                        <div style="margin-bottom: 24px; padding: 16px; background-color: #1a1a1a; border-radius: 6px; border: 1px solid #333;">
+                            <p style="margin: 0; color: #f0f6fc; text-align: center;">
+                                No API key generated yet. Please complete Step 1 first.
                             </p>
-                        ` : ''}
-                        ${this.tokenValid ? html`
-                            <p style="text-align: center; margin-top: 12px;">
-                                Token valid for Org: <strong>${this.aioOrg}</strong>, Site: <strong>${this.aioSite}</strong>
-                            </p>
-                        `: ''}
-                    </div>
+                        </div>
+                    `}
                 </div>
             </div>
 
