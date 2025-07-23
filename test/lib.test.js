@@ -10,7 +10,7 @@ OF ANY KIND, either express or implied. See the License for the specific languag
 governing permissions and limitations under the License.
 */
 
-const { findDescription, getPrimaryImage, extractPathDetails, generatePriceString } = require('../actions/pdp-renderer/lib');
+const { findDescription, getPrimaryImage, extractPathDetails, generatePriceString, prepareBaseTemplate } = require('../actions/pdp-renderer/lib');
 
 describe('lib', () => {
     test('findDescription', () => {
@@ -92,5 +92,196 @@ describe('lib', () => {
 
         // No discount
         expect(generatePriceString({ price: { regular: value100, final: value100 }})).toBe('€100.00');
+    });
+
+    describe('prepareBaseTemplate', () => {
+        // Mock fetch globally for these tests
+        const originalFetch = global.fetch;
+        const mockTemplateHtml = '<div class="hero">Hero content</div><div class="product-recommendations">Recommendations</div>';
+
+        beforeEach(() => {
+            global.fetch = jest.fn();
+        });
+
+        afterEach(() => {
+            global.fetch = originalFetch;
+            jest.clearAllMocks();
+        });
+
+        test('should replace {locale} token when locale is provided and not default', async () => {
+            global.fetch.mockResolvedValueOnce({
+                text: () => Promise.resolve(mockTemplateHtml)
+            });
+
+            const url = 'https://content.com/{locale}/products/default';
+            const blocks = ['product-recommendations'];
+            const context = { locale: 'en' };
+
+            await prepareBaseTemplate(url, blocks, context);
+
+            expect(global.fetch).toHaveBeenCalledWith('https://content.com/en/products/default.plain.html');
+        });
+
+        test('should replace {locale} token with complex locale codes', async () => {
+            global.fetch.mockResolvedValueOnce({
+                text: () => Promise.resolve(mockTemplateHtml)
+            });
+
+            const url = 'https://content.com/{locale}/products/default';
+            const blocks = ['product-recommendations'];
+            const context = { locale: 'en/uk' };
+
+            await prepareBaseTemplate(url, blocks, context);
+
+            expect(global.fetch).toHaveBeenCalledWith('https://content.com/en/uk/products/default.plain.html');
+        });
+
+        test('should handle URL with multiple {locale} tokens (only replaces first occurrence)', async () => {
+            global.fetch.mockResolvedValueOnce({
+                text: () => Promise.resolve(mockTemplateHtml)
+            });
+
+            const url = 'https://content.com/{locale}/category/{locale}/products/default';
+            const blocks = ['product-recommendations'];
+            const context = { locale: 'fr' };
+
+            await prepareBaseTemplate(url, blocks, context);
+
+            // Current implementation only replaces the first {locale} occurrence
+            expect(global.fetch).toHaveBeenCalledWith('https://content.com/fr/category/{locale}/products/default.plain.html');
+        });
+
+        test('should trim whitespace and trailing slash before locale replacement', async () => {
+            global.fetch.mockResolvedValueOnce({
+                text: () => Promise.resolve(mockTemplateHtml)
+            });
+
+            const url = '  https://content.com/{locale}/products/default/  ';
+            const blocks = ['product-recommendations'];
+            const context = { locale: 'de' };
+
+            await prepareBaseTemplate(url, blocks, context);
+
+            expect(global.fetch).toHaveBeenCalledWith('https://content.com/de/products/default.plain.html');
+        });
+
+        test('should not replace {locale} token when locale is "default"', async () => {
+            global.fetch.mockResolvedValueOnce({
+                text: () => Promise.resolve(mockTemplateHtml)
+            });
+
+            const url = 'https://content.com/{locale}/products/default';
+            const blocks = ['product-recommendations'];
+            const context = { locale: 'default' };
+
+            await prepareBaseTemplate(url, blocks, context);
+
+            expect(global.fetch).toHaveBeenCalledWith('https://content.com/{locale}/products/default.plain.html');
+        });
+
+        test('should not replace {locale} token when locale is not provided', async () => {
+            global.fetch.mockResolvedValueOnce({
+                text: () => Promise.resolve(mockTemplateHtml)
+            });
+
+            const url = 'https://content.com/{locale}/products/default';
+            const blocks = ['product-recommendations'];
+            const context = {};
+
+            await prepareBaseTemplate(url, blocks, context);
+
+            expect(global.fetch).toHaveBeenCalledWith('https://content.com/{locale}/products/default.plain.html');
+        });
+
+        test('should not replace {locale} token when locale is null', async () => {
+            global.fetch.mockResolvedValueOnce({
+                text: () => Promise.resolve(mockTemplateHtml)
+            });
+
+            const url = 'https://content.com/{locale}/products/default';
+            const blocks = ['product-recommendations'];
+            const context = { locale: null };
+
+            await prepareBaseTemplate(url, blocks, context);
+
+            expect(global.fetch).toHaveBeenCalledWith('https://content.com/{locale}/products/default.plain.html');
+        });
+
+        test('should not replace {locale} token when locale is undefined', async () => {
+            global.fetch.mockResolvedValueOnce({
+                text: () => Promise.resolve(mockTemplateHtml)
+            });
+
+            const url = 'https://content.com/{locale}/products/default';
+            const blocks = ['product-recommendations'];
+            const context = { locale: undefined };
+
+            await prepareBaseTemplate(url, blocks, context);
+
+            expect(global.fetch).toHaveBeenCalledWith('https://content.com/{locale}/products/default.plain.html');
+        });
+
+        test('should replace blocks with handlebars partials after locale replacement', async () => {
+            global.fetch.mockResolvedValueOnce({
+                text: () => Promise.resolve(mockTemplateHtml)
+            });
+
+            const url = 'https://content.com/{locale}/products/default';
+            const blocks = ['hero', 'product-recommendations'];
+            const context = { locale: 'es' };
+
+            const result = await prepareBaseTemplate(url, blocks, context);
+
+            expect(global.fetch).toHaveBeenCalledWith('https://content.com/es/products/default.plain.html');
+            expect(result).toContain('{{> hero }}');
+            expect(result).toContain('{{> product-recommendations }}');
+        });
+
+        test('should handle URL without {locale} token', async () => {
+            global.fetch.mockResolvedValueOnce({
+                text: () => Promise.resolve(mockTemplateHtml)
+            });
+
+            const url = 'https://content.com/products/default';
+            const blocks = ['product-recommendations'];
+            const context = { locale: 'en' };
+
+            await prepareBaseTemplate(url, blocks, context);
+
+            expect(global.fetch).toHaveBeenCalledWith('https://content.com/products/default.plain.html');
+        });
+
+        test('should handle empty blocks array', async () => {
+            global.fetch.mockResolvedValueOnce({
+                text: () => Promise.resolve(mockTemplateHtml)
+            });
+
+            const url = 'https://content.com/{locale}/products/default';
+            const blocks = [];
+            const context = { locale: 'it' };
+
+            const result = await prepareBaseTemplate(url, blocks, context);
+
+            expect(global.fetch).toHaveBeenCalledWith('https://content.com/it/products/default.plain.html');
+            expect(result).toBe('<div class="hero">Hero content</div><div class="product-recommendations">Recommendations</div>\n');
+        });
+
+        test('should decode HTML entities in the output (only &gt; is decoded)', async () => {
+            const htmlWithEntities = '<div class="hero">&gt; Hero content &lt;</div>';
+            global.fetch.mockResolvedValueOnce({
+                text: () => Promise.resolve(htmlWithEntities)
+            });
+
+            const url = 'https://content.com/{locale}/products/default';
+            const blocks = [];
+            const context = { locale: 'pt' };
+
+            const result = await prepareBaseTemplate(url, blocks, context);
+
+            // Current implementation only decodes &gt; to >, not other entities
+            expect(result).toContain('> Hero content &lt;');
+            expect(result).not.toContain('&gt;');
+            expect(result).toContain('&lt;'); // &lt; is not decoded in current implementation
+        });
     });
 });
