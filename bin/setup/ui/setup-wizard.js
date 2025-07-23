@@ -356,7 +356,8 @@ export class SetupWizard extends LitElement {
         org: { type: String },
         site: { type: String },
         availableSites: { type: Array },
-        loadingSites: { type: Boolean }
+        loadingSites: { type: Boolean },
+        allowManualSiteEntry: { type: Boolean }
     };
 
     static styles = css`
@@ -556,6 +557,7 @@ export class SetupWizard extends LitElement {
         this.site = '';
         this.availableSites = [];
         this.loadingSites = false;
+        this.allowManualSiteEntry = false;
     }
 
     connectedCallback() {
@@ -609,6 +611,7 @@ export class SetupWizard extends LitElement {
         // Reset site selection when token changes
         this.site = '';
         this.availableSites = [];
+        this.allowManualSiteEntry = false;
     }
 
     async fetchAvailableSites() {
@@ -631,8 +634,16 @@ export class SetupWizard extends LitElement {
 
             if (!response.ok) {
                 const errorText = await response.text();
-                this.showToastNotification(`Failed to fetch sites: ${response.status} ${response.statusText} - ${errorText}`, 'negative');
-                return false;
+                
+                // If it's a 4xx error, allow manual site entry
+                if (response.status >= 400 && response.status < 500) {
+                    this.allowManualSiteEntry = true;
+                    this.showToastNotification(`Unable to fetch sites (${response.status}). You can now enter the site name manually below.`, 'negative');
+                    return false;
+                } else {
+                    this.showToastNotification(`Failed to fetch sites: ${response.status} ${response.statusText} - ${errorText}`, 'negative');
+                    return false;
+                }
             }
 
             const result = await response.json();
@@ -1337,6 +1348,20 @@ export class SetupWizard extends LitElement {
                                         <sp-menu-item value="${site.name}">${site.name}</sp-menu-item>
                                     `)}
                                 </sp-picker>
+                            </div>
+                        ` : this.allowManualSiteEntry ? html`
+                            <div class="token-field-container">
+                                <sp-field-label for="site-manual" required>Site Name</sp-field-label>
+                                <sp-textfield
+                                    id="site-manual"
+                                    placeholder="Enter site name manually..."
+                                    .value=${this.site}
+                                    @input=${e => this.site = e.target.value}
+                                    style="width: 100%;"
+                                ></sp-textfield>
+                                <p style="margin: 8px 0 0 0; color: #7d8590; font-size: 12px;">
+                                    Unable to load sites automatically. Please enter the site name manually.
+                                </p>
                             </div>
                         ` : ''}
                     </div>
