@@ -84,7 +84,7 @@ async function generateProductHtml(sku, urlKey, context) {
   if (context.productsTemplate) {
     const productsTemplateURL = context.productsTemplate.replace(/\s+/g, '').replace('{locale}', localeKey);
     if (!productTemplateCache[localeKey]) productTemplateCache[localeKey] = {};
-    if (!productTemplateCache[localeKey].baseTemplate) productTemplateCache[localeKey].baseTemplate = prepareBaseTemplate(productsTemplateURL, blocksToReplace);
+    if (!productTemplateCache[localeKey].baseTemplate) productTemplateCache[localeKey].baseTemplate = prepareBaseTemplate(productsTemplateURL, blocksToReplace, context);
     const baseTemplate = await productTemplateCache[localeKey].baseTemplate;
     Handlebars.registerPartial('content', baseTemplate);
   } else {
