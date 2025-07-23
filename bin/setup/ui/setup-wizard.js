@@ -350,7 +350,6 @@ export class SetupWizard extends LitElement {
         aioConfigFile: { type: Object },
         aioConfigContent: { type: String },
         processingAioConfig: { type: Boolean },
-        locales: { type: String },
         gitInfo: { type: Object },
         generatedApiKey: { type: String },
         org: { type: String },
@@ -540,7 +539,8 @@ export class SetupWizard extends LitElement {
             contentUrl: '',
             productsTemplate: '',
             storeUrl: '',
-            configName: 'config'
+            configName: 'config',
+            locales: null
         };
         this.previewData = null;
         this.healthChecks = [];
@@ -550,7 +550,6 @@ export class SetupWizard extends LitElement {
         this.aioConfigFile = null;
         this.aioConfigContent = '';
         this.processingAioConfig = false;
-        this.locales = 'en-US';
         this.gitInfo = null;
         this.generatedApiKey = '';
         this.org = '';
@@ -793,7 +792,8 @@ export class SetupWizard extends LitElement {
 
     handleAdvancedSettingInput(field, value) {
         if (field === 'locales') {
-            this.locales = value;
+            // Convert empty string to null for locales
+            this.advancedSettings[field] = value.trim() === '' ? null : value;
         } else {
             this.advancedSettings[field] = value;
         }
@@ -1475,6 +1475,13 @@ export class SetupWizard extends LitElement {
                             .value=${this.advancedSettings.productPageUrlFormat} 
                             @input=${e => this.handleAdvancedSettingInput('productPageUrlFormat', e.target.value)}
                         ></sp-textfield>
+
+                        <sp-field-label for="locales">Locales (can be empty)</sp-field-label>
+                        <sp-textfield 
+                            id="locales" 
+                            .value=${this.advancedSettings.locales || ''} 
+                            @input=${e => this.handleAdvancedSettingInput('locales', e.target.value)}
+                        ></sp-textfield>
                     </div>
                 </div>
 
@@ -1502,13 +1509,6 @@ export class SetupWizard extends LitElement {
                                     id="store-url" 
                                     .value=${this.advancedSettings.storeUrl} 
                                     @input=${e => this.handleAdvancedSettingInput('storeUrl', e.target.value)}
-                                ></sp-textfield>
-                                
-                                <sp-field-label for="locales">Locales (optional)</sp-field-label>
-                                <sp-textfield 
-                                    id="locales" 
-                                    .value=${this.advancedSettings.locales} 
-                                    @input=${e => this.handleAdvancedSettingInput('locales', e.target.value)}
                                 ></sp-textfield>
                             </div>
                         </sp-accordion-item>

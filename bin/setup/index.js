@@ -15,8 +15,52 @@ import yaml from 'js-yaml';
 import fs from 'fs';
 import dotenvStringify from 'dotenv-stringify';
 import dotenv from 'dotenv';
+import path from 'path';
 
 const execAsync = promisify(exec);
+
+/**
+ * Constructs the URL of a product.
+ *
+ * @param {Object} product Product with sku and urlKey properties.
+ * @param {Object} context The context object containing the store URL and path format.
+ * @returns {string} The product url or null if storeUrl or pathFormat are missing.
+ */
+function getProductUrl(product, context, addStore = true) {
+  const { storeUrl, pathFormat } = context;
+  if (!storeUrl || !pathFormat) {
+    return null;
+  }
+
+  const availableParams = {
+    sku: product.sku,
+    urlKey: product.urlKey,
+  };
+  
+  // Only add locale if it has a valid value
+  if (context.locale) {
+    availableParams.locale = context.locale;
+  }
+
+  let path = pathFormat.split('/')
+    .filter(Boolean)
+    .map(part => {
+      if (part.startsWith('{') && part.endsWith('}')) {
+        const key = part.substring(1, part.length - 1);
+        // Skip parts where we don't have a value
+        return availableParams[key] || '';
+      }
+      return part;
+    })
+    .filter(Boolean); // Remove any empty segments
+
+  if (addStore) {
+    path.unshift(storeUrl);
+    return path.join('/');
+  }
+
+  return `/${path.join('/')}`;
+}
 
 // Configuration and Constants
 const RULES_MAP = {
@@ -92,11 +136,14 @@ const RULES_MAP = {
       }
     }
 
-    static async buildIndexConfig(currentYamlConfig) {
+    static async buildIndexConfig(currentYamlConfig, {locales, storeUrl, productPageUrlFormat}) {
+      const pathsToInclude = locales.map(locale => path.join(getProductUrl({}, {storeUrl, pathFormat: productPageUrlFormat, locale}, false), '**'));
       try {
         const sampleIndexConfigContent = fs.readFileSync('query.yaml', 'utf8');
         const existingIndexConfig = currentYamlConfig ? yaml.load(currentYamlConfig) : {};
         const newConfig = yaml.load(sampleIndexConfigContent);
+
+        newConfig['indices']['index-published-products'].include = pathsToInclude;
 
         const mergedConfig = {
           ...existingIndexConfig,
@@ -406,9 +453,11 @@ const RULES_MAP = {
           overlay: { url: overlayBaseURL, type: 'markup', suffix: '.html' }
         }
       };
+
+      const parsedLocales = locales ? locales.split(',') : [];
   
       const [newIndexConfig, { newConfig: newAppConfig, currentConfig: currentAppConfig }] = await Promise.all([
-        ConfigService.buildIndexConfig(currentIndexConfig),
+        ConfigService.buildIndexConfig(currentIndexConfig, {locales: parsedLocales, storeUrl, productPageUrlFormat}),
         ConfigService.buildAppConfig({ org, site, locales, contentUrl, productsTemplate, productPageUrlFormat, storeUrl })
       ]);
   
