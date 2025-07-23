@@ -69,7 +69,9 @@ function getPrimaryImage(product, role = 'image') {
  * @returns {Promise<string>} The adapted base template HTML as a string.
  */
 async function prepareBaseTemplate(url, blocks, context) {
-  url = url.replace(/\s+/g, '').replace(/\/$/, '').replace('{locale}', context.locale || 'default');
+  if(context.locale && context.locale !== 'default') {
+    url = url.replace(/\s+/g, '').replace(/\/$/, '').replace('{locale}', context.locale);
+  }
 
   const baseTemplateHtml = await fetch(`${url}.plain.html`).then(resp => resp.text());
 
