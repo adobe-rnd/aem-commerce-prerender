@@ -27,6 +27,8 @@ Pluggable prerendering stack for ahead-of-time data fetching and embedding in Pr
   1. Run `npm run setup` to onboard and configure your environment. At the end of the process a Site Context will be created and stored in your localStorage: this will be the authentication medium required to operate the https://prerender.aem-storefront.com management interface (you will be redirected to this address).
   1. Customise the code that contains the rendering logic according to your requirements, for [structured data](/actions/pdp-renderer/ldJson.js), [markup](/actions/pdp-renderer/render.js) and [templates](https://github.com/adobe-rnd/aem-commerce-prerender/tree/main/actions/pdp-renderer/templates) - more info [here](/docs/CUSTOMIZE.md)
   1. Deploy the solution with `npm run deploy`
+  1. Go to the [Storefront Prerender](https://prerender.aem-storefront.com/#/change-detector) and check that the two rules for change dtetector are enabled (green circles).
+  1. THe system is now up and running and, in the first cycle of operation, it should publish all the products in the catalog. You can browse and count them from [here](https://prerender.aem-storefront.com/#/products)
   
 ### App Builder Setup
 
