@@ -36,7 +36,7 @@ _For the following steps, you need the "Developer" role [in the Admin Console](h
   1. Select "App Builder" and choose the environment (workspaces) according to your needs (we recommend Stage and Production as a starting point)
   1. You can leave all the other fields as per default settings; don't forget to provide a descriptive project title.
   1. After saving the newly created project, click on the workspace you want to deploy the prerendering stack to - use Stage to get started.
-  1. In the top-right click "Download All": this will download a JSON file that will be used in the setup process.
+  1. In the top-right click "Download All": this will download a JSON file that will be used in the [setup process](#configuration-wizard).
 
 ### Frontend & PDP Drop-in
  - In general, any changes to the frontend code are outside the scope of this guide.
