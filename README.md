@@ -10,7 +10,7 @@ Pluggable prerendering stack for ahead-of-time data fetching and embedding in Pr
 
 ## Architecture
 <details>
-  <summary>Show the details</summary>
+  <summary>Expand the diagram</summary>
 
   ![Architecture](/docs/architecture.jpg)
 
