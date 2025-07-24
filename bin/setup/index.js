@@ -15,8 +15,52 @@ import yaml from 'js-yaml';
 import fs from 'fs';
 import dotenvStringify from 'dotenv-stringify';
 import dotenv from 'dotenv';
+import path from 'path';
 
 const execAsync = promisify(exec);
+
+/**
+ * Constructs the URL of a product.
+ *
+ * @param {Object} product Product with sku and urlKey properties.
+ * @param {Object} context The context object containing the store URL and path format.
+ * @returns {string} The product url or null if storeUrl or pathFormat are missing.
+ */
+function getProductUrl(product, context, addStore = true) {
+  const { storeUrl, pathFormat } = context;
+  if (!storeUrl || !pathFormat) {
+    return null;
+  }
+
+  const availableParams = {
+    sku: product.sku,
+    urlKey: product.urlKey,
+  };
+  
+  // Only add locale if it has a valid value
+  if (context.locale) {
+    availableParams.locale = context.locale;
+  }
+
+  let path = pathFormat.split('/')
+    .filter(Boolean)
+    .map(part => {
+      if (part.startsWith('{') && part.endsWith('}')) {
+        const key = part.substring(1, part.length - 1);
+        // Skip parts where we don't have a value
+        return availableParams[key] || '';
+      }
+      return part;
+    })
+    .filter(Boolean); // Remove any empty segments
+
+  if (addStore) {
+    path.unshift(storeUrl);
+    return path.join('/');
+  }
+
+  return `/${path.join('/')}`;
+}
 
 // Configuration and Constants
 const RULES_MAP = {
@@ -91,24 +135,29 @@ const RULES_MAP = {
         throw new Error('Failed to read app.config.yaml. Make sure the file exists in the current directory.');
       }
     }
-  
-    static async buildIndexConfig(currentYamlConfig) {
-      const sampleConfigRequest = await fetch(
-        'https://raw.githubusercontent.com/adobe-rnd/aem-commerce-prerender/refs/heads/main/query.yaml'
-      );
-      const sampleIndexConfigContent = await sampleConfigRequest.text();
-      const existingIndexConfig = currentYamlConfig ? yaml.load(currentYamlConfig) : {};
-      const newConfig = yaml.load(sampleIndexConfigContent);
-  
-      const mergedConfig = {
-        ...existingIndexConfig,
-        indices: {
-          ...existingIndexConfig.indices,
-          'index-published-products': newConfig['indices']['index-published-products']
-        }
-      };
-  
-      return yaml.dump(mergedConfig, { indent: 2 });
+
+    static async buildIndexConfig(currentYamlConfig, {locales, storeUrl, productPageUrlFormat}) {
+      const pathsToInclude = locales.map(locale => path.join(getProductUrl({}, {storeUrl, pathFormat: productPageUrlFormat, locale}, false), '**'));
+      try {
+        const sampleIndexConfigContent = fs.readFileSync('query.yaml', 'utf8');
+        const existingIndexConfig = currentYamlConfig ? yaml.load(currentYamlConfig) : {};
+        const newConfig = yaml.load(sampleIndexConfigContent);
+
+        newConfig['indices']['index-published-products'].include = pathsToInclude;
+
+        const mergedConfig = {
+          ...existingIndexConfig,
+          indices: {
+            ...existingIndexConfig.indices,
+            'index-published-products': newConfig['indices']['index-published-products']
+          }
+        };
+
+        return yaml.dump(mergedConfig, { indent: 2 });
+      } catch (error) {
+        console.error('Error reading query.yaml:', error);
+        throw new Error('Failed to read query.yaml. Make sure the file exists in the current directory.');
+      }
     }
   }
   
@@ -202,6 +251,81 @@ const RULES_MAP = {
   
   // Route Handlers
   class ApiRoutes {
+    static async getGitInfo(request) {
+      try {
+        // Get git remote URL
+        const { stdout } = await execAsync('git remote get-url origin');
+        const remoteUrl = stdout.trim();
+        
+        // Extract org and site from GitHub URL
+        // Handles both SSH and HTTPS URLs
+        let match = remoteUrl.match(/github\.com[:/]([^/]+)\/([^/]+?)(?:\.git)?$/);
+        
+        if (!match) {
+          return RequestHelper.errorResponse('Could not extract org/site from git remote URL: ' + remoteUrl);
+        }
+        
+        const [, org, site] = match;
+        
+        return RequestHelper.jsonResponse({
+          org,
+          site,
+          remoteUrl
+        });
+      } catch (error) {
+        console.error('Error getting git info:', error);
+        return RequestHelper.errorResponse('Failed to get git repository information: ' + error.message, 500);
+      }
+    }
+
+    static async createApiKey(request) {
+      try {
+        const { accessToken, org, site } = await request.json();
+        
+        if (!accessToken || !org || !site) {
+          return RequestHelper.errorResponse('accessToken, org, and site are required');
+        }
+
+        const apiKeyEndpoint = `https://admin.hlx.page/config/${org}/profiles/${site}/apiKeys.json`;
+        const body = {
+          description: `Key used by PDP Prerender components [${org}/${site}]`,
+          roles: [
+            "preview",
+            "publish", 
+            "config_admin"
+          ]
+        };
+
+        console.log(`Creating API key at ${apiKeyEndpoint}`);
+        
+        const response = await fetch(apiKeyEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-auth-token': accessToken
+          },
+          body: JSON.stringify(body)
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          return RequestHelper.errorResponse(`Failed to create API key: ${response.status} ${response.statusText} - ${errorText}`, response.status);
+        }
+
+        const result = await response.json();
+        
+        return RequestHelper.jsonResponse({
+          success: true,
+          apiKey: result,
+          message: 'API key created successfully'
+        });
+        
+      } catch (error) {
+        console.error('Error creating API key:', error);
+        return RequestHelper.errorResponse('Failed to create API key: ' + error.message, 500);
+      }
+    }
+
     static async wizardDone(request) {
         console.log("Wizard completed, shutting down server.");
         setTimeout(() => process.exit(0), 1000); // Delay to allow response to be sent
@@ -280,17 +404,24 @@ const RULES_MAP = {
       }
   
       const { filesBase } = await RequestHelper.initServices(headers);
-      const { sub } = jwtBody.payload;
-      const [org, site] = sub.split('/');
+      
+      // Get org and site from URL parameters
+      const url = new URL(request.url);
+      const org = url.searchParams.get('org');
+      const site = url.searchParams.get('site');
+      
+      if (!org || !site) {
+        return RequestHelper.errorResponse('org and site parameters are required in URL');
+      }
   
       const reqBody = await request.json();
-      const { productPageUrlFormat, contentUrl, productsTemplate, storeUrl, org: userInputOrg, site: userInputSite } = reqBody;
+      const { productPageUrlFormat, contentUrl, productsTemplate, storeUrl } = reqBody;
       let { locales } = reqBody;
   
       if (locales?.trim() === '') locales = null;
   
-      if (!contentUrl || !productsTemplate || !productPageUrlFormat || !userInputOrg || !userInputSite || !storeUrl) {
-        return RequestHelper.errorResponse('Missing required parameters. Please provide: locales, contentUrl, productsTemplate, productPageUrlFormat, org, site, and storeUrl');
+      if (!contentUrl || !productsTemplate || !productPageUrlFormat || !storeUrl) {
+        return RequestHelper.errorResponse('Missing required parameters. Please provide: contentUrl, productsTemplate, productPageUrlFormat, and storeUrl');
       }
   
       const siteConfigEndpoint = `https://admin.hlx.page/config/${org}/sites/${site}.json`;
@@ -322,10 +453,12 @@ const RULES_MAP = {
           overlay: { url: overlayBaseURL, type: 'markup', suffix: '.html' }
         }
       };
+
+      const parsedLocales = locales ? locales.split(',') : [];
   
       const [newIndexConfig, { newConfig: newAppConfig, currentConfig: currentAppConfig }] = await Promise.all([
-        ConfigService.buildIndexConfig(currentIndexConfig),
-        ConfigService.buildAppConfig({ org: userInputOrg, site: userInputSite, locales, contentUrl, productsTemplate, productPageUrlFormat, storeUrl })
+        ConfigService.buildIndexConfig(currentIndexConfig, {locales: parsedLocales, storeUrl, productPageUrlFormat}),
+        ConfigService.buildAppConfig({ org, site, locales, contentUrl, productsTemplate, productPageUrlFormat, storeUrl })
       ]);
   
       console.log("fetched all configs");
@@ -449,13 +582,19 @@ const RULES_MAP = {
         return RequestHelper.errorResponse('Invalid token', 401);
       }
 
+      // Get org and site from URL parameters
+      const url = new URL(request.url);
+      const org = url.searchParams.get('org');
+      const site = url.searchParams.get('site');
+      
+      if (!org || !site) {
+        return RequestHelper.errorResponse('org and site parameters are required in URL');
+      }
+
       const { newIndexConfig, newSiteConfig, appConfigParams, aioNamespace, aioAuth } = await request.json();
       if (!newIndexConfig || !newSiteConfig || !appConfigParams) {
         return RequestHelper.errorResponse('newIndexConfig, newSiteConfig, and appConfigParams are required');
       }
-
-      const { sub } = jwtBody.payload;
-      const [org, site] = sub.split('/');
 
       // Generate and write app.config.yaml locally
       try {
@@ -572,7 +711,9 @@ class Server {
         .get('/', () => StaticFileServer.serve('index.html'))
         .get('/api/files', ApiRoutes.getFiles)
         .get('/api/rules', ApiRoutes.getRules)
+        .get('/api/git-info', ApiRoutes.getGitInfo)
         .post('/api/aio-config', ApiRoutes.aioConfig)
+        .post('/api/create-api-key', ApiRoutes.createApiKey)
         .post('/api/external-submit', ApiRoutes.handleExternalSubmission)
         .post('/api/change-detector/rule', ApiRoutes.changeDetectorRule)
         .post('/api/wizard/done', ApiRoutes.wizardDone)

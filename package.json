@@ -40,6 +40,7 @@
     "lint": "eslint --ignore-pattern web-src --no-error-on-unmatched-pattern test src actions",
     "lint:fix": "npm run lint -- --fix",
     "deploy": "rm -r dist; aio app deploy",
+    "setup": "npm i && npx setup",
     "undeploy": "aio app undeploy"
   },
   "engines": {

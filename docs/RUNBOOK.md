@@ -1,10 +1,10 @@
 # Runbook
 ## Product change detector (aka "poller")
 
-It runs a cycle every 5 minutes (by default, and this value can be changed in aio.app.yamml), checking whether a product's lat modified date and resulting markup changed: the product page is previewed and the preview is then compared with the one stored in a cloud storage bucket.
+It runs a cycle every 5 minutes (by default, and this value can be changed in aio.app.yamml), checking whether a product's lat modified date and resulting markup changed: the product page is previewed and the preview is then compared with the one stored in a cloud storage bucket. Logic is defined in [poller.js](../actions/check-product-changes/poller.js)
 
 1. If a product page returns a 404, you can first check the list in the (Management Tool)[https://prerender.aem-storefront.com/#products]; if your search returns no results, it is very likely that the product was not published.
-1. You can check the activations (cycles) from `aio rt activations list` command:
+1. You can check the activations (cycles) from `aio rt activations list` command (see also [this guide](https://developer.adobe.com/app-builder/docs/get_started/runtime_getting_started/activations)):
 
 ```bash
 (base) ➜  aem-commerce-prerender-mycompany git:(main) aio rt activation list
@@ -239,4 +239,8 @@ from `aio rt activations list` you might notice the activations of the product s
  07/11 13:26:25  success  nodejs:22 0.0.16     5867c974307c4824a7c974307ce82490 cold  8391 871  7928ms   aem-commerce-ssg/fetch-all-products
 ```
 
-here you can inspect di logs in case of any issue, following the same workflow as per the other action. Most issues here are caused by misconfiguration in the project's yaml file or in the catalog service config in SiteConfig.
+here you can inspect the logs in case of any issue, following the same workflow as per the other action. Most issues here are caused by misconfiguration in the project's yaml file or in the catalog service config in SiteConfig.
+
+## Jobs
+
+https://www.aem.live/docs/admin.html#tag/job/operation/getJobDetails

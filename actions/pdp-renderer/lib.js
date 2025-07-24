@@ -68,7 +68,11 @@ function getPrimaryImage(product, role = 'image') {
  * @param {Array<string>} blocks The list of block class names to replace with Handlebars partials.
  * @returns {Promise<string>} The adapted base template HTML as a string.
  */
-async function prepareBaseTemplate(url, blocks) {
+async function prepareBaseTemplate(url, blocks, context) {
+  if(context.locale && context.locale !== 'default') {
+    url = url.replace(/\s+/g, '').replace(/\/$/, '').replace('{locale}', context.locale);
+  }
+
   const baseTemplateHtml = await fetch(`${url}.plain.html`).then(resp => resp.text());
 
   const $ = cheerio.load(`<main>${baseTemplateHtml}</main>`);
