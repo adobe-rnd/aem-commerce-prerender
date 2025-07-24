@@ -8,7 +8,9 @@ Pluggable prerendering stack for ahead-of-time data fetching and embedding in Pr
 * ⚙️ Define your custom rendering logic
 * 🧠 Offload intensive computation to the rendering phase
 
-## Architecture
+## Principle of Operation & Architecture
+![Principle of Operation](/docs/principle-of-operation.jpg)
+
 <details>
   <summary>Expand the diagram</summary>
 
