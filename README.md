@@ -12,7 +12,7 @@ Pluggable prerendering stack for ahead-of-time data fetching and embedding in Pr
 <details>
   <summary>Expand the diagram</summary>
 
-  ![Architecture](/docs/architecture.jpg)
+  ![Architecture](/docs/architecture-overview.jpg)
 
 </details>
 
