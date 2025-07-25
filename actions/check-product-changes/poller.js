@@ -96,6 +96,9 @@ async function saveState(state, aioLibs) {
   const fileLocation = getFileLocation(stateKey, STATE_FILE_EXT);
   const csvData = [
     ...Object.entries(state.skus)
+      // if lastRenderedAt is not set, skip the product
+      // this can happen i.e. if the product is not found
+      .filter(([, { lastRenderedAt }]) => Boolean(lastRenderedAt))
       .map(([sku, { lastRenderedAt, hash }]) => {
         return `${sku},${lastRenderedAt.getTime()},${hash || ''}`;
       }),
