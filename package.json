@@ -21,7 +21,8 @@
     "p-limit": "^6.2.0",
     "striptags": "^3.2.0",
     "vega": "^6.0.0",
-    "vega-lite": "^6.0.0"
+    "vega-lite": "^6.0.0",
+    "itty-router": "^5.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
