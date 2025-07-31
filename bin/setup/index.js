@@ -326,6 +326,80 @@ const RULES_MAP = {
       }
     }
 
+    static async enableApiKey(request) {
+      try {
+        const { accessToken, org, site, apiKeyId } = await request.json();
+        
+        if (!accessToken || !org || !site || !apiKeyId) {
+          return RequestHelper.errorResponse('accessToken, org, site, and apiKeyId are required');
+        }
+
+        const siteConfigEndpoint = `https://admin.hlx.page/config/${org}/sites/${site}.json`;
+        
+        console.log(`Getting site config from ${siteConfigEndpoint}`);
+        
+        // First, get the current site configuration
+        const getResponse = await fetch(siteConfigEndpoint, {
+          method: 'GET',
+          headers: {
+            'x-auth-token': accessToken
+          }
+        });
+
+        if (!getResponse.ok) {
+          const errorText = await getResponse.text();
+          return RequestHelper.errorResponse(`Failed to get site config: ${getResponse.status} ${getResponse.statusText} - ${errorText}`, getResponse.status);
+        }
+
+        const siteConfig = await getResponse.json();
+        
+        console.log(`Enabling API key ${apiKeyId} for site ${org}/${site}`);
+        
+        // Manipulate the JSON to add the API key ID
+        if (!siteConfig.access) {
+          siteConfig.access = {};
+        }
+        if (!siteConfig.access.admin) {
+          siteConfig.access.admin = {};
+        }
+        if (!siteConfig.access.admin.apiKeyId) {
+          siteConfig.access.admin.apiKeyId = [];
+        }
+        
+        // Add the API key ID if it's not already in the array
+        if (!siteConfig.access.admin.apiKeyId.includes(apiKeyId)) {
+          siteConfig.access.admin.apiKeyId.push(apiKeyId);
+        }
+
+        // Make the POST request to update the site configuration
+        const postResponse = await fetch(siteConfigEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-auth-token': accessToken
+          },
+          body: JSON.stringify(siteConfig)
+        });
+
+        if (!postResponse.ok) {
+          const errorText = await postResponse.text();
+          return RequestHelper.errorResponse(`Failed to update site config: ${postResponse.status} ${postResponse.statusText} - ${errorText}`, postResponse.status);
+        }
+
+        const result = await postResponse.json();
+        
+        return RequestHelper.jsonResponse({
+          success: true,
+          siteConfig: result,
+          message: 'API key enabled successfully'
+        });
+        
+      } catch (error) {
+        console.error('Error enabling API key:', error);
+        return RequestHelper.errorResponse('Failed to enable API key: ' + error.message, 500);
+      }
+    }
+
     static async wizardDone(request) {
         console.log("Wizard completed, shutting down server.");
         setTimeout(() => process.exit(0), 1000); // Delay to allow response to be sent
@@ -714,6 +788,7 @@ class Server {
         .get('/api/git-info', ApiRoutes.getGitInfo)
         .post('/api/aio-config', ApiRoutes.aioConfig)
         .post('/api/create-api-key', ApiRoutes.createApiKey)
+        .post('/api/enable-api-key', ApiRoutes.enableApiKey)
         .post('/api/external-submit', ApiRoutes.handleExternalSubmission)
         .post('/api/change-detector/rule', ApiRoutes.changeDetectorRule)
         .post('/api/wizard/done', ApiRoutes.wizardDone)
