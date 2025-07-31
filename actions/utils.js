@@ -10,6 +10,7 @@ OF ANY KIND, either express or implied. See the License for the specific languag
 governing permissions and limitations under the License.
 */
 const deepmerge = require('@fastify/deepmerge')();
+const helixSharedStringLib = require('@adobe/helix-shared-string');
 
 /* This file exposes some common utilities for your actions */
 
@@ -381,7 +382,7 @@ function getProductUrl(product, context, addStore = true) {
     return path.join('/');
   }
 
-  return `/${path.join('/')}`;
+  return helixSharedStringLib.sanitizePath(`/${path.join('/')}`);
 }
 
 /**

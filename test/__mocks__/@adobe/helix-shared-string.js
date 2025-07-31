@@ -1,5 +1,3 @@
-const { beforeEach, afterEach } = require('@jest/globals');
-
 /*
 Copyright 2025 Adobe. All rights reserved.
 This file is licensed to you under the Apache License, Version 2.0 (the "License");
@@ -12,7 +10,16 @@ OF ANY KIND, either express or implied. See the License for the specific languag
 governing permissions and limitations under the License.
 */
 
-jest.setTimeout(10000);
-
-beforeEach(() => { });
-afterEach(() => { });
+// Mock implementation of @adobe/helix-shared-string for Jest tests
+module.exports = {
+  sanitizePath: (path) => {
+    // Simple implementation that mimics the basic functionality
+    if (!path) return '/';
+    
+    // Remove duplicate slashes and normalize
+    const normalized = path.replace(/\/+/g, '/');
+    
+    // Ensure it starts with /
+    return normalized.startsWith('/') ? normalized : `/${normalized}`;
+  }
+}; 
