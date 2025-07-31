@@ -36,9 +36,9 @@ test('simple product markup', async () => {
   // Validate images
   expect($('.product-details > div > div:contains("Images")').next().find('img').map((_, e) => $(e).prop('outerHTML')).toArray()).toMatchInlineSnapshot(`
 [
-  "<img src="http://www.aemshop.net/media/catalog/product/adobestoredata/ADB177.jpg">",
-  "<img src="http://www.aemshop.net/media/catalog/product/adobestoredata/ADB177-2.jpg">",
-  "<img src="http://www.aemshop.net/media/catalog/product/adobestoredata/ADB177-3.jpg">",
+  "<img src="https://www.aemshop.net/media/catalog/product/adobestoredata/ADB177.jpg">",
+  "<img src="https://www.aemshop.net/media/catalog/product/adobestoredata/ADB177-2.jpg">",
+  "<img src="https://www.aemshop.net/media/catalog/product/adobestoredata/ADB177-3.jpg">",
 ]
 `);
 
@@ -69,7 +69,7 @@ test('simple product markup', async () => {
         "itemCondition": "https://schema.org/NewCondition"
       }
     ],
-    "image": "http://www.aemshop.net/media/catalog/product/adobestoredata/ADB177.jpg"
+    "image": "https://www.aemshop.net/media/catalog/product/adobestoredata/ADB177.jpg"
   };
   expect(ldJson).toEqual(expected);
 });
@@ -90,7 +90,7 @@ test('complex product markup', async () => {
   // Validate images
   expect($('.product-details > div > div:contains("Images")').next().find('img').map((_, e) => $(e).prop('outerHTML')).toArray()).toMatchInlineSnapshot(`
 [
-  "<img src="http://www.aemshop.net/media/catalog/product/a/d/adb124.jpg">",
+  "<img src="https://www.aemshop.net/media/catalog/product/a/d/adb124.jpg">",
 ]
 `);
 
@@ -140,7 +140,7 @@ test('complex product markup', async () => {
         "sku": "SSGCONFIG123-blue",
         "name": "BYOM Configurable Product-blue",
         "gtin": "",
-        "image": "http://www.aemshop.net/media/catalog/product/a/d/adb402_1.jpg",
+        "image": "https://www.aemshop.net/media/catalog/product/a/d/adb402_1.jpg",
         "offers": [
           {
             "@type": "Offer",
@@ -159,7 +159,7 @@ test('complex product markup', async () => {
         "sku": "SSGCONFIG123-green",
         "name": "BYOM Configurable Product-green",
         "gtin": "",
-        "image": "http://www.aemshop.net/media/catalog/product/a/d/adb412_1.jpg",
+        "image": "https://www.aemshop.net/media/catalog/product/a/d/adb412_1.jpg",
         "offers": [
           {
             "@type": "Offer",
@@ -178,7 +178,7 @@ test('complex product markup', async () => {
         "sku": "SSGCONFIG123-red",
         "name": "BYOM Configurable Product-red",
         "gtin": "",
-        "image": "http://www.aemshop.net/media/catalog/product/a/d/adb187_1.jpg",
+        "image": "https://www.aemshop.net/media/catalog/product/a/d/adb187_1.jpg",
         "offers": [
           {
             "@type": "Offer",
@@ -193,7 +193,7 @@ test('complex product markup', async () => {
         "color": "red"
       }
     ],
-    "image": "http://www.aemshop.net/media/catalog/product/a/d/adb124.jpg"
+    "image": "https://www.aemshop.net/media/catalog/product/a/d/adb124.jpg"
   };
   expect(ldJson).toEqual(expected);
 });
