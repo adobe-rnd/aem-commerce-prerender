@@ -51,7 +51,7 @@ The product page URL and pathname are subject to the following [limits](https://
 This means that, for example, if your pathFormat configured in app.config.yaml in your repo contains the SKU and your sku has unsupported characters, the resulting url is, by default, sanitized. For example: `MY_PRODUCT_123` becomes `my-product-123`
 
 ### PDP Drop-in (frontend)
- - In the prerendered PDPs, the SKU - originally parsed from the URL - can be retrieved from the meta tag `meta[name="sku"]`. This way of retrieving the sku is generally more robust and becomes a requirement when the sku is sanitized, and therefore is not possible to query the actual product using it, because it's not in CS.
+ - In the prerendered PDPs, the SKU - originally parsed from the URL - can be retrieved from the meta tag `meta[name="sku"]`. This way of retrieving the sku is generally more robust and becomes a requirement when the sku is sanitized, and therefore is not possible to query the actual product using it, because the transformed SKU is not in CS.
  - One requirement could be to hide the prerendered semantic markup (the one coming from the templates and in general, the pdp-renderer action) and the advised way to do it is to simply replace the contents of `.product-details` block with the decorated html hosting the PDP drop-in.
  - In fact, this semantic HTML provides rich information and context to LLM crawlers as well as search engine crawlers not supporting javascript: having js replace that code with the UI meant for client side rendering, means that if no js is available the semantic html operates as a natural fallback.
 
