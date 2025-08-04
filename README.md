@@ -25,6 +25,7 @@ Pluggable prerendering stack for ahead-of-time data fetching and embedding in Pr
 
 ### Configuration Wizard
 
+  1. First install `aio` CLI globally: `npm install -g @adobe/aio-cli`.
   1. In case you do not have an App Builder environment JSON file, follow [these steps first](#app-builder-setup)
   1. Create a repo from template in your org by clicking [here](https://github.com/new?template_name=aem-commerce-prerender&template_owner=adobe-rnd). You can now clone the resulting repo from your org
   1. Download your AppBuilder project JSON file, you will use it to perform the initial setup wizard that will show up in the browser
