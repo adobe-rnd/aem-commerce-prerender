@@ -167,7 +167,7 @@ const RULES_MAP = {
       if (aioNamespace && aioAuth) {
         try {
           console.log('Fetching overlay URL from prerender service...');
-          
+
           const response = await fetch('https://prerender.aem-storefront.com/api/v1/web/appbuilder-aem-storefront-prerender-ui/api/overlay-url', {
             method: 'GET',
             headers: {
@@ -181,7 +181,7 @@ const RULES_MAP = {
           }
 
           const data = await response.json();
-          
+
           if (data.overlayUrl) {
             console.log('Successfully retrieved overlay URL:', data.overlayUrl);
             return data.overlayUrl;
@@ -194,7 +194,7 @@ const RULES_MAP = {
           // Fall back to the original method if API call fails
         }
       }
-      
+
       // Original file-based approach (fallback or when no AIO credentials)
       const testFileName = '/test-dir';
       const testFileContent = Buffer.from('This is a mock file');
@@ -323,9 +323,7 @@ const RULES_MAP = {
         const body = {
           description: `prerender_key:${org}/${site}`,
           roles: [
-            "preview",
             "publish",
-            "config_admin"
           ]
         };
 
