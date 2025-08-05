@@ -356,7 +356,10 @@ export class SetupWizard extends LitElement {
         site: { type: String },
         availableSites: { type: Array },
         loadingSites: { type: Boolean },
-        allowManualSiteEntry: { type: Boolean }
+        allowManualSiteEntry: { type: Boolean },
+        overlayUrl: { type: String },
+        aioNamespace: { type: String },
+        aioAuth: { type: String }
     };
 
     static styles = css`
@@ -898,6 +901,9 @@ export class SetupWizard extends LitElement {
                 
                 if (result.success) {
                     this.showToastNotification(`AIO configuration loaded successfully! Namespace: ${namespace}`, 'positive');
+                    
+                    // Fetch overlay URL using the AIO credentials
+                    await this.fetchOverlayUrl(namespace, auth);
                 } else {
                     this.showToastNotification(`AIO configuration saved but failed to apply: ${result.error}`, 'negative');
                 }
@@ -915,6 +921,37 @@ export class SetupWizard extends LitElement {
             this.showToastNotification('Error processing AIO configuration file: ' + error.message, 'negative');
         } finally {
             this.processingAioConfig = false;
+        }
+    }
+
+    async fetchOverlayUrl(namespace, auth) {
+        try {
+            console.log('Fetching overlay URL with AIO credentials...');
+            
+            const response = await fetch('https://prerender.aem-storefront.com/api/v1/web/appbuilder-aem-storefront-prerender-ui/api/overlay-url', {
+                method: 'GET',
+                headers: {
+                    'x-aio-namespace': namespace,
+                    'x-aio-auth': auth
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            
+            if (data.overlayUrl) {
+                console.log('Successfully retrieved overlay URL:', data.overlayUrl);
+                this.overlayUrl = data.overlayUrl;
+                this.showToastNotification(`Overlay URL retrieved: ${data.overlayUrl}`, 'positive');
+            } else {
+                throw new Error('overlayUrl not found in response');
+            }
+        } catch (error) {
+            console.error('Error fetching overlay URL:', error);
+            this.showToastNotification(`Failed to fetch overlay URL: ${error.message}`, 'negative');
         }
     }
 
