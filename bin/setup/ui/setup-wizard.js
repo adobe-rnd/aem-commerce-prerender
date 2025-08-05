@@ -356,7 +356,9 @@ export class SetupWizard extends LitElement {
         site: { type: String },
         availableSites: { type: Array },
         loadingSites: { type: Boolean },
-        allowManualSiteEntry: { type: Boolean }
+        allowManualSiteEntry: { type: Boolean },
+        aioNamespace: { type: String },
+        aioAuth: { type: String }
     };
 
     static styles = css`
