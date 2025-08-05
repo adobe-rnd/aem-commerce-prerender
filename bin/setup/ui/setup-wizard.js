@@ -700,7 +700,7 @@ export class SetupWizard extends LitElement {
             }
 
             // Check if there's a non-expired key with the expected description
-            const expectedDescription = `Key used by PDP Prerender components [${this.org}/${this.site}]`;
+            const expectedDescription = `prerender_key:${this.org}/${this.site}`;
             let existingKey = null;
             const currentTime = new Date();
 

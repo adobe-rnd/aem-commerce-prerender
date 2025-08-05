@@ -36,7 +36,7 @@ function getProductUrl(product, context, addStore = true) {
     sku: product.sku,
     urlKey: product.urlKey,
   };
-  
+
   // Only add locale if it has a valid value
   if (context.locale) {
     availableParams.locale = context.locale;
@@ -73,7 +73,7 @@ const RULES_MAP = {
       description: 'Triggers a check for products that have been updated, created or deleted in the Catalog. This is triggered every minute. If execution lasts more than 1 minute, there won\'t be any concurrency.',
     }
   }
-  
+
   const CONTENT_TYPES = {
     '.js': 'application/javascript',
     '.html': 'text/html',
@@ -85,7 +85,7 @@ const RULES_MAP = {
     '.gif': 'image/gif',
     '.svg': 'image/svg+xml'
   }
-  
+
   // Utility Classes
   class AuthService {
     static async verifyJWT(token) {
@@ -95,10 +95,10 @@ const RULES_MAP = {
         const [headerB64, payloadB64, signatureB64] = token.split('.');
         const header = JSON.parse(atob(headerB64));
         const payload = JSON.parse(atob(payloadB64));
-  
+
         console.log('Token Header:', header);
         console.log('Token Payload:', payload);
-  
+
         return { isValid: true, header, payload };
       } catch (error) {
         console.error('Token verification failed:', error);
@@ -106,16 +106,16 @@ const RULES_MAP = {
       }
     }
   }
-  
+
   class ConfigService {
     static async buildAppConfig(params) {
       const { org, site, locales, contentUrl, productsTemplate, productPageUrlFormat, storeUrl } = params;
-      
+
       try {
         const sampleConfigContent = fs.readFileSync('app.config.yaml', 'utf8');
         const currentConfig = yaml.load(sampleConfigContent);
         const { inputs } = currentConfig.application.runtimeManifest.packages['aem-commerce-ssg'];
-  
+
         Object.assign(inputs, {
           ORG: org,
           SITE: site,
@@ -125,7 +125,7 @@ const RULES_MAP = {
           STORE_URL: storeUrl,
           LOCALES: locales
         });
-  
+
         return {
           newConfig: yaml.dump(currentConfig, { indent: 2, quotingType: '"', forceQuotes: true }),
           currentConfig: sampleConfigContent
@@ -160,28 +160,28 @@ const RULES_MAP = {
       }
     }
   }
-  
+
   class FileService {
     static async getOverlayBaseURL(filesBase) {
       const testFileName = '/test-dir';
       const testFileContent = Buffer.from('This is a mock file');
       await filesBase.write(testFileName, testFileContent);
-  
+
       const fileProperties = await filesBase.getProperties(testFileName);
       const url = fileProperties.url;
       const baseUrl = url.match(/(https:\/\/[^"'\s]+?)\/[^/]+$/)?.[1] || null;
-      
+
       if (!baseUrl) {
         throw new Error('Failed to extract base URL');
       }
-  
+
       await filesBase.delete(testFileName);
       return `${baseUrl}-public/public/pdps`;
     }
-  
+
     static async deleteFiles(filesBase, foldersToEmpty) {
       let totalFilesCount = 0;
-      
+
       for (const folder of foldersToEmpty) {
         const folderFiles = await filesBase.list(`${folder}/`);
         for (let i = 0; i < folderFiles.length; i += 5) {
@@ -190,11 +190,11 @@ const RULES_MAP = {
           totalFilesCount += batch.length;
         }
       }
-      
+
       return totalFilesCount;
     }
   }
-  
+
   class StaticFileServer {
     static serve(path) {
       try {
@@ -204,7 +204,7 @@ const RULES_MAP = {
         const content = readFileSync(filePath);
         const extension = path.substring(path.lastIndexOf('.'));
         const contentType = CONTENT_TYPES[extension] || 'text/plain';
-  
+
         return new Response(content, {
           headers: { 'Content-Type': contentType }
         });
@@ -217,7 +217,7 @@ const RULES_MAP = {
       }
     }
   }
-  
+
   class RequestHelper {
     static extractHeaders(request) {
       const headers = request.headers;
@@ -227,7 +227,7 @@ const RULES_MAP = {
         aemAdminToken: headers.get('X-AEM-admin-token')
       };
     }
-  
+
     static async initServices(headers) {
       const { namespace, auth } = headers;
       return {
@@ -236,19 +236,19 @@ const RULES_MAP = {
         stateBase: await State.init({ ow: { namespace, auth } })
       };
     }
-  
+
     static jsonResponse(data, status = 200, extraHeaders = {}) {
       return new Response(JSON.stringify(data), {
         status,
         headers: { 'Content-Type': 'application/json', ...extraHeaders }
       });
     }
-  
+
     static errorResponse(message, status = 400) {
       return RequestHelper.jsonResponse({ error: message }, status);
     }
   }
-  
+
   // Route Handlers
   class ApiRoutes {
     static async getGitInfo(request) {
@@ -256,17 +256,17 @@ const RULES_MAP = {
         // Get git remote URL
         const { stdout } = await execAsync('git remote get-url origin');
         const remoteUrl = stdout.trim();
-        
+
         // Extract org and site from GitHub URL
         // Handles both SSH and HTTPS URLs
         let match = remoteUrl.match(/github\.com[:/]([^/]+)\/([^/]+?)(?:\.git)?$/);
-        
+
         if (!match) {
           return RequestHelper.errorResponse('Could not extract org/site from git remote URL: ' + remoteUrl);
         }
-        
+
         const [, org, site] = match;
-        
+
         return RequestHelper.jsonResponse({
           org,
           site,
@@ -281,23 +281,23 @@ const RULES_MAP = {
     static async createApiKey(request) {
       try {
         const { accessToken, org, site } = await request.json();
-        
+
         if (!accessToken || !org || !site) {
           return RequestHelper.errorResponse('accessToken, org, and site are required');
         }
 
         const apiKeyEndpoint = `https://admin.hlx.page/config/${org}/profiles/${site}/apiKeys.json`;
         const body = {
-          description: `Key used by PDP Prerender components [${org}/${site}]`,
+          description: `prerender_key:${org}/${site}`,
           roles: [
             "preview",
-            "publish", 
+            "publish",
             "config_admin"
           ]
         };
 
         console.log(`Creating API key at ${apiKeyEndpoint}`);
-        
+
         const response = await fetch(apiKeyEndpoint, {
           method: 'POST',
           headers: {
@@ -313,13 +313,13 @@ const RULES_MAP = {
         }
 
         const result = await response.json();
-        
+
         return RequestHelper.jsonResponse({
           success: true,
           apiKey: result,
           message: 'API key created successfully'
         });
-        
+
       } catch (error) {
         console.error('Error creating API key:', error);
         return RequestHelper.errorResponse('Failed to create API key: ' + error.message, 500);
@@ -336,23 +336,23 @@ const RULES_MAP = {
         try {
             const formData = await request.formData();
             const jsonData = formData.get('data');
-            
+
             if (!jsonData) {
                 return RequestHelper.errorResponse('No data field found in form submission');
             }
 
             const parsedData = JSON.parse(jsonData);
-            
+
             console.log('Received external submission:');
             console.log('ID:', parsedData.id);
             console.log('Org:', parsedData.org);
             console.log('Site:', parsedData.site);
             console.log('Namespace:', parsedData.appbuilderProjectJSON?.project?.workspace?.details?.runtime?.namespaces?.[0]?.name);
             console.log('AEM Admin JWT:', parsedData.aemAdminJWT ? 'Present' : 'Missing');
-            
+
             // Here you could process the data further, save to database, etc.
             // For now, we'll just log it and return success
-            
+
             return RequestHelper.jsonResponse({
                 success: true,
                 message: 'Configuration received successfully',
@@ -363,7 +363,7 @@ const RULES_MAP = {
                     namespace: parsedData.appbuilderProjectJSON?.project?.workspace?.details?.runtime?.namespaces?.[0]?.name
                 }
             });
-            
+
         } catch (error) {
             console.error('Error processing external submission:', error);
             return RequestHelper.errorResponse('Failed to process submission: ' + error.message, 500);
@@ -376,57 +376,57 @@ const RULES_MAP = {
       const files = await filesBase.list('/');
       return RequestHelper.jsonResponse({ files });
     }
-  
+
     static async changeDetectorRule(request) {
       const headers = RequestHelper.extractHeaders(request);
       const { runtimeBase } = await RequestHelper.initServices(headers);
       const { ruleName, active } = await request.json();
-  
+
       console.log(`Setting rule ${ruleName} to ${active ? 'active' : 'inactive'}`);
-  
+
       if (active) {
         await runtimeBase.rules.enable({ name: ruleName });
       } else {
         await runtimeBase.rules.disable({ name: ruleName });
       }
-  
+
       return RequestHelper.jsonResponse({
         message: `Rule ${ruleName} ${active ? 'enabled' : 'disabled'}`
       });
     }
-  
+
     static async setup(request) {
       const headers = RequestHelper.extractHeaders(request);
       const jwtBody = await AuthService.verifyJWT(headers.aemAdminToken);
-      
+
       if (!jwtBody.isValid) {
         return RequestHelper.errorResponse('Invalid token', 401);
       }
-  
+
       const { filesBase } = await RequestHelper.initServices(headers);
-      
+
       // Get org and site from URL parameters
       const url = new URL(request.url);
       const org = url.searchParams.get('org');
       const site = url.searchParams.get('site');
-      
+
       if (!org || !site) {
         return RequestHelper.errorResponse('org and site parameters are required in URL');
       }
-  
+
       const reqBody = await request.json();
       const { productPageUrlFormat, contentUrl, productsTemplate, storeUrl } = reqBody;
       let { locales } = reqBody;
-  
+
       if (locales?.trim() === '') locales = null;
-  
+
       if (!contentUrl || !productsTemplate || !productPageUrlFormat || !storeUrl) {
         return RequestHelper.errorResponse('Missing required parameters. Please provide: contentUrl, productsTemplate, productPageUrlFormat, and storeUrl');
       }
-  
+
       const siteConfigEndpoint = `https://admin.hlx.page/config/${org}/sites/${site}.json`;
       console.log(`Fetching site config from ${siteConfigEndpoint}`);
-  
+
       const [siteConfigResponse, indexConfigResponse] = await Promise.all([
         fetch(siteConfigEndpoint, {
           method: 'GET',
@@ -437,14 +437,14 @@ const RULES_MAP = {
           headers: { 'x-auth-token': headers.aemAdminToken }
         })
       ]);
-  
+
       const [currentSiteConfig, currentIndexConfig] = await Promise.all([
         siteConfigResponse.json(),
         indexConfigResponse.text()
       ]);
-  
+
       console.log(`Fetched site config from ${siteConfigEndpoint}`);
-  
+
       const overlayBaseURL = await FileService.getOverlayBaseURL(filesBase);
       const newSiteConfig = {
         ...currentSiteConfig,
@@ -455,20 +455,20 @@ const RULES_MAP = {
       };
 
       const parsedLocales = locales ? locales.split(',') : [];
-  
+
       const [newIndexConfig, { newConfig: newAppConfig, currentConfig: currentAppConfig }] = await Promise.all([
         ConfigService.buildIndexConfig(currentIndexConfig, {locales: parsedLocales, storeUrl, productPageUrlFormat}),
         ConfigService.buildAppConfig({ org, site, locales, contentUrl, productsTemplate, productPageUrlFormat, storeUrl })
       ]);
-  
+
       console.log("fetched all configs");
-  
+
       const patches = [
         createPatch("site-config.json.patch", JSON.stringify(currentSiteConfig, null, 2), JSON.stringify(newSiteConfig, null, 2)),
         createPatch("index-config.yaml.patch", currentIndexConfig, newIndexConfig),
         createPatch("app-config.yaml.patch", currentAppConfig, newAppConfig)
       ];
-  
+
       return RequestHelper.jsonResponse({
         currentSiteConfig,
         newSiteConfig,
@@ -478,12 +478,12 @@ const RULES_MAP = {
         patch: patches.join('\n')
       });
     }
-  
+
     static async deleteChangeDetectorState(request) {
       const headers = RequestHelper.extractHeaders(request);
       const { filesBase } = await RequestHelper.initServices(headers);
       const foldersToEmpty = ['check-product-changes', 'public'];
-  
+
       try {
         const totalFilesCount = await FileService.deleteFiles(filesBase, foldersToEmpty);
         console.log(`All files deleted successfully. Total files deleted: ${totalFilesCount}`);
@@ -492,31 +492,31 @@ const RULES_MAP = {
         return RequestHelper.jsonResponse({ message: 'Error deleting files.', error: error.message }, 500);
       }
     }
-  
+
     static async productScraperScrape(request) {
       const headers = RequestHelper.extractHeaders(request);
       const jwtBody = await AuthService.verifyJWT(headers.aemAdminToken);
-      
+
       if (!jwtBody.isValid) {
         return RequestHelper.errorResponse('Invalid token', 401);
       }
-  
+
       const { runtimeBase } = await RequestHelper.initServices(headers);
       const { contentUrl, configName } = await request.json();
-      
+
       if (!contentUrl || !configName) {
         return RequestHelper.errorResponse('contentUrl and configName are required');
       }
-  
+
       const { sub } = jwtBody.payload;
       const [org, site] = sub.split('/');
-  
+
       const result = await runtimeBase.actions.invoke({
         blocking: true,
         result: true,
         name: 'aem-commerce-ssg/fetch-all-products',
       });
-  
+
       return RequestHelper.jsonResponse({ message: 'Action invoked successfully.', result });
     }
 
@@ -525,11 +525,11 @@ const RULES_MAP = {
       const { aioNamespace, aioAuth, fileContent, fileName } = await request.json();
 
       const newFileName = fileName.replace(/\.json$/, '.aio.json');
-      
+
       try {
         // Save the configuration file
         await fs.writeFileSync(newFileName, fileContent);
-        
+
         // Execute aio app use command
         console.log(`Executing: aio app use "${newFileName}"`);
         const { stdout, stderr } = await execAsync(`aio app use "${newFileName}" --no-input`, {
@@ -537,27 +537,27 @@ const RULES_MAP = {
           timeout: 30000,
           stdio: 'pipe'
         });
-        
+
         if (stdout) {
           console.log('AIO app use output:', stdout);
         }
         if (stderr) {
           console.log('AIO app use warnings:', stderr);
         }
-        
+
         console.log('Successfully executed aio app use command.');
-        
-        return RequestHelper.jsonResponse({ 
+
+        return RequestHelper.jsonResponse({
           success: true,
           message: 'AIO configuration saved and applied successfully.',
           output: stdout,
           warnings: stderr
         });
-        
+
       } catch (error) {
         console.error('Failed to execute aio app use command:', error.message);
-        
-        return RequestHelper.jsonResponse({ 
+
+        return RequestHelper.jsonResponse({
           success: false,
           message: 'AIO configuration saved but failed to apply.',
           error: error.message,
@@ -577,7 +577,7 @@ const RULES_MAP = {
     static async helixConfig(request) {
       const headers = RequestHelper.extractHeaders(request);
       const jwtBody = await AuthService.verifyJWT(headers.aemAdminToken);
-      
+
       if (!jwtBody.isValid) {
         return RequestHelper.errorResponse('Invalid token', 401);
       }
@@ -586,7 +586,7 @@ const RULES_MAP = {
       const url = new URL(request.url);
       const org = url.searchParams.get('org');
       const site = url.searchParams.get('site');
-      
+
       if (!org || !site) {
         return RequestHelper.errorResponse('org and site parameters are required in URL');
       }
@@ -664,18 +664,18 @@ const RULES_MAP = {
         indexConfigApplyResult
       });
     }
-  
+
     static async getChangeDetector(request) {
       const headers = RequestHelper.extractHeaders(request);
       const { runtimeBase, stateBase } = await RequestHelper.initServices(headers);
-  
+
       const [lastActivations, rulesList] = await Promise.all([
-        runtimeBase.activations.list().then(activations => 
+        runtimeBase.activations.list().then(activations =>
           activations.filter(activation => activation.name === 'check-product-changes')
         ),
         runtimeBase.rules.list()
       ]);
-  
+
       const rules = await Promise.all(rulesList.map(async rule => {
         if (RULES_MAP[rule.name]) {
           const ruleDetails = await runtimeBase.rules.get(rule.name);
@@ -689,7 +689,7 @@ const RULES_MAP = {
           };
         }
       }));
-  
+
       return RequestHelper.jsonResponse({
         running: stateBase.get('running') === 'true',
         lastActivation: lastActivations[0],
@@ -705,7 +705,7 @@ class Server {
       this.router = AutoRouter();
       this.setupRoutes();
     }
-  
+
     setupRoutes() {
       this.router
         .get('/', () => StaticFileServer.serve('index.html'))
@@ -727,7 +727,7 @@ class Server {
           return StaticFileServer.serve(path);
         });
     }
-  
+
       start(port = 3030) {
     const ittyServer = createServerAdapter(this.router.fetch);
     const httpServer = createServer(ittyServer);
@@ -736,7 +736,7 @@ class Server {
     openBrowser(`http://localhost:${port}`);
   }
   }
-  
+
 // Utility function to open browser cross-platform
 function openBrowser(url) {
   const platform = process.platform;
@@ -767,7 +767,7 @@ function openBrowser(url) {
 // Main function
 async function main() {
   console.log('Starting AEM Commerce Prerender Setup Wizard...');
-  
+
   // Start the server directly
   new Server().start(3030);
 }
