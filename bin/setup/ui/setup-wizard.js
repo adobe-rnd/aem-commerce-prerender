@@ -461,6 +461,32 @@ export class SetupWizard extends LitElement {
         }
         .token-field-container {
             width: 100%;
+        }
+
+        .browse-button {
+            padding: 12px 24px;
+            background-color: #0078d4;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .browse-button:hover {
+            background-color: #106ebe;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .browse-button:active {
+            background-color: #005a9e;
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
             max-width: 600px;
             margin: 0 auto;
         }
@@ -468,31 +494,6 @@ export class SetupWizard extends LitElement {
             width: 100%;
             max-width: 600px;
             margin: 0 auto;
-        }
-        .dropzone-container {
-            border: 2px dashed #555;
-            border-radius: 8px;
-            padding: 32px 24px;
-            text-align: center;
-            background-color: #2a2a2a;
-            color: #ccc;
-            cursor: pointer;
-            transition: border-color 0.3s, background-color 0.3s;
-            width: 100%;
-            margin: 0 auto;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-        }
-        .dropzone-container:hover {
-            border-color: #0078d4;
-            background-color: #333;
-        }
-        sp-dropzone {
-            width: 100%;
-            display: flex;
-            justify-content: center;
         }
         .health-check-container {
             margin-top: 24px;
@@ -564,6 +565,24 @@ export class SetupWizard extends LitElement {
     connectedCallback() {
         super.connectedCallback();
         this.fetchGitInfo();
+        this.ensureFileInputAccessible();
+    }
+
+    ensureFileInputAccessible() {
+      // Ensure the file input is properly accessible
+      this.updateComplete.then(() => {
+          const fileInput = this.shadowRoot.getElementById('aio-file-input');
+          if (fileInput) {
+              console.log('File input found and accessible');
+              // Ensure it's not disabled
+              fileInput.disabled = false;
+              // Ensure it's properly configured
+              fileInput.accept = '.json';
+              fileInput.type = 'file';
+          } else {
+              console.warn('File input not found during initialization');
+          }
+      });
     }
 
     async fetchGitInfo() {
@@ -893,32 +912,38 @@ export class SetupWizard extends LitElement {
         return true;
     }
 
-    handleDragOver(event) {
-        event.preventDefault();
-        event.dataTransfer.dropEffect = 'copy';
-    }
-
-    async handleAIOConfigDrop(event) {
-        event.preventDefault();
-        const files = event.dataTransfer.files;
-        if (files.length > 0) {
-            await this.processAIOConfigFile(files[0]);
-        }
-    }
-
     async handleAIOConfigFileSelect(event) {
         const files = event.target.files;
-        if (files.length > 0) {
+        if (files && files.length > 0) {
             await this.processAIOConfigFile(files[0]);
+        } else {
+            console.warn('No files selected in file input');
         }
     }
 
-    handleDropzoneClick(event) {
+    handleBrowseClick(event) {
         event.preventDefault();
-        const fileInput = this.shadowRoot.getElementById('aio-file-input');
-        if (fileInput) {
-            fileInput.click();
-        }
+        event.stopPropagation();
+
+        console.log('Browse button clicked');
+
+        // Create a temporary file input
+        const tempInput = document.createElement('input');
+        tempInput.type = 'file';
+        tempInput.accept = '.json';
+        tempInput.style.display = 'none';
+
+        tempInput.addEventListener('change', (e) => {
+            console.log('Temporary file input change event:', e);
+            this.handleAIOConfigFileSelect(e);
+            // Clean up the temporary input
+            if (tempInput.parentNode) {
+                tempInput.parentNode.removeChild(tempInput);
+            }
+        });
+
+        document.body.appendChild(tempInput);
+        tempInput.click();
     }
 
     async processAIOConfigFile(file) {
@@ -1464,11 +1489,6 @@ export class SetupWizard extends LitElement {
             <div class="full-width-section">
                 <div class="centered-content">
                     <div class="dropzone-section">
-                        <h4 style="text-align: center; margin-bottom: 16px;">AIO Configuration Upload</h4>
-                        <p style="text-align: center; margin-bottom: 24px; color: #ccc;">
-                            Upload your AIO configuration JSON file to automatically load namespace and auth credentials.
-                        </p>
-
                         ${this.processingAioConfig ? html`
                             <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px; gap: 16px;">
                                 <sp-progress-circle indeterminate size="l" label="Processing configuration..."></sp-progress-circle>
@@ -1476,14 +1496,17 @@ export class SetupWizard extends LitElement {
                             </div>
                         ` : html`
                             <div style="display: flex; justify-content: center; width: 100%;">
-                                <sp-dropzone @drop=${this.handleAIOConfigDrop} @dragover=${this.handleDragOver} @click=${this.handleDropzoneClick} style="width: 100%; max-width: 500px;">
-                                    <div class="dropzone-container">
+                                <div class="file-upload-container" style="width: 100%; max-width: 500px; border: 2px solid #333; border-radius: 8px; padding: 40px; text-align: center; background-color: #2a2a2a;">
+                                    <div class="upload-content">
                                         <sp-icon-upload style="font-size: 48px; color: #0078d4; margin-bottom: 16px;"></sp-icon-upload>
-                                        <h4 style="margin: 0 0 8px 0;">Drop AIO Configuration JSON here</h4>
-                                        <p style="margin: 0; color: #999;">or click to browse files</p>
+                                        <h4 style="margin: 0 0 8px 0; color: #f0f6fc;">Upload AIO Configuration JSON</h4>
+                                        <p style="margin: 0 0 24px 0; color: #999;">Select your AIO configuration file to automatically load namespace and auth credentials.</p>
+                                        <button type="button" class="browse-button" @click=${this.handleBrowseClick}>
+                                            Browse Files
+                                        </button>
                                         <input type="file" accept=".json" @change=${this.handleAIOConfigFileSelect} style="display: none;" id="aio-file-input" />
                                     </div>
-                                </sp-dropzone>
+                                </div>
                             </div>
                         `}
                     </div>
