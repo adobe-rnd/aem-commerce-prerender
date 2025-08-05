@@ -292,7 +292,7 @@ class DiffViewer extends LitElement {
             diffContainer.appendChild(loadingIndicator);
             return;
         }
-        
+
         // Only render if CSS is loaded and patch is available
         if (!this.cssLoaded || !this.patch) {
             return;
@@ -319,7 +319,7 @@ class DiffViewer extends LitElement {
         // Append sanitized and adjusted HTML
         diffContainer.appendChild(tempContainer);
     }
-    
+
     render() {
         return html`
             <div id="diff-container" class="diff-container-dark">
@@ -461,6 +461,32 @@ export class SetupWizard extends LitElement {
         }
         .token-field-container {
             width: 100%;
+        }
+
+        .browse-button {
+            padding: 12px 24px;
+            background-color: #0078d4;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .browse-button:hover {
+            background-color: #106ebe;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .browse-button:active {
+            background-color: #005a9e;
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
             max-width: 600px;
             margin: 0 auto;
         }
@@ -468,31 +494,6 @@ export class SetupWizard extends LitElement {
             width: 100%;
             max-width: 600px;
             margin: 0 auto;
-        }
-        .dropzone-container {
-            border: 2px dashed #555;
-            border-radius: 8px;
-            padding: 32px 24px;
-            text-align: center;
-            background-color: #2a2a2a;
-            color: #ccc;
-            cursor: pointer;
-            transition: border-color 0.3s, background-color 0.3s;
-            width: 100%;
-            margin: 0 auto;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-        }
-        .dropzone-container:hover {
-            border-color: #0078d4;
-            background-color: #333;
-        }
-        sp-dropzone {
-            width: 100%;
-            display: flex;
-            justify-content: center;
         }
         .health-check-container {
             margin-top: 24px;
@@ -564,6 +565,24 @@ export class SetupWizard extends LitElement {
     connectedCallback() {
         super.connectedCallback();
         this.fetchGitInfo();
+        this.ensureFileInputAccessible();
+    }
+
+    ensureFileInputAccessible() {
+      // Ensure the file input is properly accessible
+      this.updateComplete.then(() => {
+          const fileInput = this.shadowRoot.getElementById('aio-file-input');
+          if (fileInput) {
+              console.log('File input found and accessible');
+              // Ensure it's not disabled
+              fileInput.disabled = false;
+              // Ensure it's properly configured
+              fileInput.accept = '.json';
+              fileInput.type = 'file';
+          } else {
+              console.warn('File input not found during initialization');
+          }
+      });
     }
 
     async fetchGitInfo() {
@@ -600,7 +619,7 @@ export class SetupWizard extends LitElement {
             if (Date.now() >= exp * 1000) {
                 return { valid: false, error: 'Token has expired' };
             }
-            
+
             return { valid: true, payload };
         } catch (error) {
             return { valid: false, error: 'Invalid token format: ' + error.message };
@@ -625,7 +644,7 @@ export class SetupWizard extends LitElement {
         try {
             const sitesEndpoint = `https://admin.hlx.page/config/${this.org}/sites.json`;
             console.log(`Fetching sites from ${sitesEndpoint}`);
-            
+
             const response = await fetch(sitesEndpoint, {
                 method: 'GET',
                 headers: {
@@ -635,7 +654,7 @@ export class SetupWizard extends LitElement {
 
             if (!response.ok) {
                 const errorText = await response.text();
-                
+
                 // If it's a 4xx error, allow manual site entry
                 if (response.status >= 400 && response.status < 500) {
                     this.allowManualSiteEntry = true;
@@ -649,7 +668,7 @@ export class SetupWizard extends LitElement {
 
             const result = await response.json();
             this.availableSites = result.sites || [];
-            
+
             if (this.availableSites.length === 0) {
                 this.showToastNotification('No sites found for this organization', 'negative');
                 return false;
@@ -657,7 +676,7 @@ export class SetupWizard extends LitElement {
 
             this.showToastNotification(`Found ${this.availableSites.length} sites`, 'positive');
             return true;
-            
+
         } catch (error) {
             console.error('Error fetching sites:', error);
             this.showToastNotification('Error fetching sites: ' + error.message, 'negative');
@@ -684,7 +703,7 @@ export class SetupWizard extends LitElement {
             };
 
             console.log(`Creating API key at ${apiKeyEndpoint}`);
-            
+
             const response = await fetch(apiKeyEndpoint, {
                 method: 'POST',
                 headers: {
@@ -711,7 +730,7 @@ export class SetupWizard extends LitElement {
             await this.handleTokenChange(this.token);
             this.showToastNotification('API key created successfully!', 'positive');
             return true;
-            
+
         } catch (error) {
             console.error('Error creating API key:', error);
             this.showToastNotification('Error creating API key: ' + error.message, 'negative');
@@ -723,7 +742,7 @@ export class SetupWizard extends LitElement {
 
     disconnectedCallback() {
         super.disconnectedCallback();
-        
+
         // Clean up toast timeout to prevent memory leaks
         if (this.toastTimeout) {
             clearTimeout(this.toastTimeout);
@@ -758,7 +777,7 @@ export class SetupWizard extends LitElement {
             this.aioSite = site;
             this.tokenValid = true;
             this.aioConfigContent = JSON.stringify(payload, null, 2);
-            
+
             // Check if token org/site matches user's configured values
             if (this.org && this.site && (org !== this.org || site !== this.site)) {
                 this.showToastNotification(`Warning: Token is for ${org}/${site} but you configured ${this.org}/${this.site}. Make sure these match.`, 'negative');
@@ -804,22 +823,22 @@ export class SetupWizard extends LitElement {
 
     validateAdvancedSettings() {
         const { productPageUrlFormat, contentUrl, productsTemplate, storeUrl } = this.advancedSettings;
-        
+
         if (!productPageUrlFormat) {
             this.showToastNotification('Product page URL format is required', 'negative');
             return false;
         }
-        
+
         if (!contentUrl) {
             this.showToastNotification('Content URL is required', 'negative');
             return false;
         }
-        
+
         if (!productsTemplate) {
             this.showToastNotification('Products template is required', 'negative');
             return false;
         }
-        
+
         if (!storeUrl) {
             this.showToastNotification('Store URL is required', 'negative');
             return false;
@@ -837,51 +856,57 @@ export class SetupWizard extends LitElement {
         return true;
     }
 
-    handleDragOver(event) {
-        event.preventDefault();
-        event.dataTransfer.dropEffect = 'copy';
-    }
-
-    async handleAIOConfigDrop(event) {
-        event.preventDefault();
-        const files = event.dataTransfer.files;
-        if (files.length > 0) {
-            await this.processAIOConfigFile(files[0]);
-        }
-    }
-
     async handleAIOConfigFileSelect(event) {
         const files = event.target.files;
-        if (files.length > 0) {
+        if (files && files.length > 0) {
             await this.processAIOConfigFile(files[0]);
+        } else {
+            console.warn('No files selected in file input');
         }
     }
 
-    handleDropzoneClick(event) {
+    handleBrowseClick(event) {
         event.preventDefault();
-        const fileInput = this.shadowRoot.getElementById('aio-file-input');
-        if (fileInput) {
-            fileInput.click();
-        }
+        event.stopPropagation();
+
+        console.log('Browse button clicked');
+
+        // Create a temporary file input
+        const tempInput = document.createElement('input');
+        tempInput.type = 'file';
+        tempInput.accept = '.json';
+        tempInput.style.display = 'none';
+
+        tempInput.addEventListener('change', (e) => {
+            console.log('Temporary file input change event:', e);
+            this.handleAIOConfigFileSelect(e);
+            // Clean up the temporary input
+            if (tempInput.parentNode) {
+                tempInput.parentNode.removeChild(tempInput);
+            }
+        });
+
+        document.body.appendChild(tempInput);
+        tempInput.click();
     }
 
     async processAIOConfigFile(file) {
         this.processingAioConfig = true;
-        
+
         try {
             const fileContent = await this.readFileAsText(file);
             const config = JSON.parse(fileContent);
 
             const {name: namespace, auth} = config.project?.workspace?.details?.runtime?.namespaces?.[0];
-            
+
             console.log('Extracted namespace:', namespace);
             console.log('Extracted auth:', auth ? 'Found' : 'Not found');
-            
+
             if (namespace && auth) {
                 this.aioNamespace = namespace;
                 this.aioAuth = auth;
                 this.aioConfigFile = file;
-                
+
                 // Send the config to the backend
                 const response = await fetch('/api/aio-config', {
                     method: 'POST',
@@ -895,9 +920,9 @@ export class SetupWizard extends LitElement {
                         fileName: file.name
                     })
                 });
-                
+
                 const result = await response.json();
-                
+
                 if (result.success) {
                     this.showToastNotification(`AIO configuration loaded successfully! Namespace: ${namespace}`, 'positive');
                 } else {
@@ -908,7 +933,7 @@ export class SetupWizard extends LitElement {
                 const missingItems = [];
                 if (!namespace) missingItems.push('namespace');
                 if (!auth) missingItems.push('auth/client_secret');
-                
+
                 this.showToastNotification(`Could not extract ${missingItems.join(' and ')} from the configuration file. Please check the browser console for the file structure and ensure it's a valid AIO configuration file.`, 'negative');
                 console.error('Failed to extract required fields. File structure:', config);
             }
@@ -940,11 +965,11 @@ export class SetupWizard extends LitElement {
         if (this.toastTimeout) {
             clearTimeout(this.toastTimeout);
         }
-        
+
         this.toastMessage = message;
         this.toastVariant = variant;
         this.showToast = true;
-        
+
         // Auto-hide after 4 seconds (positive toasts) or 6 seconds (negative toasts)
         const autoHideDelay = variant === 'positive' ? 4000 : 6000;
         this.toastTimeout = setTimeout(() => {
@@ -975,7 +1000,7 @@ export class SetupWizard extends LitElement {
         event.stopPropagation();
         this.hideToastNotification();
     }
-    
+
     handleToastClick(event) {
         event.stopPropagation();
         this.hideToastNotification();
@@ -995,14 +1020,14 @@ export class SetupWizard extends LitElement {
                 this.showToastNotification('Please select a site from the dropdown. Click "Load Available Sites" first if you haven\'t already.', 'negative');
                 return;
             }
-            
+
             // Validate the access token
             const tokenValidation = this.validateAccessToken(this.accessToken);
             if (!tokenValidation.valid) {
                 this.showToastNotification(`Token validation failed: ${tokenValidation.error}`, 'negative');
                 return;
             }
-            
+
             const success = await this.createApiKey();
             if (!success) {
                 return;
@@ -1024,10 +1049,10 @@ export class SetupWizard extends LitElement {
         }
         this.currentStep++;
     }
-    
+
     async handlePreviewSetup() {
         this.loading = true;
-        
+
         const diffViewer = this.shadowRoot.querySelector('diff-viewer');
         if (diffViewer) diffViewer.loading = true;
 
@@ -1077,7 +1102,7 @@ export class SetupWizard extends LitElement {
     downloadConfigFiles() {
         // Download app.config.yaml
         this.downloadConfig();
-        
+
         // Download aem-commerce-prerender-org--site.json
         const commerceConfig = {
             aemAdminToken: this.accessToken,
@@ -1086,17 +1111,17 @@ export class SetupWizard extends LitElement {
             aioAuth: this.aioAuth,
             aioNamespace: this.aioNamespace
         };
-        
+
         const fileName = `aem-commerce-prerender-${this.org}--${this.site}.json`;
         const jsonContent = JSON.stringify(commerceConfig, null, 2);
-        
+
         const a = document.createElement('a');
         const file = new Blob([jsonContent], {type: 'application/json'});
         a.href = URL.createObjectURL(file);
         a.download = fileName;
         a.click();
         URL.revokeObjectURL(a.href);
-        
+
         this.showToastNotification('Configuration files downloaded successfully!', 'positive');
     }
 
@@ -1146,7 +1171,7 @@ export class SetupWizard extends LitElement {
                     'x-aio-namespace': this.aioNamespace
                 }
             });
-            
+
             // We expect a 2xx status code for success
             this.healthChecks.push({
                 name: 'Files Endpoint',
@@ -1170,7 +1195,7 @@ export class SetupWizard extends LitElement {
                     'x-aio-namespace': this.aioNamespace
                 }
             });
-            
+
             // We expect a 2xx status code for success
             this.healthChecks.push({
                 name: 'Rules Endpoint',
@@ -1239,12 +1264,12 @@ export class SetupWizard extends LitElement {
 
             // Append form to document and submit
             document.body.appendChild(form);
-            
+
             console.log('Submitting configuration to external endpoint...');
             console.log('Payload:', JSON.stringify(payload, null, 2));
-            
+
             this.showToastNotification('Setup complete! Redirecting to external configuration...', 'positive');
-            
+
             // Submit the form - this will redirect to the target page
             setTimeout(() => {
                 form.submit();
@@ -1274,14 +1299,14 @@ export class SetupWizard extends LitElement {
     renderStep1AccessToken() {
         return html`<div class="step-content">
             <h3>Step 1: Get Access Token</h3>
-            
+
             <div class="full-width-section">
                 <div class="centered-content">
                     <div style="max-width: 600px; text-align: center;">
                         <p style="margin-bottom: 24px; color: #ccc; line-height: 1.5;">
                             Before we can proceed with the setup, you need to login to the AEM Admin API and retrieve an access token (this will later be used to retrieve a permanent service token for the Prerendering service).
                         </p>
-                        
+
                         ${this.gitInfo ? html`
                             <div style="margin-bottom: 24px; padding: 16px; background-color: #1a1a1a; border-radius: 6px; border: 1px solid #333;">
                                 <div style="margin-bottom: 8px;">
@@ -1298,7 +1323,7 @@ export class SetupWizard extends LitElement {
                                 </p>
                             </div>
                         ` : ''}
-                        
+
                         <div style="text-align: left; background-color: #1a1a1a; padding: 20px; border-radius: 6px; border: 1px solid #333; margin-bottom: 24px;">
                             <h4 style="margin: 0 0 12px 0;">Instructions:</h4>
                             <ol style="margin: 0; padding-left: 20px; color: #ccc; line-height: 1.6;">
@@ -1309,7 +1334,7 @@ export class SetupWizard extends LitElement {
                                 <li>Paste that token in the textarea below</li>
                             </ol>
                         </div>
-                        
+
                         <div class="token-field-container" style="margin-bottom: 24px;">
                             <sp-field-label for="access-token" required>Access Token</sp-field-label>
                             <sp-textfield
@@ -1325,8 +1350,8 @@ export class SetupWizard extends LitElement {
 
                         ${this.accessToken ? html`
                             <div style="margin-bottom: 24px;">
-                                <sp-button 
-                                    variant="secondary" 
+                                <sp-button
+                                    variant="secondary"
                                     @click=${this.fetchAvailableSites}
                                     ?disabled=${this.loadingSites}
                                     style="margin-bottom: 16px;"
@@ -1375,7 +1400,7 @@ export class SetupWizard extends LitElement {
     renderStep2Token() {
         return html`<div class="step-content">
             <h3>Step 2: AIO Configuration</h3>
-            
+
             <!-- Generated API Key Display -->
             <div class="full-width-section">
                 <div class="centered-content">
@@ -1408,11 +1433,6 @@ export class SetupWizard extends LitElement {
             <div class="full-width-section">
                 <div class="centered-content">
                     <div class="dropzone-section">
-                        <h4 style="text-align: center; margin-bottom: 16px;">AIO Configuration Upload</h4>
-                        <p style="text-align: center; margin-bottom: 24px; color: #ccc;">
-                            Upload your AIO configuration JSON file to automatically load namespace and auth credentials.
-                        </p>
-                        
                         ${this.processingAioConfig ? html`
                             <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px; gap: 16px;">
                                 <sp-progress-circle indeterminate size="l" label="Processing configuration..."></sp-progress-circle>
@@ -1420,14 +1440,17 @@ export class SetupWizard extends LitElement {
                             </div>
                         ` : html`
                             <div style="display: flex; justify-content: center; width: 100%;">
-                                <sp-dropzone @drop=${this.handleAIOConfigDrop} @dragover=${this.handleDragOver} @click=${this.handleDropzoneClick} style="width: 100%; max-width: 500px;">
-                                    <div class="dropzone-container">
+                                <div class="file-upload-container" style="width: 100%; max-width: 500px; border: 2px solid #333; border-radius: 8px; padding: 40px; text-align: center; background-color: #2a2a2a;">
+                                    <div class="upload-content">
                                         <sp-icon-upload style="font-size: 48px; color: #0078d4; margin-bottom: 16px;"></sp-icon-upload>
-                                        <h4 style="margin: 0 0 8px 0;">Drop AIO Configuration JSON here</h4>
-                                        <p style="margin: 0; color: #999;">or click to browse files</p>
+                                        <h4 style="margin: 0 0 8px 0; color: #f0f6fc;">Upload AIO Configuration JSON</h4>
+                                        <p style="margin: 0 0 24px 0; color: #999;">Select your AIO configuration file to automatically load namespace and auth credentials.</p>
+                                        <button type="button" class="browse-button" @click=${this.handleBrowseClick}>
+                                            Browse Files
+                                        </button>
                                         <input type="file" accept=".json" @change=${this.handleAIOConfigFileSelect} style="display: none;" id="aio-file-input" />
                                     </div>
-                                </sp-dropzone>
+                                </div>
                             </div>
                         `}
                     </div>
@@ -1440,7 +1463,7 @@ export class SetupWizard extends LitElement {
         return html`
             <div class="step-content">
                 <h3>Step 3: Review Configuration</h3>
-                
+
                 <!-- AIO Credentials Display -->
                 <div style="margin-bottom: 24px; padding: 16px; background-color: #1a1a1a; border-radius: 6px; border: 1px solid #333;">
                     <h4 style="margin: 0 0 12px 0; color: #f0f6fc;">AIO Runtime Credentials</h4>
@@ -1451,37 +1474,37 @@ export class SetupWizard extends LitElement {
                         <span style="color: #f0f6fc;">${this.maskCredential(this.aioAuth)}</span>
                     </div>
                 </div>
-                
+
                 <!-- Main Configuration Fields -->
                 <div class="main-config-fields">
                     <div class="form-grid">
                         <sp-field-label for="org-field">Organization</sp-field-label>
-                        <sp-textfield 
-                            id="org-field" 
-                            .value=${this.org} 
+                        <sp-textfield
+                            id="org-field"
+                            .value=${this.org}
                             readonly
                             style="background-color: #2a2a2a;"
                         ></sp-textfield>
-                        
+
                         <sp-field-label for="site-field">Site</sp-field-label>
-                        <sp-textfield 
-                            id="site-field" 
-                            .value=${this.site} 
+                        <sp-textfield
+                            id="site-field"
+                            .value=${this.site}
                             readonly
                             style="background-color: #2a2a2a;"
                         ></sp-textfield>
 
                         <sp-field-label for="product-page-url-format" required>Product Page URL Format</sp-field-label>
-                        <sp-textfield 
-                            id="product-page-url-format" 
-                            .value=${this.advancedSettings.productPageUrlFormat} 
+                        <sp-textfield
+                            id="product-page-url-format"
+                            .value=${this.advancedSettings.productPageUrlFormat}
                             @input=${e => this.handleAdvancedSettingInput('productPageUrlFormat', e.target.value)}
                         ></sp-textfield>
 
                         <sp-field-label for="locales">Locales (can be empty)</sp-field-label>
-                        <sp-textfield 
-                            id="locales" 
-                            .value=${this.advancedSettings.locales || ''} 
+                        <sp-textfield
+                            id="locales"
+                            .value=${this.advancedSettings.locales || ''}
                             @input=${e => this.handleAdvancedSettingInput('locales', e.target.value)}
                         ></sp-textfield>
                     </div>
@@ -1493,23 +1516,23 @@ export class SetupWizard extends LitElement {
                         <sp-accordion-item label="Advanced Settings" ?open=${false}>
                             <div class="form-grid" style="padding: 16px 0;">
                                 <sp-field-label for="content-url" required>Content URL</sp-field-label>
-                                <sp-textfield 
-                                    id="content-url" 
-                                    .value=${this.advancedSettings.contentUrl} 
+                                <sp-textfield
+                                    id="content-url"
+                                    .value=${this.advancedSettings.contentUrl}
                                     @input=${e => this.handleAdvancedSettingInput('contentUrl', e.target.value)}
                                 ></sp-textfield>
-                                
+
                                 <sp-field-label for="products-template" required>Products Template</sp-field-label>
-                                <sp-textfield 
-                                    id="products-template" 
-                                    .value=${this.advancedSettings.productsTemplate} 
+                                <sp-textfield
+                                    id="products-template"
+                                    .value=${this.advancedSettings.productsTemplate}
                                     @input=${e => this.handleAdvancedSettingInput('productsTemplate', e.target.value)}
                                 ></sp-textfield>
-                                
+
                                 <sp-field-label for="store-url" required>Commerce Store URL</sp-field-label>
-                                <sp-textfield 
-                                    id="store-url" 
-                                    .value=${this.advancedSettings.storeUrl} 
+                                <sp-textfield
+                                    id="store-url"
+                                    .value=${this.advancedSettings.storeUrl}
                                     @input=${e => this.handleAdvancedSettingInput('storeUrl', e.target.value)}
                                 ></sp-textfield>
                             </div>
@@ -1552,8 +1575,8 @@ export class SetupWizard extends LitElement {
     render() {
         return html`
             ${this.showToast ? html`
-                <div 
-                    class="toast-notification ${this.showToast ? 'visible' : ''}" 
+                <div
+                    class="toast-notification ${this.showToast ? 'visible' : ''}"
                     style="background-color: ${this.toastVariant === 'positive' ? 'var(--toast-positive-bg)' : 'var(--toast-negative-bg)'};"
                     @click=${this.handleToastClick}
                 >
