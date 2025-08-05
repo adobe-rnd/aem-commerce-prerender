@@ -162,7 +162,40 @@ const RULES_MAP = {
   }
   
   class FileService {
-    static async getOverlayBaseURL(filesBase) {
+    static async getOverlayBaseURL(filesBase, aioNamespace, aioAuth) {
+      // If AIO credentials are provided, use the new API approach
+      if (aioNamespace && aioAuth) {
+        try {
+          console.log('Fetching overlay URL from prerender service...');
+          
+          const response = await fetch('https://prerender.aem-storefront.com/api/v1/web/appbuilder-aem-storefront-prerender-ui/api/overlay-url', {
+            method: 'GET',
+            headers: {
+              'x-aio-namespace': aioNamespace,
+              'x-aio-auth': aioAuth
+            }
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
+          }
+
+          const data = await response.json();
+          
+          if (data.overlayUrl) {
+            console.log('Successfully retrieved overlay URL:', data.overlayUrl);
+            return data.overlayUrl;
+          } else {
+            throw new Error('overlayUrl not found in response');
+          }
+        } catch (error) {
+          console.error('Error fetching overlay URL from prerender service:', error);
+          console.log('Falling back to file-based approach...');
+          // Fall back to the original method if API call fails
+        }
+      }
+      
+      // Original file-based approach (fallback or when no AIO credentials)
       const testFileName = '/test-dir';
       const testFileContent = Buffer.from('This is a mock file');
       await filesBase.write(testFileName, testFileContent);
@@ -445,7 +478,7 @@ const RULES_MAP = {
   
       console.log(`Fetched site config from ${siteConfigEndpoint}`);
   
-      const overlayBaseURL = await FileService.getOverlayBaseURL(filesBase);
+      const overlayBaseURL = await FileService.getOverlayBaseURL(filesBase, headers.namespace, headers.auth);
       const newSiteConfig = {
         ...currentSiteConfig,
         content: {
