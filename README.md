@@ -25,24 +25,24 @@ Pluggable prerendering stack for ahead-of-time data fetching and embedding in Pr
 
 ### Configuration Wizard
 
-  1. In case you do not have an App Builder environment JSON file, follow [these steps first](#app-builder-setup)
-  1. Create a repo from template in your org by clicking [here](https://github.com/new?template_name=aem-commerce-prerender&template_owner=adobe-rnd). You can now clone the resulting repo from your org
+  1. In case you do not have an App Builder environment JSON file, follow the [App Builder Setup Guide](#app-builder-setup)
+  1. [Create a repo](https://github.com/new?template_name=aem-commerce-prerender&template_owner=adobe-rnd) from template in your org. Clone the new repo to your local machine
   1. Download your AppBuilder project JSON file, you will use it to perform the initial setup wizard that will show up in the browser
   1. Run `npm run setup` to onboard and configure your environment.
   1. When you get to the step 3, expand the advanced settings and check the template URL. In case the site has localised templates, with a URL similar to `https://main--site--org.aem.page/en-us/products/default`, you can add a token `{locale}` to define a URL pattern that will be filled with the locales; the resulting URL to be provided would then be `https://main--site--org.aem.page/{locale}/products/default`
   1. A field you have to review is the `pathPrefix`: it's used to define the path under which the product pages will be served. You have to define a URI pattern and you can use the following tokens for that: `{locale}`, `{urlKey}`, `{sku}`. If you are deploying to a live environment, if needed to create logical separation, a good practice is to define a different path prefix from the one currently used, for example `/{locale}/products-prerendered/{urlKey}` when the current is `/{locale}/products/{urlKey}`. Whend ready to switch, it's possible to define it in `app.config.yaml` and then running `aio app deploy` again.
   1. At the end of the process a Site Context will be created and stored in your localStorage: this will be the authentication medium required to operate the <https://prerender.aem-storefront.com> management interface (you will be redirected to this address).
-  1. Customize the code that contains the rendering logic according to your requirements, for [structured data](/actions/pdp-renderer/ldJson.js), [markup](/actions/pdp-renderer/render.js) and [templates](https://github.com/adobe-rnd/aem-commerce-prerender/tree/main/actions/pdp-renderer/templates) - more info [here](/docs/CUSTOMIZE.md)
+  1. [Customize the code](/docs/CUSTOMIZE.md) that contains the rendering logic according to your requirements, for [structured data](/actions/pdp-renderer/ldJson.js), [markup](/actions/pdp-renderer/render.js) and [templates](https://github.com/adobe-rnd/aem-commerce-prerender/tree/main/actions/pdp-renderer/templates)
   1. Deploy the solution with `npm run deploy`
   1. Go to the [Storefront Prerender](https://prerender.aem-storefront.com/#/change-detector) and check that the two rules for change dtetector are enabled (green circles).
-  1. The system is now up and running and, in the first cycle of operation, it should publish all the products in the catalog. You can browse and count them from [here](https://prerender.aem-storefront.com/#/products)
+  1. The system is now up and running and, in the first cycle of operation, it should publish all the products in the catalog. You can browse and count them from [the Management UI](https://prerender.aem-storefront.com/#/products)
 
 ### App Builder Setup
 
 _For the following steps, you need the "Developer" role [in the Admin Console](https://helpx.adobe.com/enterprise/using/manage-developers.html)_
 
   1. First install `aio` CLI globally: `npm install -g @adobe/aio-cli`.
-  1. Go to [https://developer.adobe.com/console](https://developer.adobe.com/console) and choose "Create project from template"
+  1. Go to [Adobe Developer Console](https://developer.adobe.com/console) and choose "Create project from template"
   1. Select "App Builder" and choose the environment (workspaces) according to your needs (we recommend Stage and Production as a starting point)
   1. You can leave all the other fields as per default settings; don't forget to provide a descriptive project title.
   1. After saving the newly created project, click on the workspace you want to deploy the prerendering stack to - use Stage to get started.
@@ -63,6 +63,10 @@ This means that, for example, if your pathFormat configured in app.config.yaml i
 
  You might want to check out the [instructions and guidelines](/docs/POST-SETUP.md) around operation and maintenance of the solution
 
+### Troubleshooting
+
+Please follow the [runbook](/docs/RUNBOOK.md) to troubleshoot issues during development and system ops.
+
 ## Considerations & Use Cases
 
- Few considerations around advantages, use cases and prerequisites are available in the [dedicated page](/docs/USE-CASES.md)
+Some considerations around [advantages, use cases and prerequisites](/docs/USE-CASES.md).
