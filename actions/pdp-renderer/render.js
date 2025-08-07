@@ -5,10 +5,11 @@ const { findDescription, prepareBaseTemplate, getPrimaryImage, generatePriceStri
 const { generateLdJson } = require('./ldJson');
 const { requestSaaS, getProductUrl } = require('../utils');
 const { ProductQuery, ProductByUrlKeyQuery } = require('../queries');
+const { validateHtml } = require('../lib/validateHtml');
 
 const productTemplateCache = {};
 
-function toTemplateProductData(baseProduct) {
+function toTemplateProductData(baseProduct, context) {
   const templateProductData = { ...baseProduct };
   const primaryImage = getPrimaryImage(baseProduct)?.url;
 
@@ -19,6 +20,20 @@ function toTemplateProductData(baseProduct) {
   templateProductData.metaImage = primaryImage;
   templateProductData.primaryImage = primaryImage;
   templateProductData.metaTitle = baseProduct.metaTitle || baseProduct.name || 'Product Details';
+
+  // For each field which can contain HTML, validate it. If it is invalid, strip the HTML and log a warning.
+  const htmlFieldValidations = {
+    metaDescription: validateHtml(templateProductData.metaDescription),
+    shortDescription: validateHtml(templateProductData.shortDescription),
+    description: validateHtml(templateProductData.description)
+  }
+
+  Object.entries(htmlFieldValidations).forEach(([field, validation]) => {
+    if (!validation.valid) {
+      templateProductData[field] = '';
+      context.logger.warn(`HTML validation failed for "${field}" field: ${validation.reason}`);
+    }
+  })
 
   return templateProductData;
 }
@@ -65,7 +80,7 @@ async function generateProductHtml(sku, urlKey, context) {
   }
 
   // Assign meta tag data for template
-  const templateProductData = toTemplateProductData(baseProduct);
+  const templateProductData = toTemplateProductData(baseProduct, context);
 
   // Generate LD-JSON
   const ldJson = await generateLdJson(baseProduct, context);
