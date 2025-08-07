@@ -36,6 +36,7 @@ Pluggable prerendering stack for ahead-of-time data fetching and embedding in Pr
   1. Deploy the solution with `npm run deploy`
   1. Go to the [Storefront Prerender](https://prerender.aem-storefront.com/#/change-detector) and check that the two rules for change dtetector are enabled (green circles).
   1. The system is now up and running and, in the first cycle of operation, it should publish all the products in the catalog. You can browse and count them from [the Management UI](https://prerender.aem-storefront.com/#/products)
+  1. From within the same UI, in hte "Markup Storage" tab, you can browse the generated HTML files. You can also reset the state of the Change detector ("Reset Products List") and force republish  of all the products ("Trigger Product Scraping" button).
 
 ### Management UI Setup
 
