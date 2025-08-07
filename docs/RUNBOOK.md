@@ -3,6 +3,16 @@
 
 It runs a cycle every 5 minutes (by default, and this value can be changed in aio.app.yamml), checking whether a product's lat modified date and resulting markup changed: the product page is previewed and the preview is then compared with the one stored in a cloud storage bucket. Logic is defined in [poller.js](../actions/check-product-changes/poller.js)
 
+### Force re-publishing all PDPs
+
+1. Go to https://prerender.aem-storefront.com/#/markup-storage
+2. Make sure the right context is selected (top-right dropdown)
+3. Click on "Reset Products List"
+4. Click on "Trigger Product Scraper"
+5. Wait for 5 minutes, the system will reprocess all the products
+
+### Operation
+
 1. If a product page returns a 404, you can first check the list in the (Management Tool)[https://prerender.aem-storefront.com/#products]; if your search returns no results, it is very likely that the product was not published.
 1. You can check the activations (cycles) from `aio rt activations list` command (see also [this guide](https://developer.adobe.com/app-builder/docs/get_started/runtime_getting_started/activations)):
 
