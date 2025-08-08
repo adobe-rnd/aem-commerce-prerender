@@ -21,17 +21,15 @@ function toTemplateProductData(baseProduct, context) {
   templateProductData.primaryImage = primaryImage;
   templateProductData.metaTitle = baseProduct.metaTitle || baseProduct.name || 'Product Details';
 
-  // For each field which can contain HTML, validate it. If it is invalid, strip the HTML and log a warning.
-  const htmlFieldValidations = {
+  const fieldValidations = {
     metaDescription: validateHtml(templateProductData.metaDescription),
     shortDescription: validateHtml(templateProductData.shortDescription),
     description: validateHtml(templateProductData.description)
   }
 
-  Object.entries(htmlFieldValidations).forEach(([field, validation]) => {
+  Object.entries(fieldValidations).forEach(([field, validation]) => {
     if (!validation.valid) {
-      templateProductData[field] = '';
-      context.logger.warn(`HTML validation failed for "${field}" field: ${validation.reason}`);
+      context.logger.warn(`Validation failed for "${field}" field: ${validation.reason}`);
     }
   })
 
