@@ -23,7 +23,7 @@ jest.mock('@adobe/aio-sdk', () => ({
 
 
 const { Core } = require('@adobe/aio-sdk')
-const mockLoggerInstance = { info: jest.fn(), debug: jest.fn(), error: jest.fn() }
+const mockLoggerInstance = { info: jest.fn(), debug: jest.fn(), error: jest.fn(), warn: jest.fn() }
 Core.Logger.mockReturnValue(mockLoggerInstance)
 
 const action = require('./../actions/pdp-renderer/index.js')
@@ -36,6 +36,7 @@ beforeEach(() => {
   mockLoggerInstance.info.mockReset()
   mockLoggerInstance.debug.mockReset()
   mockLoggerInstance.error.mockReset()
+  mockLoggerInstance.warn.mockReset()
 })
 
 const fakeParams = {
@@ -84,7 +85,7 @@ describe('pdp-renderer', () => {
 
       expect(response.body).toBeDefined();
       expect(typeof response.body).toBe('string');
-      
+
       const $ = cheerio.load(response.body);
       expect($('.product-recommendations')).toHaveLength(1);
       expect($('body > main > div')).toHaveLength(2);
@@ -161,7 +162,7 @@ describe('pdp-renderer', () => {
         PRODUCT_PAGE_URL_FORMAT: '/{urlKey}',
         __ow_path: `/crown-summit-backpack`,
       });
-     
+
       const $ = cheerio.load(response.body);
       expect($('body > main > div.product-details > div > div > h1').text()).toEqual('Crown Summit Backpack');
     });
@@ -243,9 +244,9 @@ describe('pdp-renderer', () => {
 
     test('render images', async () => {
       const response = await getProductResponse();
-      
+
       const $ = cheerio.load(response.body);
-      
+
       expect($('body > main > div.product-details > div > div:contains("Images")').next().find('img').map((_,e) => $(e).prop('outerHTML')).toArray()).toEqual([
         '<img src="http://www.aemshop.net/media/catalog/product/m/b/mb03-black-0.jpg">',
         '<img src="http://www.aemshop.net/media/catalog/product/m/b/mb03-black-0_alt1.jpg">'
@@ -254,9 +255,9 @@ describe('pdp-renderer', () => {
 
     test('render description', async () => {
       const response = await getProductResponse();
-      
+
       const $ = cheerio.load(response.body);
-      
+
       expect($('body > main > div.product-details > div > div:contains("Description")').next().html().trim()).toMatchInlineSnapshot(`
 "<p>The Crown Summit Backpack is equally at home in a gym locker, study cube or a pup tent, so be sure yours is packed with books, a bag lunch, water bottles, yoga block, laptop, or whatever else you want in hand. Rugged enough for day hikes and camping trips, it has two large zippered compartments and padded, adjustable shoulder straps.</p>
     <ul>
@@ -265,24 +266,24 @@ describe('pdp-renderer', () => {
     <li>Two-way zippers.</li>
     <li>H 20" x W 14" x D 12".</li>
     <li>Weight: 2 lbs, 8 oz. Volume: 29 L.</li>
-    <ul></ul></ul>"
+    </ul>"
 `);
     });
 
     test('render price', async () => {
       const response = await getProductResponse();
-      
+
       const $ = cheerio.load(response.body);
 
-      
+
       expect($('body > main > div.product-details > div > div:contains("Price")').next().text()).toBe('$38.00');
     });
 
     test('render title', async () => {
       const response = await getProductResponse();
-      
+
       const $ = cheerio.load(response.body);
-      
+
       expect($('body > main > div.product-details > div > div > h1').text()).toEqual('Crown Summit Backpack');
     });
   })
@@ -428,9 +429,9 @@ describe('generateProductHtml', () => {
   const mockConfig = require('./mock-responses/mock-config.json');
   const server = useMockServer();
   const defaultContext = {
-    logger: { debug: jest.fn() },
+    logger: { debug: jest.fn(), warn: jest.fn() },
     storeUrl: 'https://store.com',
-    contentUrl: 'https://content.com', 
+    contentUrl: 'https://content.com',
     configName: 'config',
   };
 
@@ -455,17 +456,17 @@ describe('generateProductHtml', () => {
       // Use both handlers for 404 responses
       server.use(handlers.return404());
       server.use(handlers.returnLiveSearch404());
-      
+
       // Mock the config to be pre-loaded to avoid the HTTP request
       const contextWithConfig = {
         ...defaultContext,
         config: mockConfig.data.reduce((acc, { key, value }) => ({ ...acc, [key]: value }), {})
       };
-      
+
       await expect(generateProductHtml('NON-EXISTENT', null, contextWithConfig))
         .rejects
         .toThrow('Product not found');
-        
+
       await expect(generateProductHtml(null, 'non-existent-product', contextWithConfig))
         .rejects
         .toThrow('Product not found');
@@ -475,7 +476,7 @@ describe('generateProductHtml', () => {
   describe('HTML generation', () => {
     test('generates HTML with product template', async () => {
       server.use(handlers.defaultProduct());
-      
+
       // Mock the template fetch
       const templateHtml = fs.readFileSync(path.join(__dirname, 'mock-responses', 'product-default.html'), 'utf8');
       server.use(

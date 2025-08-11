@@ -161,7 +161,7 @@ const CategoriesQuery = `
           name
           level
           urlPath
-      }      
+      }
     }
 `;
 
@@ -194,7 +194,7 @@ const ProductsQuery = `
       items {
         productView {
           urlKey
-          sku          
+          sku
         }
       }
       page_info {
