@@ -526,6 +526,99 @@ describe('generateProductHtml', () => {
 
       expect(html).toContain('Crown Summit Backpack');
     });
+
+    describe('HTML Validation', () => {
+      test('logs warning when shortDescription contains invalid HTML', async () => {
+        server.use(handlers.defaultProductInvalidShortDescription());
+
+        const response = await action.main({
+          STORE_URL: 'https://store.com',
+          CONTENT_URL: 'https://content.com',
+          CONFIG_NAME: 'config',
+          PRODUCT_PAGE_URL_FORMAT: '/products/{sku}',
+          __ow_path: `/products/24-MB03`,
+        });
+
+        expect(response.body).toBeDefined();
+        expect(mockLoggerInstance.warn).toHaveBeenCalledWith(
+          'Validation failed for "shortDescription" field: Mismatched tags: expected </p> but found </div> at line 1, position 23'
+        );
+      });
+
+      test('logs warning when description contains invalid HTML', async () => {
+        server.use(handlers.defaultProductInvalidDescription());
+
+        const response = await action.main({
+          STORE_URL: 'https://store.com',
+          CONTENT_URL: 'https://content.com',
+          CONFIG_NAME: 'config',
+          PRODUCT_PAGE_URL_FORMAT: '/products/{sku}',
+          __ow_path: `/products/24-MB03`,
+        });
+
+        expect(response.body).toBeDefined();
+        expect(mockLoggerInstance.warn).toHaveBeenCalledWith(
+          'Validation failed for "description" field: Mismatched tags: expected </li> but found </ul> at line 1, position 33'
+        );
+      });
+
+      test('logs multiple warnings when multiple fields contain invalid HTML', async () => {
+        server.use(handlers.defaultProductBadData());
+
+        const response = await action.main({
+          STORE_URL: 'https://store.com',
+          CONTENT_URL: 'https://content.com',
+          CONFIG_NAME: 'config',
+          PRODUCT_PAGE_URL_FORMAT: '/products/{sku}',
+          __ow_path: `/products/24-MB03`,
+        });
+
+        expect(response.body).toBeDefined();
+        expect(mockLoggerInstance.warn).toHaveBeenCalledTimes(2);
+        expect(mockLoggerInstance.warn).toHaveBeenCalledWith(
+          'Validation failed for "shortDescription" field: Unclosed tags: div'
+        );
+        expect(mockLoggerInstance.warn).toHaveBeenCalledWith(
+          'Validation failed for "description" field: Unclosed tags: p'
+        );
+      });
+
+      test('does not log warnings when HTML is valid', async () => {
+        server.use(handlers.defaultProductValidHtml());
+
+        const response = await action.main({
+          STORE_URL: 'https://store.com',
+          CONTENT_URL: 'https://content.com',
+          CONFIG_NAME: 'config',
+          PRODUCT_PAGE_URL_FORMAT: '/products/{sku}',
+          __ow_path: `/products/24-MB03`,
+        });
+
+        expect(response.body).toBeDefined();
+        expect(mockLoggerInstance.warn).not.toHaveBeenCalled();
+      });
+
+      test('handles empty or undefined HTML fields gracefully', async () => {
+        server.use(handlers.defaultProductEmptyHtml());
+
+        const response = await action.main({
+          STORE_URL: 'https://store.com',
+          CONTENT_URL: 'https://content.com',
+          CONFIG_NAME: 'config',
+          PRODUCT_PAGE_URL_FORMAT: '/products/{sku}',
+          __ow_path: `/products/24-MB03`,
+        });
+
+        expect(response.body).toBeDefined();
+        expect(mockLoggerInstance.warn).toHaveBeenCalledTimes(2);
+        expect(mockLoggerInstance.warn).toHaveBeenCalledWith(
+          'Validation failed for "shortDescription" field: Input must be a string'
+        );
+        expect(mockLoggerInstance.warn).toHaveBeenCalledWith(
+          'Validation failed for "description" field: Input must be a string'
+        );
+      });
+    });
   });
 });
 

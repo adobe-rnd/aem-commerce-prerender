@@ -22,7 +22,6 @@ function toTemplateProductData(baseProduct, context) {
   templateProductData.metaTitle = baseProduct.metaTitle || baseProduct.name || 'Product Details';
 
   const fieldValidations = {
-    metaDescription: validateHtml(templateProductData.metaDescription),
     shortDescription: validateHtml(templateProductData.shortDescription),
     description: validateHtml(templateProductData.description)
   }
