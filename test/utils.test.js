@@ -33,12 +33,11 @@ const SAMPLE_CONFIGBUS_RESPONSE = {
 };
 
 const { useMockServer } = require('./mock-server');
-const { errorResponse, stringParameters, checkMissingRequestInputs, getBearerToken, request, requestSpreadsheet, getConfig, requestSaaS, getProductUrl } = require('./../actions/utils.js');
+const { errorResponse, checkMissingRequestInputs, getBearerToken, request, requestSpreadsheet, getConfig, requestSaaS, getProductUrl } = require('./../actions/utils.js');
 const { http, HttpResponse } = require('msw');
 
 test('interface', () => {
   expect(typeof errorResponse).toBe('function')
-  expect(typeof stringParameters).toBe('function')
   expect(typeof checkMissingRequestInputs).toBe('function')
   expect(typeof getBearerToken).toBe('function')
 })
@@ -66,22 +65,6 @@ describe('errorResponse', () => {
         body: { error: 'errorMessage' }
       }
     })
-  })
-})
-
-describe('stringParameters', () => {
-  test('no auth header', () => {
-    const params = {
-      a: 1, b: 2, __ow_headers: { 'x-api-key': 'fake-api-key' }
-    }
-    expect(stringParameters(params)).toEqual(JSON.stringify(params))
-  })
-  test('with auth header', () => {
-    const params = {
-      a: 1, b: 2, __ow_headers: { 'x-api-key': 'fake-api-key', authorization: 'secret' }
-    }
-    expect(stringParameters(params)).toEqual(expect.stringContaining('"authorization":"<hidden>"'))
-    expect(stringParameters(params)).not.toEqual(expect.stringContaining('secret'))
   })
 })
 
