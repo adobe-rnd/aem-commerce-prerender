@@ -19,25 +19,6 @@ const [STATE_FILE_EXT, PDP_FILE_EXT] = ['csv', 'html'];
 
 /**
  *
- * Returns a log ready string of the action input parameters.
- * The `Authorization` header content will be replaced by '<hidden>'.
- *
- * @param {object} params action input parameters.
- *
- * @returns {string}
- *
- */
-function stringParameters (params) {
-  // hide authorization token without overriding params
-  let headers = params.__ow_headers || {}
-  if (headers.authorization) {
-    headers = { ...headers, authorization: '<hidden>' }
-  }
-  return JSON.stringify({ ...params, __ow_headers: headers })
-}
-
-/**
- *
  * Returns the list of missing keys giving an object and its required keys.
  * A parameter is missing if its value is undefined or ''.
  * A value of 0 or null is not considered as missing.
@@ -412,7 +393,6 @@ function formatMemoryUsage(data) {
 module.exports = {
   errorResponse,
   getBearerToken,
-  stringParameters,
   checkMissingRequestInputs,
   requestSaaS,
   getConfig,

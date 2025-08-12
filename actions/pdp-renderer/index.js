@@ -11,7 +11,7 @@ governing permissions and limitations under the License.
 */
 
 const { Core } = require('@adobe/aio-sdk')
-const { errorResponse, stringParameters } = require('../utils');
+const { errorResponse } = require('../utils');
 const { extractPathDetails } = require('./lib');
 const { generateProductHtml } = require('./render');
 
@@ -33,45 +33,34 @@ async function main (params) {
   const logger = Core.Logger('main', { level: params.LOG_LEVEL || 'info' })
 
   try {
-    logger.debug(stringParameters(params))
+    let { sku, urlKey, locale } = params;
     const {
       __ow_path,
-      pathFormat : pathFormatQuery,
-      configName : configNameQuery,
-      configSheet : configSheetQuery,
-      contentUrl : contentUrlQuery,
-      storeUrl : storeUrlQuery,
-      productsTemplate : productsTemplateQuery,
-      STORE_URL,
-      CONTENT_URL,
-      CONFIG_NAME,
-      CONFIG_SHEET,
-      PRODUCTS_TEMPLATE,
-      PRODUCT_PAGE_URL_FORMAT,
-      LOCALES,
-    } = params;
-
-    const pathFormat = pathFormatQuery || PRODUCT_PAGE_URL_FORMAT;
-    const configName = configNameQuery || CONFIG_NAME;
-    const configSheet = configSheetQuery || CONFIG_SHEET;
-    const contentUrl = contentUrlQuery || CONTENT_URL;
-    const storeUrl = storeUrlQuery || STORE_URL;
-    const allowedLocales = LOCALES ? LOCALES.split(',').map(a => a.trim()) : [];
-    let context = { contentUrl, storeUrl, configName, configSheet, logger, pathFormat, allowedLocales };
-    context.productsTemplate = productsTemplateQuery || PRODUCTS_TEMPLATE;
-    context.productsTemplate = productsTemplateQuery || PRODUCTS_TEMPLATE;
-
-    const result = extractPathDetails(__ow_path, pathFormat);
-    logger.debug('Path parse results', JSON.stringify(result, null, 4));
-    const { sku, urlKey, locale } = result;
+      STORE_URL: storeUrl,
+      CONTENT_URL: contentUrl,
+      CONFIG_NAME: configName,
+      CONFIG_SHEET: configSheet,
+      PRODUCTS_TEMPLATE: productsTemplate,
+      PRODUCT_PAGE_URL_FORMAT: pathFormat,
+    } = params;   
+    
+    if (!sku && !urlKey) {
+      // try to extract sku and urlKey from path
+      const result = extractPathDetails(__ow_path, pathFormat);
+      logger.debug('Path parse results', JSON.stringify(result, null, 4));
+      sku = result.sku;
+      urlKey = result.urlKey;
+      locale = result.locale;
+    }
 
     if ((!sku && !urlKey) || !contentUrl) {
       return errorResponse(400, 'Invalid path', logger);
     }
 
+    const context = { contentUrl, storeUrl, configName, configSheet, logger, pathFormat, productsTemplate };
     // Map locale to context
     if (locale) {
-      context = { ...context, locale };
+      context.locale = locale;
     }
 
     // Retrieve base product

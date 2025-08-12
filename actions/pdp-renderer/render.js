@@ -32,7 +32,7 @@ async function generateProductHtml(sku, urlKey, context) {
   const logger = context.logger;
   let baseProduct;
   if (sku) {
-    const baseProductData = await requestSaaS(ProductQuery, 'ProductQuery', { sku: sku.toUpperCase() }, context);
+    const baseProductData = await requestSaaS(ProductQuery, 'ProductQuery', { sku }, context);
     if (!baseProductData?.data?.products || baseProductData?.data?.products?.length === 0) {
       const error = new Error('Product not found');
       error.statusCode = 404;
