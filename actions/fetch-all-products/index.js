@@ -102,6 +102,7 @@ async function main(params) {
     CONTENT_URL: contentUrl,
     CONFIG_NAME: configName = 'configs',
     CONFIG_SHEET: configSheet,
+    PRODUCT_PAGE_URL_FORMAT: pathFormat,
   } = params;
   if (!siteName || !orgName || !contentUrl) {
     return {
@@ -120,6 +121,7 @@ async function main(params) {
     storeUrl,
     contentUrl,
     logger: logger,
+    pathFormat,
   };
 
   const results = await Promise.all(locales.map(async (locale) => {
