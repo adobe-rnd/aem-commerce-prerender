@@ -21,7 +21,7 @@ const runtimePackage = 'aem-commerce-ssg'
 const actionUrl = `https://${namespace}.${hostname}/api/v1/web/${runtimePackage}/pdp-renderer`
 
 test('simple product markup', async () => {
-  const res = await fetch(`${actionUrl}/products-ssg/bezier-tee/ADB177`);
+  const res = await fetch(`${actionUrl}/products-ssg/bezier-tee/adb177?sku=ADB177`);
   const content = await res.text();
 
   // Parse markup and compare
@@ -75,7 +75,7 @@ test('simple product markup', async () => {
 });
 
 test('complex product markup', async () => {
-  const res = await fetch(`${actionUrl}/products-ssg/ssg-configurable-product/ssgconfig123`);
+  const res = await fetch(`${actionUrl}/products-ssg/ssg-configurable-product/ssgconfig123?sku=SSGCONFIG123`);
   const content = await res.text();
 
   // Parse markup and compare
@@ -199,7 +199,7 @@ test('complex product markup', async () => {
 });
 
 test('product by urlKey', async () => {
-  const res = await fetch(`${actionUrl}/bezier-tee?pathFormat=/{urlKey}`);
+  const res = await fetch(`${actionUrl}/bezier-tee?urlKey=bezier-tee`);
   const content = await res.text();
 
   // Parse markup and compare
