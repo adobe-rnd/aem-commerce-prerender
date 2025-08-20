@@ -562,6 +562,29 @@ export class SetupWizard extends LitElement {
         this.allowManualSiteEntry = false;
     }
 
+    updateUrlsFromSelection() {
+        if (this.org && this.site) {
+            const baseUrl = `https://main--${this.site}--${this.org}.aem.live`;
+            this.advancedSettings = {
+                ...this.advancedSettings,
+                contentUrl: baseUrl,
+                storeUrl: baseUrl,
+                productsTemplate: `${baseUrl}/products/default`,
+            };
+        }
+    }
+
+    handleOrgChange(e) {
+        this.org = e.target.value;
+        this.updateUrlsFromSelection();
+    }
+
+    handleSiteChange(e) {
+        this.site = e.target.value;
+        this.updateUrlsFromSelection();
+    }
+
+
     connectedCallback() {
         super.connectedCallback();
         this.fetchGitInfo();
@@ -674,6 +697,15 @@ export class SetupWizard extends LitElement {
                 return false;
             }
 
+
+            // Auto-select first site if available and none selected yet
+            if (!this.site && this.availableSites.length > 0) {
+                const first = this.availableSites[0];
+                if (first && first.name) {
+                    this.site = first.name;
+                    this.updateUrlsFromSelection();
+                }
+            }
             this.showToastNotification(`Found ${this.availableSites.length} sites`, 'positive');
             return true;
 
@@ -1072,8 +1104,9 @@ export class SetupWizard extends LitElement {
                 this.showToastNotification('Please enter organization name', 'negative');
                 return;
             }
+            this.site = (this.site || '').trim();
             if (!this.site) {
-                this.showToastNotification('Please select a site from the dropdown. Click "Load Available Sites" first if you haven\'t already.', 'negative');
+                this.showToastNotification('Please select a site (dropdown) or enter it manually below.', 'negative');
                 return;
             }
 
@@ -1370,7 +1403,7 @@ export class SetupWizard extends LitElement {
                                     <sp-textfield
                                         id="org-input"
                                         .value=${this.org}
-                                        @input=${e => this.org = e.target.value}
+                                        @input=${e => this.handleOrgChange(e)}
                                         style="width: 100%;"
                                     ></sp-textfield>
                                 </div>
@@ -1421,10 +1454,10 @@ export class SetupWizard extends LitElement {
                             <div class="token-field-container">
                                 <sp-field-label for="site-select" required>Select Site</sp-field-label>
                                 <sp-picker
-                                    id="site-select"
-                                    .value=${this.site}
-                                    @change=${e => this.site = e.target.value}
-                                    style="width: 100%;"
+                                        id="site-select"
+                                        .value=${this.site}
+                                        @change=${e => this.handleSiteChange(e)}
+                                        style="width: 100%;"
                                 >
                                     <sp-menu-item value="">Select a site...</sp-menu-item>
                                     ${this.availableSites.map(site => html`
@@ -1439,7 +1472,7 @@ export class SetupWizard extends LitElement {
                                     id="site-manual"
                                     placeholder="Enter site name manually..."
                                     .value=${this.site}
-                                    @input=${e => this.site = e.target.value}
+                                    @input=${e => this.handleSiteChange(e)}
                                     style="width: 100%;"
                                 ></sp-textfield>
                                 <p style="margin: 8px 0 0 0; color: #7d8590; font-size: 12px;">
@@ -1499,7 +1532,7 @@ export class SetupWizard extends LitElement {
                                 <div class="file-upload-container" style="width: 100%; max-width: 500px; border: 2px solid #333; border-radius: 8px; padding: 40px; text-align: center; background-color: #2a2a2a;">
                                     <div class="upload-content">
                                         <sp-icon-upload style="font-size: 48px; color: #0078d4; margin-bottom: 16px;"></sp-icon-upload>
-                                        <h4 style="margin: 0 0 8px 0; color: #f0f6fc;">Upload AIO Configuration JSON</h4>
+                                        <h4 style="margin: 0 0 8px 0; color: #f0f6fc;">Upload the AIO configuration JSON from your App Builder project</h4>
                                         <p style="margin: 0 0 24px 0; color: #999;">Select your AIO configuration file to automatically load namespace and auth credentials.</p>
                                         <button type="button" class="browse-button" @click=${this.handleBrowseClick}>
                                             Browse Files
