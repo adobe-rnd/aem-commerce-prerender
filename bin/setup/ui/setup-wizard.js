@@ -1221,7 +1221,7 @@ export class SetupWizard extends LitElement {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-AEM-admin-token': this.accessToken
+                    'X-AEM-admin-token': this.token
                 },
                 body: JSON.stringify({
                     newIndexConfig: this.previewData.newIndexConfig,
