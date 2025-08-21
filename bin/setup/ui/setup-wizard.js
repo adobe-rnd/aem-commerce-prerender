@@ -1188,8 +1188,7 @@ export class SetupWizard extends LitElement {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-AEM-admin-token': this.accessToken,
-                    'X-AIO-auth': this.token
+                    'X-AEM-admin-token': this.accessToken
                 },
                 body: JSON.stringify({
                     newIndexConfig: this.previewData.newIndexConfig,
@@ -1200,7 +1199,8 @@ export class SetupWizard extends LitElement {
                         ...this.advancedSettings
                     },
                     aioNamespace: this.aioNamespace,
-                    aioAuth: this.aioAuth
+                    aioAuth: this.aioAuth,
+                    serviceToken: this.token
                 })
             });
 
