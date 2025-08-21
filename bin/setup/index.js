@@ -606,7 +606,7 @@ const RULES_MAP = {
 
     static async helixConfig(request) {
       const headers = RequestHelper.extractHeaders(request);
-      const jwtBody = await AuthService.verifyJWT(headers.aemAdminToken);
+      const jwtBody = await AuthService.verifyJWT(headers.auth);
 
       if (!jwtBody.isValid) {
         return RequestHelper.errorResponse('Invalid token', 401);
@@ -648,7 +648,7 @@ const RULES_MAP = {
             envObject = dotenv.parse(envContent);
         }
 
-        envObject['AEM_ADMIN_API_AUTH_TOKEN'] = headers.aemAdminToken;
+        envObject['AEM_ADMIN_API_AUTH_TOKEN'] = headers.auth;
 
         const newEnvContent = dotenvStringify(envObject);
         fs.writeFileSync(envPath, newEnvContent);
