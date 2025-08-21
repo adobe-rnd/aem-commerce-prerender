@@ -321,9 +321,11 @@ const RULES_MAP = {
 
         const apiKeyEndpoint = `https://admin.hlx.page/config/${org}/profiles/${site}/apiKeys.json`;
         const body = {
-          description: `prerender_key:${org}/${site}`,
+          description: `Key used by PDP Prerender components [${org}/${site}]`,
           roles: [
-            "publish",
+            "preview",
+            "publish", 
+            "config_admin"
           ]
         };
 
