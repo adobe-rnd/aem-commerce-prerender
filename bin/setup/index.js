@@ -321,9 +321,11 @@ const RULES_MAP = {
 
         const apiKeyEndpoint = `https://admin.hlx.page/config/${org}/profiles/${site}/apiKeys.json`;
         const body = {
-          description: `prerender_key:${org}/${site}`,
+          description: `Key used by PDP Prerender components [${org}/${site}]`,
           roles: [
-            "publish",
+            "preview",
+            "publish", 
+            "config_admin"
           ]
         };
 
@@ -621,9 +623,9 @@ const RULES_MAP = {
         return RequestHelper.errorResponse('org and site parameters are required in URL');
       }
 
-      const { newIndexConfig, newSiteConfig, appConfigParams, aioNamespace, aioAuth } = await request.json();
-      if (!newIndexConfig || !newSiteConfig || !appConfigParams) {
-        return RequestHelper.errorResponse('newIndexConfig, newSiteConfig, and appConfigParams are required');
+      const { newIndexConfig, newSiteConfig, appConfigParams, aioNamespace, aioAuth, serviceToken } = await request.json();
+      if (!newIndexConfig || !newSiteConfig || !appConfigParams || !serviceToken) {
+        return RequestHelper.errorResponse('newIndexConfig, newSiteConfig, serviceToken, and appConfigParams are required');
       }
 
       // Generate and write app.config.yaml locally
@@ -648,7 +650,7 @@ const RULES_MAP = {
             envObject = dotenv.parse(envContent);
         }
 
-        envObject['AEM_ADMIN_API_AUTH_TOKEN'] = headers.aemAdminToken;
+        envObject['AEM_ADMIN_API_AUTH_TOKEN'] = serviceToken;
 
         const newEnvContent = dotenvStringify(envObject);
         fs.writeFileSync(envPath, newEnvContent);
