@@ -16,6 +16,7 @@ const { CategoriesQuery, ProductCountQuery, ProductsQuery } = require('../querie
 const { Core, Files } = require('@adobe/aio-sdk')
 const { requestSaaS, FILE_PREFIX } = require('../utils');
 const { Timings } = require('../lib/benchmark');
+const { getRuntimeConfig } = require('../lib/runtimeConfig');
 
 async function getSkus(categoryPath, context) {
   let productsResp = await requestSaaS(ProductsQuery, 'getProducts', { currentPage: 1, categoryPath }, context);
@@ -95,59 +96,49 @@ async function getAllSkus(context) {
 }
 
 async function main(params) {
-  const logger = Core.Logger('main', { level: params.LOG_LEVEL || 'info' })
-  const {
-    SITE: siteName,
-    ORG: orgName,
-    CONTENT_URL: contentUrl,
-    CONFIG_NAME: configName = 'configs',
-    CONFIG_SHEET: configSheet,
-    PRODUCT_PAGE_URL_FORMAT: pathFormat,
-  } = params;
-  if (!siteName || !orgName || !contentUrl) {
+  // Resolve runtime config (CONTENT_URL/STORE_URL/templates built from ORG/SITE if missing)
+  const cfg = getRuntimeConfig(params);
+  const logger = Core.Logger('main', { level: cfg.logLevel });
+
+  // If CONTENT_URL couldn't be resolved → fail clearly
+  if (!cfg.contentUrl) {
     return {
       statusCode: 400,
-      body: {
-        status: 'error',
-        message: 'missing required parameters'
-      }
-    }
+      body: { status: 'error', message: 'missing CONTENT_URL (couldn’t derive from ORG/SITE and not provided explicitly)' }
+    };
   }
-  const storeUrl = params.STORE_URL;
-  const locales = params.LOCALES ? params.LOCALES.split(',') : [null];
+
   const sharedContext = {
-    configName,
-    configSheet,
-    storeUrl,
-    contentUrl,
-    logger: logger,
-    pathFormat,
+    configName: cfg.configName,
+    configSheet: cfg.configSheet,
+    storeUrl: cfg.storeUrl,
+    contentUrl: cfg.contentUrl,
+    logger,
+    pathFormat: cfg.pathFormat
   };
 
-  const results = await Promise.all(locales.map(async (locale) => {
-    const context = { ...sharedContext };
-    if (locale) {
-      context.locale = locale;
-    }
-    const timings = new Timings();
-    const stateFilePrefix = locale || 'default';
-    const allSkus = await getAllSkus(context);
-    timings.sample('getAllSkus');
-    const filesLib = await Files.init(params.libInit || {});
-    timings.sample('saveFile');
-    const productsFileName = `${FILE_PREFIX}/${stateFilePrefix}-products.json`;
-    await filesLib.write(productsFileName, JSON.stringify(allSkus));
-    return timings.measures;
-  }));
+  const results = await Promise.all(
+      cfg.locales.map(async (locale) => {
+        const context = { ...sharedContext };
+        if (locale) {
+            context.locale = locale;
+        }
+        const timings = new Timings();
+        const stateFilePrefix = locale || 'default';
+        const allSkus = await getAllSkus(context);
+        timings.sample('getAllSkus');
+        const filesLib = await Files.init(params.libInit || {});
+        timings.sample('saveFile');
+        const productsFileName = `${FILE_PREFIX}/${stateFilePrefix}-products.json`;
+        await filesLib.write(productsFileName, JSON.stringify(allSkus));
+        return timings.measures;
+      })
+  );
 
-  const response = {
+  return {
     statusCode: 200,
-    body: {
-      status: 'completed',
-      timings: results,
-    }
-  }
-  return response;
+    body: { status: 'completed', timings: results }
+  };
 }
 
 exports.main = main

@@ -66,3 +66,5 @@ application:
           productScraperRule:
             trigger: "productScraperTrigger"
             action: "fetch-all-products"
+  hooks:
+    post-app-deploy: "node scripts/disable-rules.js"

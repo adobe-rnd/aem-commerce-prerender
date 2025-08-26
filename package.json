@@ -41,7 +41,6 @@
     "e2e": "node --experimental-vm-modules node_modules/jest/bin/jest.js --collectCoverage=false --testRegex ./e2e",
     "lint": "eslint --ignore-pattern web-src --no-error-on-unmatched-pattern test src actions",
     "lint:fix": "npm run lint -- --fix",
-    "predeploy": "node scripts/check-env.js",
     "deploy": "rm -r dist; aio app deploy",
     "setup": "npm i && npx setup",
     "undeploy": "aio app undeploy"

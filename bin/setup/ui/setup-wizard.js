@@ -727,72 +727,18 @@ export class SetupWizard extends LitElement {
         this.loading = true;
         try {
             const apiKeyEndpoint = `https://admin.hlx.page/config/${this.org}/sites/${this.site}/apiKeys.json`;
-
-            // First, check for existing API keys
-            console.log(`Checking for existing API keys at ${apiKeyEndpoint}`);
-
-            const getResponse = await fetch(apiKeyEndpoint, {
-                method: 'GET',
-                headers: {
-                    'authorization': `token ${this.accessToken}`
-                }
-            });
-
-            let existingKeys = {};
-
-            if (getResponse.status === 404) {
-                // 404 means no API keys exist yet, which is fine
-                console.log('No existing API keys found (404 response)');
-            } else if (!getResponse.ok) {
-                const errorText = await getResponse.text();
-                this.showToastNotification(`Failed to check existing API keys: ${getResponse.status} ${getResponse.statusText} - ${errorText}`, 'negative');
-                return false;
-            } else {
-                existingKeys = await getResponse.json();
-                console.log('Existing API keys:', existingKeys);
-            }
-
-            // Check if there's a non-expired key with the expected description
-            const expectedDescription = `prerender_key:${this.org}/${this.site}`;
-            let existingKey = null;
-            const currentTime = new Date();
-
-            if (existingKeys && typeof existingKeys === 'object') {
-                for (const [keyId, keyData] of Object.entries(existingKeys)) {
-                    if (keyData.description === expectedDescription) {
-                        const expirationDate = new Date(keyData.expiration);
-                        if (expirationDate > currentTime) {
-                            existingKey = { id: keyId, ...keyData };
-                            break;
-                        }
-                    }
-                }
-            }
-
-            if (existingKey) {
-                // Use existing key
-                console.log('Found existing non-expired API key:', existingKey);
-                this.generatedApiKey = existingKey;
-                this.token = existingKey.value || existingKey.id;
-                this.aioOrg = this.org;
-                this.aioSite = this.site;
-                await this.handleTokenChange(this.token);
-                this.showToastNotification('Using existing API key!', 'positive');
-                return true;
-            }
-
-            // No existing key found, create a new one
-            console.log('No existing API key found, creating new one');
             const body = {
-                description: expectedDescription,
+                description: `Key used by PDP Prerender components [${this.org}/${this.site}]`,
                 roles: [
+                    "preview",
                     "publish",
+                    "config_admin"
                 ]
             };
 
             console.log(`Creating API key at ${apiKeyEndpoint}`);
 
-            const postResponse = await fetch(apiKeyEndpoint, {
+            const response = await fetch(apiKeyEndpoint, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -801,13 +747,13 @@ export class SetupWizard extends LitElement {
                 body: JSON.stringify(body)
             });
 
-            if (!postResponse.ok) {
-                const errorText = await postResponse.text();
-                this.showToastNotification(`Failed to create API key: ${postResponse.status} ${postResponse.statusText} - ${errorText}`, 'negative');
+            if (!response.ok) {
+                const errorText = await response.text();
+                this.showToastNotification(`Failed to create API key: ${response.status} ${response.statusText} - ${errorText}`, 'negative');
                 return false;
             }
 
-            const result = await postResponse.json();
+            const result = await response.json();
             this.generatedApiKey = result;
             // Auto-populate the AEM admin token with the generated API key value
             this.token = result.value;
@@ -1232,7 +1178,8 @@ export class SetupWizard extends LitElement {
                         ...this.advancedSettings
                     },
                     aioNamespace: this.aioNamespace,
-                    aioAuth: this.aioAuth
+                    aioAuth: this.aioAuth,
+                    serviceToken: this.token
                 })
             });
 

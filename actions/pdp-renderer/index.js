@@ -14,6 +14,7 @@ const { Core } = require('@adobe/aio-sdk')
 const { errorResponse } = require('../utils');
 const { extractPathDetails } = require('./lib');
 const { generateProductHtml } = require('./render');
+const { getRuntimeConfig } = require('../lib/runtimeConfig');
 
 /**
  * Parameters
@@ -30,35 +31,36 @@ const { generateProductHtml } = require('./render');
  * @param {string} params.PRODUCT_PAGE_URL_FORMAT The path format to use for parsing
  */
 async function main (params) {
-  const logger = Core.Logger('main', { level: params.LOG_LEVEL || 'info' })
+  const cfg = getRuntimeConfig(params);
+  const logger = Core.Logger('main', { level: cfg.logLevel });
 
   try {
     let { sku, urlKey, locale } = params;
-    const {
-      __ow_path,
-      STORE_URL: storeUrl,
-      CONTENT_URL: contentUrl,
-      CONFIG_NAME: configName,
-      CONFIG_SHEET: configSheet,
-      PRODUCTS_TEMPLATE: productsTemplate,
-      PRODUCT_PAGE_URL_FORMAT: pathFormat,
-    } = params;   
+    const { __ow_path } = params; 
     
     if (!sku && !urlKey) {
       // try to extract sku and urlKey from path
-      const result = extractPathDetails(__ow_path, pathFormat);
+      const result = extractPathDetails(__ow_path, cfg.pathFormat);
       logger.debug('Path parse results', JSON.stringify(result, null, 4));
       sku = result.sku;
       urlKey = result.urlKey;
       locale = result.locale;
     }
 
-    if ((!sku && !urlKey) || !contentUrl) {
+    if ((!sku && !urlKey) || !cfg.contentUrl) {
       return errorResponse(400, 'Invalid path', logger);
     }
 
-    const context = { contentUrl, storeUrl, configName, configSheet, logger, pathFormat, productsTemplate };
-    // Map locale to context
+    const context = {
+      contentUrl: cfg.contentUrl,
+      storeUrl: cfg.storeUrl,
+      configName: cfg.configName,
+      configSheet: cfg.configSheet,
+      logger,
+      pathFormat: cfg.pathFormat,
+      productsTemplate: cfg.productsTemplate
+    };// Map locale to context
+    
     if (locale) {
       context.locale = locale;
     }
