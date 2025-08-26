@@ -12,7 +12,7 @@ function listRules() {
         const out = sh("aio rt rule list");
         return out
             .split("\n")
-            .slice(2) // пропускаем заголовки
+            .slice(2)
             .map(l => l.trim().split(/\s+/)[0])
             .filter(Boolean);
     }
