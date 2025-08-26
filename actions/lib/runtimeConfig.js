@@ -46,12 +46,6 @@ function getRuntimeConfig(params = {}) {
 
     const { ORG, SITE } = merged;
 
-    if (!ORG || !SITE) {
-        const err = new Error('Missing required runtime variables: ORG and SITE are mandatory');
-        err.statusCode = 400;
-        throw err;
-    }
-
     // Resolve CONTENT_URL
     if (!merged.CONTENT_URL && ORG && SITE) {
         merged.CONTENT_URL = merged.CONTENT_URL_TEMPLATE
