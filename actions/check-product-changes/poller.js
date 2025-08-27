@@ -227,24 +227,24 @@ async function enrichProductWithRenderedHash(product, context) {
   }
 
   return (await renderLimit$)(async () => {
-  try {
-    const productHtml = await generateProductHtml(sku, urlKey, context);
-    product.renderedAt = new Date();
-    product.newHash = crypto.createHash('sha256').update(productHtml).digest('hex');
+    try {
+      const productHtml = await generateProductHtml(sku, urlKey, context);
+      product.renderedAt = new Date();
+      product.newHash = crypto.createHash('sha256').update(productHtml).digest('hex');
 
-    // Save HTML immediately if product should be processed
-    if (shouldPreviewAndPublish(product) && productHtml) {
-      try {
-        const { filesLib } = context.aioLibs;
-        const htmlPath = `/public/pdps${path}.${PDP_FILE_EXT}`;
-        await filesLib.write(htmlPath, productHtml);
-        logger.debug(`Saved HTML for product ${sku} to ${htmlPath}`);
-      } catch (e) {
-        // Reset newHash if saving fails
-        product.newHash = null;
-        logger.error(`Error saving HTML for product ${sku}:`, e);
+      // Save HTML immediately if product should be processed
+      if (shouldPreviewAndPublish(product) && productHtml) {
+        try {
+          const { filesLib } = context.aioLibs;
+          const htmlPath = `/public/pdps${path}.${PDP_FILE_EXT}`;
+          await filesLib.write(htmlPath, productHtml);
+          logger.debug(`Saved HTML for product ${sku} to ${htmlPath}`);
+        } catch (e) {
+          // Reset newHash if saving fails
+          product.newHash = null;
+          logger.error(`Error saving HTML for product ${sku}:`, e);
+        }
       }
-    }
     } catch (e) {
       logger.error(`Error generating product HTML for SKU ${sku}:`, e);
     }
@@ -353,6 +353,28 @@ function filterProducts(condition, products, remainingSkus, context) {
   return { included, ignored };
 }
 
+let getLastModifiedDatesLimit$;
+async function getLastModifiedDates(skus, context) {
+  if (skus.length > BATCH_SIZE) {
+    const reqs = [];
+    for (let i = 0; i < skus.length; i += BATCH_SIZE) {
+      const batch = skus.slice(i, i + BATCH_SIZE);
+      reqs.push(getLastModifiedDates(batch, context));
+    }
+    const results = await Promise.all(reqs);
+    return results.flat();
+  }
+
+  if (!getLastModifiedDatesLimit$) {
+    getLastModifiedDatesLimit$ = import('p-limit').then(({ default: pLimit }) => pLimit(50));
+  }
+
+  return (await getLastModifiedDatesLimit$)(async () => {
+    return requestSaaS(GetLastModifiedQuery, 'getLastModified', { skus }, context)
+      .then(resp => resp.data.products);
+  });
+}
+
 async function poll(params, aioLibs, logger) {
   checkParams(params);
 
@@ -421,12 +443,10 @@ async function poll(params, aioLibs, logger) {
 
       // get last modified dates, filter out products that don't need to be (re)rendered
       const knownSkus = Object.keys(state.skus);
-      let lastModifiedResp = await requestSaaS(GetLastModifiedQuery, 'getLastModified', { skus: knownSkus }, context);
-      logger.info(`Fetched last modified date for ${lastModifiedResp.data.products.length} skus, total ${knownSkus.length}`);
-      let products = lastModifiedResp.data?.products || [];
+      let products = await getLastModifiedDates(knownSkus, context);
+      logger.info(`Fetched last modified date for ${products.length} skus, total ${knownSkus.length}`);
       products = products.map(product => enrichProductWithMetadata(product, state, context));
       ({ included: products } = filterProducts(shouldRender, products, knownSkus, context));
-      lastModifiedResp = null;
       timings.sample('get-changed-products');
 
       // create batches of products to preview and publish
