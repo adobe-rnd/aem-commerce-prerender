@@ -36,7 +36,7 @@ application:
               memorySize: 256
               timeout: 3600000
             inputs:
-              AEM_ADMIN_AUTH_TOKEN: "${AEM_ADMIN_API_AUTH_TOKEN}"
+              AEM_ADMIN_API_AUTH_TOKEN: "${AEM_ADMIN_API_AUTH_TOKEN}"
             annotations:
               final: true
           fetch-all-products:
