@@ -99,23 +99,7 @@ async function main(params) {
   // Resolve runtime config (CONTENT_URL/STORE_URL/templates built from ORG/SITE if missing)
   const cfg = getRuntimeConfig(params);
   const logger = Core.Logger('main', { level: cfg.logLevel });
-
-  // If CONTENT_URL couldn't be resolved → fail clearly
-  if (!cfg.contentUrl) {
-    return {
-      statusCode: 400,
-      body: { status: 'error', message: 'missing CONTENT_URL (couldn’t derive from ORG/SITE and not provided explicitly)' }
-    };
-  }
-
-  const sharedContext = {
-    configName: cfg.configName,
-    configSheet: cfg.configSheet,
-    storeUrl: cfg.storeUrl,
-    contentUrl: cfg.contentUrl,
-    logger,
-    pathFormat: cfg.pathFormat
-  };
+  const sharedContext = { ...cfg, logger }
 
   const results = await Promise.all(
       cfg.locales.map(async (locale) => {

@@ -18,10 +18,10 @@ const { getRuntimeConfig } = require('../lib/runtimeConfig');
 
 async function main(params) {
   const cfg = getRuntimeConfig(params);
-  const logger = Core.Logger('main', { level: params.LOG_LEVEL || 'info' });
+  const logger = Core.Logger('main', { level: cfg.LOG_LEVEL || 'info' });
   const observabilityClient = new ObservabilityClient(logger, {
     token: cfg.adminAuthToken,
-    endpoint: cfg.ingestorEndpoint,
+    endpoint: cfg.logIngestorEndpoint,
     org: cfg.org,
     site: cfg.site
   });
@@ -44,7 +44,7 @@ async function main(params) {
     // a ttl == function timeout is a mitigation for this risk
     await stateMgr.put('running', 'true', { ttl: 3600 });
     activationResult = await poll(
-        { ...params, __cfg: cfg },
+        cfg,
         { stateLib: stateMgr, filesLib },
         logger
     );

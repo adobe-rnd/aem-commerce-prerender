@@ -50,21 +50,19 @@ application:
             runtime: "nodejs:22"
             annotations:
               final: true
-        triggers:
-          productPollerTrigger:
-            feed: "/whisk.system/alarms/interval"
-            inputs:
-              minutes: 5
-          productScraperTrigger:
-            feed: "/whisk.system/alarms/interval"
-            inputs:
-              minutes: 60
-        rules:
-          productPollerRule:
-            trigger: "productPollerTrigger"
-            action: "check-product-changes"
-          productScraperRule:
-            trigger: "productScraperTrigger"
-            action: "fetch-all-products"
-  hooks:
-    post-app-deploy: "node scripts/disable-rules.js"
+#        triggers:
+#          productPollerTrigger:
+#            feed: "/whisk.system/alarms/interval"
+#            inputs:
+#              minutes: 5
+#          productScraperTrigger:
+#            feed: "/whisk.system/alarms/interval"
+#            inputs:
+#              minutes: 60
+#        rules:
+#          productPollerRule:
+#            trigger: "productPollerTrigger"
+#            action: "check-product-changes"
+#          productScraperRule:
+#            trigger: "productScraperTrigger"
+#            action: "fetch-all-products"
