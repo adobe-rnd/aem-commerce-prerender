@@ -137,7 +137,18 @@ const RULES_MAP = {
     }
 
     static async buildIndexConfig(currentYamlConfig, {locales, storeUrl, productPageUrlFormat}) {
-      const pathsToInclude = locales.map(locale => path.join(getProductUrl({}, {storeUrl, pathFormat: productPageUrlFormat, locale}, false), '**'));
+      const seeds = locales?.filter(Boolean)?.length ? locales : [null];
+
+      const pathsToInclude = [...new Set(
+          seeds
+              .map(locale => getProductUrl(
+                  {},
+                  { storeUrl, pathFormat: productPageUrlFormat, locale },
+                  false
+              ))
+              .filter(Boolean)
+              .map(p => path.posix.join(p, '**'))
+      )];
       try {
         const sampleIndexConfigContent = fs.readFileSync('query.yaml', 'utf8');
         const existingIndexConfig = currentYamlConfig ? yaml.load(currentYamlConfig) : {};
