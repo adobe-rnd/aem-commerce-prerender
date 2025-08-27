@@ -26,6 +26,33 @@ const handlers = {
     matcher?.(req);
     return HttpResponse.json(mockProduct);
   }),
+
+  defaultProductInvalidShortDescription: (matcher) => graphql.query('ProductQuery', (req) => {
+    matcher?.(req);
+    // Create a product with invalid HTML in shortDescription
+    const invalidProduct = {
+      ...mockProduct.data.products[0],
+      shortDescription: '<div><p>Mismatched tags</div>'
+    };
+    return HttpResponse.json({
+      data: {
+        products: [invalidProduct]
+      }
+    });
+  }),
+  defaultProductInvalidDescription: (matcher) => graphql.query('ProductQuery', (req) => {
+    matcher?.(req);
+    // Create a product with invalid HTML in description
+    const invalidProduct = {
+      ...mockProduct.data.products[0],
+      description: '<ul><li>List item<li>Another item</ul>'
+    };
+    return HttpResponse.json({
+      data: {
+        products: [invalidProduct]
+      }
+    });
+  }),
   defaultComplexProduct: (matcher) => graphql.query('ProductQuery', (req) => {
     matcher?.(req);
     return HttpResponse.json(mockComplexProduct);
@@ -37,6 +64,51 @@ const handlers = {
   defaultProductLiveSearch: (matcher) => graphql.query('ProductByUrlKey', (req) => {
     matcher?.(req);
     return HttpResponse.json(mockProductLs);
+  }),
+  defaultProductBadData: (matcher) => graphql.query('ProductQuery', (req) => {
+    matcher?.(req);
+    // Create a product with invalid HTML in multiple fields
+    const badProduct = {
+      ...mockProduct.data.products[0],
+      metaDescription: '<span>Unclosed span',
+      shortDescription: '<div>Unclosed div',
+      description: '<p>Unclosed paragraph'
+    };
+    return HttpResponse.json({
+      data: {
+        products: [badProduct]
+      }
+    });
+  }),
+  defaultProductValidHtml: (matcher) => graphql.query('ProductQuery', (req) => {
+    matcher?.(req);
+    // Create a product with valid HTML in all fields
+    const validProduct = {
+      ...mockProduct.data.products[0],
+      metaDescription: '<p>Valid paragraph</p>',
+      shortDescription: '<div>Valid div</div>',
+      description: '<ul><li>Valid list item</li></ul>'
+    };
+    return HttpResponse.json({
+      data: {
+        products: [validProduct]
+      }
+    });
+  }),
+  defaultProductEmptyHtml: (matcher) => graphql.query('ProductQuery', (req) => {
+    matcher?.(req);
+    // Create a product with empty/undefined HTML fields
+    const emptyProduct = {
+      ...mockProduct.data.products[0],
+      metaDescription: '',
+      shortDescription: undefined,
+      description: null
+    };
+    return HttpResponse.json({
+      data: {
+        products: [emptyProduct]
+      }
+    });
   }),
   return404: (matcher) => graphql.query('ProductQuery', (req) => {
     matcher?.(req);
