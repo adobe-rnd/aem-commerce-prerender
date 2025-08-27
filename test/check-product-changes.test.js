@@ -143,7 +143,7 @@ describe('Poller', () => {
   };
 
   const mockSaaSResponse = (skus, lastModifiedOffset = 10000) => {
-    requestSaaS.mockImplementation((query, operation) => {
+    requestSaaS.mockImplementation((query, operation, variables) => {
       if (operation === 'getAllSkus') {
         return Promise.resolve({
           data: {
@@ -156,7 +156,7 @@ describe('Poller', () => {
       if (operation === 'getLastModified') {
         return Promise.resolve({
           data: {
-            products: skus.map(sku => ({ 
+            products: variables.skus.map(sku => ({ 
               urlKey: `url-${sku}`, 
               sku, 
               lastModifiedAt: new Date().getTime() - lastModifiedOffset 
@@ -315,6 +315,35 @@ describe('Poller', () => {
           null,
           1
       );
+      expect(AdminAPI.prototype.startProcessing).toHaveBeenCalledTimes(1);
+      expect(AdminAPI.prototype.stopProcessing).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle large number of products in batches', async () => {
+      const now = new Date().getTime();
+      const filesLib = mockFiles();
+      const stateLib = mockState();
+      const skus = Array.from({ length: 10000 }, (_, i) => `sku-${i}`);
+      const skuData = skus.reduce((acc, sku) => {
+        acc[sku] = { timestamp: now - 100000 };
+        return acc;
+      }, {});
+
+      // Setup initial state with existing products
+      setupSkuData(filesLib, stateLib, skuData, now - 700000);
+      // Mock catalog service responses
+      mockSaaSResponse(skus, 5000);
+
+      const result = await poll(defaultParams, { filesLib, stateLib }, mockLogger);
+
+      // Verify results
+      expect(result.state).toBe('completed');
+      expect(result.status.published).toBe(skus.length);
+      expect(result.status.ignored).toBe(0);
+
+      // Verify API calls (batch size is 50)
+      expect(requestSaaS).toHaveBeenCalledTimes(skus.length / 50);
+      expect(AdminAPI.prototype.previewAndPublish).toHaveBeenCalledTimes(skus.length / 50);
       expect(AdminAPI.prototype.startProcessing).toHaveBeenCalledTimes(1);
       expect(AdminAPI.prototype.stopProcessing).toHaveBeenCalledTimes(1);
     });
