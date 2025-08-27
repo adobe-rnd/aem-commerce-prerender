@@ -51,12 +51,12 @@ describe('pdp-renderer', () => {
     })
 
     test('should set logger to use LOG_LEVEL param', async () => {
-      await action.main({ ...fakeParams, LOG_LEVEL: 'fakeLevel' })
+      await action.main({ ...fakeParams, CONTENT_URL: 'https://content.com', LOG_LEVEL: 'fakeLevel' })
       expect(Core.Logger).toHaveBeenCalledWith(expect.any(String), { level: 'fakeLevel' })
     })
 
     test('should return an http response with error for invalid path', async () => {
-      const response = await action.main(fakeParams)
+      const response = await action.main({ ...fakeParams, CONTENT_URL: 'https://content.com'})
       expect(response).toEqual({
         error: {
           statusCode: 400,
