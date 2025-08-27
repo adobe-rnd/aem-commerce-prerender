@@ -18,7 +18,7 @@ const { getRuntimeConfig } = require('../lib/runtimeConfig');
 
 async function main(params) {
   const cfg = getRuntimeConfig(params);
-  const logger = Core.Logger('main', { level: cfg.LOG_LEVEL || 'info' });
+  const logger = Core.Logger('main', { level: cfg.logLevel });
   const observabilityClient = new ObservabilityClient(logger, {
     token: cfg.adminAuthToken,
     endpoint: cfg.logIngestorEndpoint,

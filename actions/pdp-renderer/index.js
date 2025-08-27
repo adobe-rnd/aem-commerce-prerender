@@ -51,15 +51,7 @@ async function main (params) {
       return errorResponse(400, 'Invalid path', logger);
     }
 
-    const context = {
-      contentUrl: cfg.contentUrl,
-      storeUrl: cfg.storeUrl,
-      configName: cfg.configName,
-      configSheet: cfg.configSheet,
-      logger,
-      pathFormat: cfg.pathFormat,
-      productsTemplate: cfg.productsTemplate
-    };// Map locale to context
+    const context = { ...cfg, logger };
     
     if (locale) {
       context.locale = locale;
