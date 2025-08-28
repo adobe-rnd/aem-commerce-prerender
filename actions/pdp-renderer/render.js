@@ -89,7 +89,7 @@ async function generateProductHtml(sku, urlKey, context) {
     Handlebars.registerPartial('content', baseTemplate);
   } else {
     // Use product details block as sole content if no products template is defined
-    Handlebars.registerPartial('content', productDetailsHbs);
+    Handlebars.registerPartial('content', `<div>${productDetailsHbs}</div>`);
   }
 
   return pageTemplate({

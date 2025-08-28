@@ -1,58 +1,56 @@
-<div>
-  <div class="product-details">
+<div class="product-details">
+  <div>
     <div>
-      <div>
-        <h1>{{name}}</h1>
-      </div>
+      <h1>{{name}}</h1>
     </div>
-    {{#if hasImages}}
-    <div>
-      <div><h2>Images</h2></div>
-      <div>
-        <ul>
-          {{#each imageList}}
-          <li><img src="{{this}}"></li>
-          {{/each}}
-        </ul>
-      </div>
-    </div>
-    {{/if}}
-    {{#if description}}
-    <div>
-      <div><h2>Description</h2></div>
-      <div>{{{description}}}</div>
-    </div>
-    {{/if}}
-    {{#if priceString}}
-    <div>
-      <div><h2>Price</h2></div>
-      <div>{{priceString}}</div>
-    </div>
-    {{/if}}
-    {{#if options}}
-    <div>
-      <div><h2>Options</h2></div>
-      <div>
-        <ul>
-          {{#each options}}
-          <li>
-            <h3>{{title}}</h3>
-            option id <em>{{id}}</em>
-            required <em>{{required}}</em>
-            {{#if values}}
-            <ul>
-              {{#each values}}
-              <li>
-                <a href="{{url}}">{{title}} <em>{{#if inStock}}in stock{{else}}out of stock{{/if}}</em></a>
-              </li>
-              {{/each}}
-            </ul>
-            {{/if}}
-          </li>
-          {{/each}}
-        </ul>
-      </div>
-    </div>
-    {{/if}}
   </div>
+  {{#if hasImages }}
+  <div>
+    <div><h2>Images</h2></div>
+    <div>
+      <ul>
+        {{#each imageList}}
+        <li><img src="{{this}}"></li>
+        {{/each}}
+      </ul>
+    </div>
+  </div>
+  {{/if}}
+  {{#if description}}
+  <div>
+    <div><h2>Description</h2></div>
+    <div>{{{description}}}</div>
+  </div>
+  {{/if}}
+  {{#if priceString}}
+  <div>
+    <div><h2>Price</h2></div>
+    <div>{{priceString}}</div>
+  </div>
+  {{/if}}
+  {{#if options}}
+  <div>
+    <div><h2>Options</h2></div>
+    <div>
+      <ul>
+        {{#each options}}
+        <li>
+          <h3>{{title}}</h3>
+          option id <em>{{id}}</em>
+          required <em>{{required}}</em>
+          {{#if values}}
+          <ul>
+            {{#each values}}
+            <li>
+              <a href="{{url}}">{{title}} <em>{{#if inStock}}in stock{{else}}out of stock{{/if}}</em></a>
+            </li>
+            {{/each}}
+          </ul>
+          {{/if}}
+        </li>
+        {{/each}}
+      </ul>
+    </div>
+  </div>
+  {{/if}}
 </div>
