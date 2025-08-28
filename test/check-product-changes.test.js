@@ -115,14 +115,15 @@ describe('Poller', () => {
   });
 
   const defaultParams = {
-    ORG: 'orgName',
-    SITE: 'siteName',
-    CONTENT_URL: 'https://content.com',
-    STORE_URL: 'https://store.com',
-    PRODUCTS_TEMPLATE: 'https://store.com/products/default',
-    PRODUCT_PAGE_URL_FORMAT: 'products/{urlKey}/{sku}',
-    CONFIG_NAME: 'configName',
-    AEM_ADMIN_AUTH_TOKEN: 'token',
+    org: 'orgName',
+    site: 'siteName',
+    contentUrl: 'https://content.com',
+    storeUrl: 'https://store.com',
+    productsTemplate: 'https://store.com/products/default',
+    productPageUrlFormat: 'products/{urlKey}/{sku}',
+    configName: 'configName',
+    adminAuthToken: 'token',
+    pathFormat: '/products/{urlKey}/{sku}',
   };
 
   const setupSkuData = (filesLib, stateLib, skuData, lastQueriedAt) => {
@@ -244,20 +245,20 @@ describe('Poller', () => {
   describe('Parameter validation', () => {
     it('should throw an error if required parameters are missing', async () => {
       const params = { ...defaultParams };
-      delete params.CONFIG_NAME;
+      delete params.configName;
       
       const filesLib = mockFiles();
       const stateLib = mockState();
 
       await expect(poll(params, { filesLib, stateLib }, mockLogger))
-        .rejects.toThrow('Missing required parameters: CONFIG_NAME');
+        .rejects.toThrow('Missing required parameters: configName');
     });
 
     it('should throw an error if STORE_URL is invalid', async () => {
       isValidUrl.mockReturnValue(false);
       const params = {
         ...defaultParams,
-        STORE_URL: 'invalid-url',
+        storeUrl: 'invalid-url',
       };
       
       const filesLib = mockFiles();

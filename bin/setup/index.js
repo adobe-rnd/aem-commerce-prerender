@@ -499,17 +499,14 @@ const RULES_MAP = {
 
       const parsedLocales = locales ? locales.split(',') : [];
 
-      const [newIndexConfig, { newConfig: newAppConfig, currentConfig: currentAppConfig }] = await Promise.all([
-        ConfigService.buildIndexConfig(currentIndexConfig, {locales: parsedLocales, storeUrl, productPageUrlFormat}),
-        ConfigService.buildAppConfig({ org, site, locales, contentUrl, productsTemplate, productPageUrlFormat, storeUrl })
-      ]);
-
-      console.log("fetched all configs");
+      const newIndexConfig = await ConfigService.buildIndexConfig(
+          currentIndexConfig,
+          { locales: parsedLocales, storeUrl, productPageUrlFormat }
+      );
 
       const patches = [
         createPatch("site-config.json.patch", JSON.stringify(currentSiteConfig, null, 2), JSON.stringify(newSiteConfig, null, 2)),
-        createPatch("index-config.yaml.patch", currentIndexConfig, newIndexConfig),
-        createPatch("app-config.yaml.patch", currentAppConfig, newAppConfig)
+        createPatch("index-config.yaml.patch", currentIndexConfig, newIndexConfig)
       ];
 
       return RequestHelper.jsonResponse({
@@ -517,7 +514,6 @@ const RULES_MAP = {
         newSiteConfig,
         currentIndexConfig,
         newIndexConfig,
-        newAppConfig,
         patch: patches.join('\n')
       });
     }
@@ -641,10 +637,6 @@ const RULES_MAP = {
 
       // Generate and write app.config.yaml locally
       try {
-        const { newConfig: newAppConfig } = await ConfigService.buildAppConfig(appConfigParams);
-        fs.writeFileSync('app.config.yaml', newAppConfig);
-        console.log('Successfully wrote app.config.yaml to local filesystem');
-
         const contextInfo = {
             ...appConfigParams,
             aioNamespace,
@@ -660,9 +652,16 @@ const RULES_MAP = {
             const envContent = fs.readFileSync(envPath, 'utf8');
             envObject = dotenv.parse(envContent);
         }
-
+        
         envObject['AEM_ADMIN_API_AUTH_TOKEN'] = serviceToken;
-
+        envObject['ORG'] = org;
+        envObject['SITE'] = site;
+        envObject['PRODUCT_PAGE_URL_FORMAT'] = appConfigParams.productPageUrlFormat;
+        envObject['CONTENT_URL'] = appConfigParams.contentUrl;
+        envObject['STORE_URL'] = appConfigParams.storeUrl;
+        envObject['PRODUCTS_TEMPLATE'] = appConfigParams.productsTemplate;
+        envObject['LOCALES'] = appConfigParams.locales;
+        
         const newEnvContent = dotenvStringify(envObject);
         fs.writeFileSync(envPath, newEnvContent);
         console.log('Successfully updated .env file with AEM_ADMIN_API_AUTH_TOKEN.');
@@ -702,7 +701,7 @@ const RULES_MAP = {
       }
 
       return RequestHelper.jsonResponse({
-        message: 'Config updated successfully and app.config.yaml written to local filesystem',
+        message: 'Config updated successfully and written to local filesystem',
         siteConfigApplyResult,
         indexConfigApplyResult
       });

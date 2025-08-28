@@ -121,31 +121,30 @@ async function deleteState(locale, filesLib) {
 
 /**
  * Checks the Adobe Commerce store for product changes, performs
- * preview/publish/delete operstions if needed, then updates the
- * state accordingly.
+ * preview/publish/delete operations if needed, then updates the state.
  *
- * @param {Object} params - The parameters object.
- * @param {string} params.SITE - The name of the site (repo or repoless).
- * @param {string} params.PRODUCT_PAGE_URL_FORMAT - The URL format for product detail pages.
- * @param {string} params.ORG - The name of the organization.
- * @param {string} params.CONFIG_NAME - The name of the configuration json/xlsx.
- * @param {string} params.PRODUCTS_TEMPLATE - URL to the products template page
- * @param {string} params.AEM_ADMIN_AUTH_TOKEN - The authentication token for AEM Admin API.
- * @param {string} [params.STORE_URL] - The store's base URL.
- * @param {string} [params.LOCALES] - Comma-separated list of allowed locales.
- * @param {string} [params.LOG_LEVEL] - The log level.
- * @param {string} [params.LOG_INGESTOR_ENDPOINT] - The log ingestor endpoint.
- * @param {FilesProvider} filesLib - The files provider object.
- * @returns {Promise<Object>} The result of the polling action.
+ * Expected normalized params (camelCase):
+ * @param {Object} params
+ * @param {string} params.contentUrl           - Base Edge Delivery URL (required).
+ * @param {string} params.configName           - Store config name (required).
+ * @param {string} params.pathFormat           - PDP URL pattern (required).
+ * @param {string} params.adminAuthToken       - Admin API token (required).
+ * @param {string} [params.site]               - Site name (optional; used to derive defaults if needed).
+ * @param {string} [params.org]                - Org name (optional; used to derive defaults if needed).
+ * @param {string} [params.storeUrl]           - Public store URL (defaults to contentUrl).
+ * @param {string} [params.productsTemplate]   - Products template URL (defaults to `${contentUrl}/products/default`).
+ * @param {string[]} [params.locales]          - Locales array, e.g., ['en','de'] (defaults to [null]).
+ * @param {string} [params.logLevel]           - Log level (defaults to 'error').
+ * @param {string} [params.logIngestorEndpoint]- Log ingestor endpoint.
  */
 function checkParams(params) {
-  const requiredParams = ['SITE', 'ORG', 'PRODUCT_PAGE_URL_FORMAT', 'AEM_ADMIN_AUTH_TOKEN', 'CONFIG_NAME', 'CONTENT_URL', 'STORE_URL', 'PRODUCTS_TEMPLATE'];
+  const requiredParams = ['site', 'org', 'pathFormat', 'adminAuthToken', 'configName', 'contentUrl', 'storeUrl', 'productsTemplate'];
   const missingParams = requiredParams.filter(param => !params[param]);
   if (missingParams.length > 0) {
     throw new Error(`Missing required parameters: ${missingParams.join(', ')}`);
   }
 
-  if (params.STORE_URL && !isValidUrl(params.STORE_URL)) {
+  if (params.storeUrl && !isValidUrl(params.storeUrl)) {
     throw new Error('Invalid storeUrl');
   }
 }
@@ -377,26 +376,24 @@ async function getLastModifiedDates(skus, context) {
 
 async function poll(params, aioLibs, logger) {
   checkParams(params);
-
+  
+  const counts = { published: 0, unpublished: 0, ignored: 0, failed: 0 };
   const {
-    // required
-    ORG: orgName,
-    SITE: siteName,
-    PRODUCT_PAGE_URL_FORMAT: pathFormat,
-
-    CONFIG_NAME: configName,
-    CONFIG_SHEET: configSheet,
-    AEM_ADMIN_AUTH_TOKEN: authToken,
-    PRODUCTS_TEMPLATE: productsTemplate,
-    STORE_URL: storeUrl,
-    CONTENT_URL: contentUrl,
-    LOCALES,
-    LOG_LEVEL: logLevel,
-    LOG_INGESTOR_ENDPOINT: logIngestorEndpoint,
+    org, site, pathFormat,
+    configName, configSheet,
+    adminAuthToken,
+    productsTemplate, storeUrl, contentUrl,
+    logLevel, logIngestorEndpoint,
+    locales: rawLocales
   } = params;
 
-  const locales = LOCALES?.split(',') || [null];
-  const counts = { published: 0, unpublished: 0, ignored: 0, failed: 0 };
+  // Normalize locales: accept array or "en,fr" string; default to [null]
+  const locales = Array.isArray(rawLocales)
+      ? rawLocales
+      : (typeof rawLocales === 'string' && rawLocales.trim()
+          ? rawLocales.split(',').map(s => s.trim()).filter(Boolean)
+          : [null]);
+
   const sharedContext = {
     storeUrl,
     contentUrl,
@@ -408,10 +405,14 @@ async function poll(params, aioLibs, logger) {
     productsTemplate,
     aioLibs,
     logLevel,
-    logIngestorEndpoint,
+    logIngestorEndpoint
   };
+
   const timings = new Timings();
-  const adminApi = new AdminAPI({ org: orgName, site: siteName }, sharedContext, { authToken });
+
+  // Pass the token under the "authToken" key (expected by AdminAPI)
+  const adminApi = new AdminAPI({ org, site }, sharedContext, { authToken: adminAuthToken });
+
   const { filesLib } = aioLibs;
 
   logger.info(`Starting poll from ${storeUrl} for locales ${locales}`);

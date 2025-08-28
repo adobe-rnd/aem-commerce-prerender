@@ -5,15 +5,16 @@ application:
       aem-commerce-ssg:
         license: "Apache-2.0"
         inputs:
-          ORG: "hlxsites"
-          SITE: "aem-boilerplate-commerce-staging"
-          PRODUCT_PAGE_URL_FORMAT: "/products-ssg/{urlKey}/{sku}"
-          LOG_LEVEL: "info"
+          ORG: "${ORG}"
+          SITE: "${SITE}"
+          PRODUCT_PAGE_URL_FORMAT: "${PRODUCT_PAGE_URL_FORMAT}"
+          LOG_LEVEL: "error"
           LOG_INGESTOR_ENDPOINT: "https://log-ingestor.aem-storefront.com/api/v1/services/change-detector"
-          CONTENT_URL: "https://main--aem-boilerplate-commerce-staging--hlxsites.aem.live"
-          PRODUCTS_TEMPLATE: "https://main--aem-boilerplate-commerce-staging--hlxsites.aem.live/products/default"
-          STORE_URL: "https://main--aem-boilerplate-commerce-staging--hlxsites.aem.live"
+          CONTENT_URL: "${CONTENT_URL}"
+          PRODUCTS_TEMPLATE: "${PRODUCTS_TEMPLATE}"
+          STORE_URL: "${STORE_URL}"
           CONFIG_NAME: "config"
+          LOCALES: "${LOCALES}"
         actions:
           pdp-renderer:
             function: "actions/pdp-renderer/index.js"
@@ -35,7 +36,7 @@ application:
               memorySize: 256
               timeout: 3600000
             inputs:
-              AEM_ADMIN_AUTH_TOKEN: "${AEM_ADMIN_API_AUTH_TOKEN}"
+              AEM_ADMIN_API_AUTH_TOKEN: "${AEM_ADMIN_API_AUTH_TOKEN}"
             annotations:
               final: true
           fetch-all-products:
@@ -49,19 +50,19 @@ application:
             runtime: "nodejs:22"
             annotations:
               final: true
-        triggers:
-          productPollerTrigger:
-            feed: "/whisk.system/alarms/interval"
-            inputs:
-              minutes: 5
-          productScraperTrigger:
-            feed: "/whisk.system/alarms/interval"
-            inputs:
-              minutes: 60
-        rules:
-          productPollerRule:
-            trigger: "productPollerTrigger"
-            action: "check-product-changes"
-          productScraperRule:
-            trigger: "productScraperTrigger"
-            action: "fetch-all-products"
+#        triggers:
+#          productPollerTrigger:
+#            feed: "/whisk.system/alarms/interval"
+#            inputs:
+#              minutes: 5
+#          productScraperTrigger:
+#            feed: "/whisk.system/alarms/interval"
+#            inputs:
+#              minutes: 60
+#        rules:
+#          productPollerRule:
+#            trigger: "productPollerTrigger"
+#            action: "check-product-changes"
+#          productScraperRule:
+#            trigger: "productScraperTrigger"
+#            action: "fetch-all-products"
