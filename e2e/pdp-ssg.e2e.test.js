@@ -15,7 +15,7 @@ const fetch = require('node-fetch');
 const cheerio = require('cheerio');
 
 // get action url
-const namespace = '245265-blazerankaemshop0001-stage';//Config.get('runtime.namespace')
+const namespace = Config.get('runtime.namespace')
 const hostname = Config.get('cna.hostname') || 'adobeioruntime.net'
 const runtimePackage = 'aem-commerce-ssg'
 const actionUrl = `https://${namespace}.${hostname}/api/v1/web/${runtimePackage}/pdp-renderer`
