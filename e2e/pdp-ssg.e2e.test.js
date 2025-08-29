@@ -28,7 +28,7 @@ test('simple product markup', async () => {
   console.log('Content:', content);
   // Parse markup and compare
   const $ = cheerio.load(content);
-
+  console.log($);
   // Validate H1
   expect($('h1').text()).toEqual('Bezier tee');
 
