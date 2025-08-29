@@ -18,7 +18,7 @@ const cheerio = require('cheerio');
 const namespace = '245265-blazerankaemshop0001-stage';//Config.get('runtime.namespace')
 const hostname = Config.get('cna.hostname') || 'adobeioruntime.net'
 const runtimePackage = 'aem-commerce-ssg'
-const actionUrl = `https://${namespace}.${hostname}/api/v1/web/${runtimePackage}/pdp-renderer`
+const actionUrl = `https://245265-blazerankaemshop0001-stage.${hostname}/api/v1/web/${runtimePackage}/pdp-renderer`
 console.log('Action URL:', actionUrl);
 
 test('simple product markup', async () => {
