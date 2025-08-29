@@ -19,11 +19,13 @@ const namespace = Config.get('runtime.namespace')
 const hostname = Config.get('cna.hostname') || 'adobeioruntime.net'
 const runtimePackage = 'aem-commerce-ssg'
 const actionUrl = `https://${namespace}.${hostname}/api/v1/web/${runtimePackage}/pdp-renderer`
+console.log('Action URL:', actionUrl);
 
 test('simple product markup', async () => {
   const res = await fetch(`${actionUrl}/products-ssg/bezier-tee/adb177?sku=ADB177`);
   const content = await res.text();
-
+  console.log('Url:', `${actionUrl}/products-ssg/bezier-tee/adb177?sku=ADB177`);
+  console.log('Content:', content);
   // Parse markup and compare
   const $ = cheerio.load(content);
 

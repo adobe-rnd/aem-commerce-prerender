@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - debug-e2e
 jobs:
   deploy:
     name: Deploy to Stage
