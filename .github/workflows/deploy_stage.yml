@@ -57,7 +57,7 @@ jobs:
           AIO_RUNTIME_AUTH: ${{ secrets.AIO_RUNTIME_AUTH_STAGE }}
         run: |
           echo "=== DEBUG ENV ==="
-          echo "AIO_RUNTIME_NAMESPACE=$AIO_RUNTIME_NAMESPACE"
+          echo "AIO_RUNTIME_NAMESPACE length: ${#AIO_RUNTIME_NAMESPACE}"
           echo "AIO_RUNTIME_AUTH length: ${#AIO_RUNTIME_AUTH}"
           echo "================="
           npm run e2e
