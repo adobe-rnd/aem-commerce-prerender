@@ -38,12 +38,9 @@ jobs:
         env:
           AIO_RUNTIME_NAMESPACE: ${{ secrets.AIO_RUNTIME_NAMESPACE_STAGE }}
           AIO_RUNTIME_AUTH: ${{ secrets.AIO_RUNTIME_AUTH_STAGE }}
-          AIO_PROJECT_ID: ${{ secrets.AIO_PROJECT_ID_STAGE }}
-          AIO_PROJECT_NAME: ${{ secrets.AIO_PROJECT_NAME_STAGE }}
-          AIO_PROJECT_ORG_ID: ${{ secrets.AIO_PROJECT_ORG_ID_STAGE }}
-          AIO_PROJECT_WORKSPACE_ID: ${{ secrets.AIO_PROJECT_WORKSPACE_ID_STAGE }}
-          AIO_PROJECT_WORKSPACE_NAME: ${{ secrets.AIO_PROJECT_WORKSPACE_NAME_STAGE }}
-          AIO_PROJECT_WORKSPACE_DETAILS_SERVICES: ${{ secrets.AIO_PROJECT_WORKSPACE_DETAILS_SERVICES_STAGE }}
+          ORG: ${{ secrets.PROJECT_ORG_STAGE }}
+          SITE: ${{ secrets.PROJECT_SITE_STAGE }}
+          PRODUCT_PAGE_URL_FORMAT: ${{ secrets.PRODUCT_PAGE_URL_FORMAT_STAGE }}
         uses: adobe/aio-apps-action@3.4.0
         with:
           os: ${{ matrix.os }}
