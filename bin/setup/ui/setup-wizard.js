@@ -1197,31 +1197,6 @@ export class SetupWizard extends LitElement {
     async performHealthChecks() {
         this.loading = true;
         this.healthChecks = [];
-
-        // Health check for local files endpoint
-        try {
-            const filesUrl = `${window.location.origin}/api/files`;
-            const filesResponse = await fetch(filesUrl, {
-                headers: {
-                    'x-aio-auth': this.aioAuth,
-                    'x-aio-namespace': this.aioNamespace
-                }
-            });
-
-            // We expect a 2xx status code for success
-            this.healthChecks.push({
-                name: 'Files Endpoint',
-                status: filesResponse.status >= 200 && filesResponse.status < 300,
-                message: filesResponse.status >= 200 && filesResponse.status < 300 ? 'Files endpoint accessible' : 'Files endpoint not accessible'
-            });
-        } catch (error) {
-            this.healthChecks.push({
-                name: 'Files Endpoint',
-                status: false,
-                message: 'Failed to check files endpoint'
-            });
-        }
-
         // Health check for rules endpoint
         try {
             const rulesUrl = `${window.location.origin}/api/rules`;
