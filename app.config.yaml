@@ -50,12 +50,21 @@ application:
             runtime: "nodejs:22"
             annotations:
               final: true
+          mark-up-clean-up:
+            function: "actions/mark-up-clean-up/index.js"
+            runtime: "nodejs:22"
+            annotations:
+              final: true
 #        triggers:
 #          productPollerTrigger:
 #            feed: "/whisk.system/alarms/interval"
 #            inputs:
 #              minutes: 5
 #          productScraperTrigger:
+#            feed: "/whisk.system/alarms/interval"
+#            inputs:
+#              minutes: 60
+#         markUpCleanUpTrigger:
 #            feed: "/whisk.system/alarms/interval"
 #            inputs:
 #              minutes: 60
@@ -66,3 +75,6 @@ application:
 #          productScraperRule:
 #            trigger: "productScraperTrigger"
 #            action: "fetch-all-products"
+#          markUpCleanUpRule:
+#            trigger: "markUpCleanUpTrigger"
+#            action: "mark-up-clean-up"
