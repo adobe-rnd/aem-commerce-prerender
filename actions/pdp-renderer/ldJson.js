@@ -49,15 +49,12 @@ async function getVariants(baseProduct, url, axes, context) {
       sku: variant.product.sku,
       name: variant.product.name,
       gtin: getGTIN(variant.product),
+      image: variantImage ? variantImage.url : (() => {
+        const fallbackImage = getPrimaryImage(baseProduct, null);
+        return fallbackImage ? fallbackImage.url : null;
+      })(),
       offers: [getOffer(variant.product, variantUrl.toString())],
     };
-
-    if (variantImage) {
-      ldJson.image = variantImage.url;
-    } else {
-      const fallbackImage = getPrimaryImage(baseProduct, null);
-      ldJson.image = fallbackImage ? fallbackImage.url : null;
-    }
     for (let axis of axes) {
       const attribute = variant.product.attributes.find(attr => attr.name === axis);
       if (attribute) {
