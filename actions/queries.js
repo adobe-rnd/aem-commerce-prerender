@@ -144,6 +144,13 @@ const GetLastModifiedQuery = `query getLastModified($skus: [String]!) {
   }
 }`;
 
+const GetUrlKeyQuery = `query getUrlKey($skus: [String]!) {
+  products(skus: $skus) {
+    sku
+    urlKey
+  }
+}`;
+
 const GetAllSkusPaginatedQuery = `query getAllSkusPaginated($currentPage: Int!) {
 	productSearch(phrase: "", page_size: 500, current_page: $currentPage) {
 		items {
@@ -213,5 +220,6 @@ module.exports = {
     GetLastModifiedQuery,
     CategoriesQuery,
     ProductCountQuery,
-    ProductsQuery
+    ProductsQuery,
+    GetUrlKeyQuery
 };
