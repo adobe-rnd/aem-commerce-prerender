@@ -28,8 +28,7 @@ describe('AdminAPI Optimized Tests', () => {
             { requestPerSecond: 5, publishBatchSize: 100, authToken: 'testToken' }
         );
         jest.useFakeTimers();
-        jest.spyOn(global, 'setInterval');
-        jest.spyOn(global, 'clearInterval');
+        // Remove setInterval/clearInterval spies as we're not using them anymore
     });
 
     afterEach(() => {
@@ -57,19 +56,25 @@ describe('AdminAPI Optimized Tests', () => {
         await Promise.resolve();
     });
 
-    test('should start processing queues', async () => {
-        await adminAPI.startProcessing();
-        expect(global.setInterval).toHaveBeenCalled();
-        jest.runOnlyPendingTimers();
+    test('should start processing queues with promise chain', async () => {
+        const processingPromise = adminAPI.startProcessing();
+        expect(adminAPI.isProcessing).toBe(true);
+        expect(processingPromise).toBeInstanceOf(Promise);
+        
+        // Stop processing to clean up
+        await adminAPI.stopProcessing();
+        expect(adminAPI.isProcessing).toBe(false);
     });
 
-    test('should stop processing queues', async () => {
+    test('should stop processing queues gracefully', async () => {
         await adminAPI.startProcessing();
-        jest.runOnlyPendingTimers();
+        expect(adminAPI.isProcessing).toBe(true);
+        
         const stopPromise = adminAPI.stopProcessing();
-        jest.runOnlyPendingTimers();
+        expect(stopPromise).toBeInstanceOf(Promise);
+        
         await stopPromise;
-        expect(global.clearInterval).toHaveBeenCalled();
+        expect(adminAPI.isProcessing).toBe(false);
     });
 
     test('should execute admin request', async () => {
@@ -111,5 +116,32 @@ describe('AdminAPI Optimized Tests', () => {
         adminAPI.unpublishPreviewQueue.push({ records: batch, resolve: jest.fn() });
         adminAPI.processQueues();
         expect(context.logger.info).toHaveBeenCalledWith('Queues: preview=0, publish=0, unpublish live=0, unpublish preview=1, inflight=0, in queue=0');
+    });
+
+    test('should handle promise chain processing gracefully', async () => {
+        // Test that the promise chain can handle empty queues
+        await adminAPI.startProcessing();
+        
+        // Should complete quickly when no work to do
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        await adminAPI.stopProcessing();
+        expect(adminAPI.isProcessing).toBe(false);
+    });
+
+    test('should handle errors in promise chain', async () => {
+        // Mock an error in processing
+        const originalProcessNextBatch = adminAPI.processNextBatch;
+        adminAPI.processNextBatch = jest.fn().mockRejectedValue(new Error('Test error'));
+        
+        await adminAPI.startProcessing();
+        
+        // Should continue processing despite errors
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        await adminAPI.stopProcessing();
+        
+        // Restore original method
+        adminAPI.processNextBatch = originalProcessNextBatch;
     });
 });
