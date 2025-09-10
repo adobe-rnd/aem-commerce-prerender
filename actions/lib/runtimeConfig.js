@@ -1,5 +1,4 @@
 /* Centralized runtime config resolver for AppBuilder actions (CommonJS) */
-/* eslint-disable no-console */
 const { isValidUrl } = require('../utils');
 
 const DEFAULTS = {

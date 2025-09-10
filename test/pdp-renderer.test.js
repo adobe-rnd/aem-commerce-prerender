@@ -330,7 +330,7 @@ describe('pdp-renderer', () => {
 
       const $ = cheerio.load(response.body);
       const optionsHeader = $('main .product-details h2:contains("Options")').first();
-      expect(optionsHeader.length).toBe(1);
+      expect(optionsHeader).toHaveLength(1);
 
       const optionsContainer = optionsHeader.parent().next();
       expect(optionsContainer.find('li').length).toBeGreaterThan(0);

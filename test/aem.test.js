@@ -66,7 +66,7 @@ describe('AdminAPI Optimized Tests', () => {
     });
 
     test('should stop processing queues gracefully', async () => {
-        const processingPromise = adminAPI.startProcessing();
+        adminAPI.startProcessing();
         
         // Immediately stop processing
         const stopPromise = adminAPI.stopProcessing();
