@@ -49,12 +49,12 @@ async function getVariants(baseProduct, url, axes, context) {
       sku: variant.product.sku,
       name: variant.product.name,
       gtin: getGTIN(variant.product),
-      image: getPrimaryImage(variant.product, null),
+      image: variantImage ? variantImage.url : (() => {
+        const fallbackImage = getPrimaryImage(baseProduct, null);
+        return fallbackImage ? fallbackImage.url : null;
+      })(),
       offers: [getOffer(variant.product, variantUrl.toString())],
     };
-    if (variantImage) {
-      ldJson.image = variantImage.url;
-    }
     for (let axis of axes) {
       const attribute = variant.product.attributes.find(attr => attr.name === axis);
       if (attribute) {
@@ -97,7 +97,7 @@ async function generateLdJson(product, context) {
       gtin,
       description: findDescription(product, ['shortDescription', 'metaDescription', 'description']),
       '@id': url,
-      offers: [getOffer(product, url, image ? image.url : null)],
+      offers: [getOffer(product, url)],
     };
   } else if (__typename === 'ComplexProductView') {
     const axes = product.options.map(({ id }) => id);
@@ -122,6 +122,8 @@ async function generateLdJson(product, context) {
 
   if (image) {
     ldJson.image = image.url;
+  } else {
+    ldJson.image = null;
   }
 
   return JSON.stringify(ldJson);
