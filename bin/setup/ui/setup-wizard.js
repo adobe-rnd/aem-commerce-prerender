@@ -527,6 +527,45 @@ export class SetupWizard extends LitElement {
             font-size: 20px;
             cursor: pointer;
         }
+        
+        /* Tooltip styles */
+        sp-textfield[data-tooltip] {
+            position: relative;
+        }
+        
+        sp-textfield[data-tooltip]:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #1a1a1a;
+            color: #ffffff;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            white-space: normal;
+            max-width: 600px;
+            word-wrap: break-word;
+            z-index: 1000;
+            border: 1px solid #333;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            pointer-events: none;
+            opacity: 0;
+            animation: tooltipFadeIn 0.2s ease-in-out forwards;
+            margin-bottom: 8px;
+        }
+        
+        @keyframes tooltipFadeIn {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(4px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+        }
     `;
 
     constructor() {
@@ -1327,11 +1366,9 @@ export class SetupWizard extends LitElement {
                                         .value=${this.org}
                                         @input=${e => this.handleOrgChange(e)}
                                         style="width: 100%;"
+                                        data-tooltip="Organization = GitHub org/user, sitename = repository name. Example: adobe-rnd / aem-commerce-prerender (https://github.com/adobe-rnd/aem-commerce-prerender)"
                                     ></sp-textfield>
                                 </div>
-                                <p style="margin: 0; color: #7d8590; font-size: 12px; text-align: left;">
-                                    Organization auto-detected from git repository. You can edit it if needed.
-                                </p>
                             </div>
                         ` : ''}
 
@@ -1396,6 +1433,7 @@ export class SetupWizard extends LitElement {
                                     .value=${this.site}
                                     @input=${e => this.handleSiteChange(e)}
                                     style="width: 100%;"
+                                    data-tooltip="If you see a 403 error, enter the site name manually"
                                 ></sp-textfield>
                                 <p style="margin: 8px 0 0 0; color: #7d8590; font-size: 12px;">
                                     Unable to load sites automatically. Please enter the site name manually.
@@ -1495,6 +1533,7 @@ export class SetupWizard extends LitElement {
                             .value=${this.org}
                             readonly
                             style="background-color: #2a2a2a;"
+                            data-tooltip="Your Adobe Experience Manager organization name. This field is read-only and was set during the initial configuration."
                         ></sp-textfield>
 
                         <sp-field-label for="site-field">Site</sp-field-label>
@@ -1503,6 +1542,7 @@ export class SetupWizard extends LitElement {
                             .value=${this.site}
                             readonly
                             style="background-color: #2a2a2a;"
+                            data-tooltip="Your AEM site name. This field is read-only and was set during the initial configuration."
                         ></sp-textfield>
 
                         <sp-field-label for="product-page-url-format" required>Product Page URL Format</sp-field-label>
@@ -1510,6 +1550,7 @@ export class SetupWizard extends LitElement {
                             id="product-page-url-format"
                             .value=${this.advancedSettings.productPageUrlFormat}
                             @input=${e => this.handleAdvancedSettingInput('productPageUrlFormat', e.target.value)}
+                            data-tooltip="Define the URL pattern for product pages. Use {urlKey} and {sku} as placeholders. Example: /products/{urlKey}/{sku}"
                         ></sp-textfield>
 
                         <sp-field-label for="locales">Locales (can be empty)</sp-field-label>
@@ -1517,6 +1558,7 @@ export class SetupWizard extends LitElement {
                             id="locales"
                             .value=${this.advancedSettings.locales || ''}
                             @input=${e => this.handleAdvancedSettingInput('locales', e.target.value)}
+                            data-tooltip="Comma-separated list of locales for multi-language support. Example: en-us,fr-fr,de-de. Leave empty for single language."
                         ></sp-textfield>
                     </div>
                 </div>
