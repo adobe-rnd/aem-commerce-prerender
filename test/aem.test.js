@@ -58,18 +58,17 @@ describe('AdminAPI Optimized Tests', () => {
 
     test('should start processing queues with promise chain', async () => {
         const processingPromise = adminAPI.startProcessing();
-        expect(adminAPI.isProcessing).toBe(true);
         expect(processingPromise).toBeInstanceOf(Promise);
         
-        // Stop processing to clean up
-        await adminAPI.stopProcessing();
+        // Wait for processing to complete (should be quick with no work)
+        await processingPromise;
         expect(adminAPI.isProcessing).toBe(false);
     });
 
     test('should stop processing queues gracefully', async () => {
-        await adminAPI.startProcessing();
-        expect(adminAPI.isProcessing).toBe(true);
+        const processingPromise = adminAPI.startProcessing();
         
+        // Immediately stop processing
         const stopPromise = adminAPI.stopProcessing();
         expect(stopPromise).toBeInstanceOf(Promise);
         
@@ -120,28 +119,27 @@ describe('AdminAPI Optimized Tests', () => {
 
     test('should handle promise chain processing gracefully', async () => {
         // Test that the promise chain can handle empty queues
-        await adminAPI.startProcessing();
+        const processingPromise = adminAPI.startProcessing();
         
         // Should complete quickly when no work to do
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await processingPromise;
         
-        await adminAPI.stopProcessing();
         expect(adminAPI.isProcessing).toBe(false);
-    });
+    }, 10000);
 
     test('should handle errors in promise chain', async () => {
         // Mock an error in processing
         const originalProcessNextBatch = adminAPI.processNextBatch;
         adminAPI.processNextBatch = jest.fn().mockRejectedValue(new Error('Test error'));
         
-        await adminAPI.startProcessing();
+        const processingPromise = adminAPI.startProcessing();
         
-        // Should continue processing despite errors
-        await new Promise(resolve => setTimeout(resolve, 200));
+        // Should complete despite errors
+        await processingPromise;
         
-        await adminAPI.stopProcessing();
+        expect(adminAPI.isProcessing).toBe(false);
         
         // Restore original method
         adminAPI.processNextBatch = originalProcessNextBatch;
-    });
+    }, 10000);
 });

@@ -88,7 +88,12 @@ class AdminAPI {
     async processQueuesWithPromiseChain() {
         const { logger } = this.context;
         
-        while (!this.shouldStop && this.hasWorkToDo()) {
+        while (!this.shouldStop) {
+            if (!this.hasWorkToDo()) {
+                // No work to do, exit the loop
+                break;
+            }
+            
             try {
                 await this.processNextBatch();
                 
@@ -108,6 +113,10 @@ class AdminAPI {
         }
         
         logger.info('Processing chain completed');
+        
+        // Reset processing state when chain completes
+        this.isProcessing = false;
+        this.processingPromise = null;
     }
 
     hasWorkToDo() {
