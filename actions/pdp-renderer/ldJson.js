@@ -33,8 +33,8 @@ async function getVariants(baseProduct, url, axes, context) {
   const { logger } = context;
   // For bundle products, extract variants from options instead of using VariantsQuery
   // Bundle products have 'product' data in their option values, configurable products don't
-  if (baseProduct.__typename === 'ComplexProductView' && baseProduct.options &&
-    baseProduct.options.some(option => option.values && option.values.some(value => value.product))) {
+  if (baseProduct.__typename === 'ComplexProductView' &&
+    baseProduct.options?.some(option => option.values?.some(value => value.product))) {
     return getBundleVariants(baseProduct, url);
   }
 
@@ -91,8 +91,8 @@ function getBundleVariants(baseProduct, url) {
             optionTitle: option.title,
             valueId: value.id,
             valueTitle: value.title,
-            quantity: value.quantity || 1,
-            isDefault: value.isDefault || false
+            quantity: value.quantity,
+            isDefault: value.isDefault
           });
         }
       }
@@ -125,12 +125,8 @@ function getBundleVariants(baseProduct, url) {
     ldJson[bundleItem.optionTitle.toLowerCase().replace(/\s+/g, '')] = bundleItem.valueTitle;
 
     // Add quantity and default status
-    if (bundleItem.quantity > 1) {
-      ldJson.quantity = bundleItem.quantity;
-    }
-    if (bundleItem.isDefault) {
-      ldJson.isDefault = true;
-    }
+    ldJson.quantity = bundleItem.quantity;
+    ldJson.isDefault = bundleItem.isDefault;
 
     variants.push(ldJson);
   });
