@@ -58,6 +58,42 @@ const ProductViewFragment = `fragment productViewFields on ProductView {
           type
           value
         }
+        ... on ProductViewOptionValueProduct {
+          product {
+            sku
+            name
+            inStock
+            images(roles: []) {
+              url
+              roles
+            }
+            attributes(roles: ["visible_in_pdp"]) {
+              name
+              label
+              value
+              roles
+            }
+            ... on SimpleProductView {
+              price {
+                roles
+                regular {
+                  amount {
+                    value
+                    currency
+                  }
+                }
+                final {
+                  amount {
+                    value
+                    currency
+                  }
+                }
+              }
+            }
+          }
+          quantity
+          isDefault
+        }
       }
     }
     priceRange {
