@@ -726,6 +726,7 @@ export class SetupWizard extends LitElement {
 
         this.loading = true;
         try {
+            // Step 1: Create the API key
             const apiKeyEndpoint = `https://admin.hlx.page/config/${this.org}/sites/${this.site}/apiKeys.json`;
             const body = {
                 description: `Key used by PDP Prerender components [${this.org}/${this.site}]`,
@@ -755,6 +756,33 @@ export class SetupWizard extends LitElement {
 
             const result = await response.json();
             this.generatedApiKey = result;
+            
+            console.log(`API key created successfully with ID: ${result.id}`);
+            this.showToastNotification('API key created successfully! Now enabling it...', 'positive');
+
+            // Step 2: Enable the API key by adding it to site configuration
+            const enableResponse = await fetch('/api/enable-api-key', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    accessToken: this.accessToken,
+                    org: this.org,
+                    site: this.site,
+                    apiKeyId: result.id
+                })
+            });
+
+            if (!enableResponse.ok) {
+                const errorText = await enableResponse.text();
+                this.showToastNotification(`Failed to enable API key: ${enableResponse.status} ${enableResponse.statusText} - ${errorText}`, 'negative');
+                return false;
+            }
+
+            const enableResult = await enableResponse.json();
+            console.log('API key enabled successfully');
+
             // Auto-populate the AEM admin token with the generated API key value
             this.token = result.value;
             // Set org/site for backward compatibility
@@ -762,12 +790,12 @@ export class SetupWizard extends LitElement {
             this.aioSite = this.site;
             // Auto-validate the token
             await this.handleTokenChange(this.token);
-            this.showToastNotification('API key created successfully!', 'positive');
+            this.showToastNotification('API key created and enabled successfully!', 'positive');
             return true;
 
         } catch (error) {
-            console.error('Error creating API key:', error);
-            this.showToastNotification('Error creating API key: ' + error.message, 'negative');
+            console.error('Error creating or enabling API key:', error);
+            this.showToastNotification('Error creating or enabling API key: ' + error.message, 'negative');
             return false;
         } finally {
             this.loading = false;
