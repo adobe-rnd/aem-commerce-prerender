@@ -28,8 +28,7 @@ describe('AdminAPI Optimized Tests', () => {
             { requestPerSecond: 5, publishBatchSize: 100, authToken: 'testToken' }
         );
         jest.useFakeTimers();
-        jest.spyOn(global, 'setInterval');
-        jest.spyOn(global, 'clearInterval');
+        // Remove setInterval/clearInterval spies as we're not using them anymore
     });
 
     afterEach(() => {
@@ -57,19 +56,24 @@ describe('AdminAPI Optimized Tests', () => {
         await Promise.resolve();
     });
 
-    test('should start processing queues', async () => {
-        await adminAPI.startProcessing();
-        expect(global.setInterval).toHaveBeenCalled();
-        jest.runOnlyPendingTimers();
+    test('should start processing queues with promise chain', async () => {
+        const processingPromise = adminAPI.startProcessing();
+        expect(processingPromise).toBeInstanceOf(Promise);
+        
+        // Wait for processing to complete (should be quick with no work)
+        await processingPromise;
+        expect(adminAPI.isProcessing).toBe(false);
     });
 
-    test('should stop processing queues', async () => {
-        await adminAPI.startProcessing();
-        jest.runOnlyPendingTimers();
+    test('should stop processing queues gracefully', async () => {
+        adminAPI.startProcessing();
+        
+        // Immediately stop processing
         const stopPromise = adminAPI.stopProcessing();
-        jest.runOnlyPendingTimers();
+        expect(stopPromise).toBeInstanceOf(Promise);
+        
         await stopPromise;
-        expect(global.clearInterval).toHaveBeenCalled();
+        expect(adminAPI.isProcessing).toBe(false);
     });
 
     test('should execute admin request', async () => {
@@ -112,4 +116,30 @@ describe('AdminAPI Optimized Tests', () => {
         adminAPI.processQueues();
         expect(context.logger.info).toHaveBeenCalledWith('Queues: preview=0, publish=0, unpublish live=0, unpublish preview=1, inflight=0, in queue=0');
     });
+
+    test('should handle promise chain processing gracefully', async () => {
+        // Test that the promise chain can handle empty queues
+        const processingPromise = adminAPI.startProcessing();
+        
+        // Should complete quickly when no work to do
+        await processingPromise;
+        
+        expect(adminAPI.isProcessing).toBe(false);
+    }, 10000);
+
+    test('should handle errors in promise chain', async () => {
+        // Mock an error in processing
+        const originalProcessNextBatch = adminAPI.processNextBatch;
+        adminAPI.processNextBatch = jest.fn().mockRejectedValue(new Error('Test error'));
+        
+        const processingPromise = adminAPI.startProcessing();
+        
+        // Should complete despite errors
+        await processingPromise;
+        
+        expect(adminAPI.isProcessing).toBe(false);
+        
+        // Restore original method
+        adminAPI.processNextBatch = originalProcessNextBatch;
+    }, 10000);
 });
