@@ -43,6 +43,8 @@ application:
             function: "actions/fetch-all-products/index.js"
             web: "yes"
             runtime: "nodejs:22"
+            inputs:
+              AEM_ADMIN_API_AUTH_TOKEN: "${AEM_ADMIN_API_AUTH_TOKEN}"
             annotations:
               final: true
           get-overlay-url:
@@ -53,6 +55,8 @@ application:
           mark-up-clean-up:
             function: "actions/mark-up-clean-up/index.js"
             runtime: "nodejs:22"
+            inputs:
+              AEM_ADMIN_API_AUTH_TOKEN: "${AEM_ADMIN_API_AUTH_TOKEN}"
             annotations:
               final: true
 #        triggers:

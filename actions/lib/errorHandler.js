@@ -1,21 +1,7 @@
-/*
-Copyright 2025 Adobe. All rights reserved.
-This file is licensed to you under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License. You may obtain a copy
-of the License at http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software distributed under
-the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR REPRESENTATIONS
-OF ANY KIND, either express or implied. See the License for the specific language
-governing permissions and limitations under the License.
-*/
+/* Error handling utilities for AppBuilder actions */
 
 /**
- * Error handling utilities for AEM Commerce Prerender
- */
-
-/**
- * Custom error class for job failures
+ * Custom error class for job-failing errors
  */
 class JobFailedError extends Error {
     constructor(message, code, statusCode = 500, details = {}) {
@@ -29,7 +15,7 @@ class JobFailedError extends Error {
 }
 
 /**
- * Error codes for different types of failures
+ * Standard error codes used across the application
  */
 const ERROR_CODES = {
     MISSING_AUTH_TOKEN: 'MISSING_AUTH_TOKEN',
@@ -49,184 +35,85 @@ const ERROR_CODES = {
 };
 
 /**
- * Handles errors and determines if job should fail
- * @param {Error} error - The error to handle
- * @param {Object} logger - Logger instance
- * @param {Object} context - Additional context for error handling
- * @returns {Object} Error response object
- */
-function handleError(error, logger, context = {}) {
-    // Determine if this is a job-failing error
-    // Batch errors should NOT fail the entire job
-    const isJobFailed = error.isJobFailed || 
-                       error.statusCode >= 500 || 
-                       error.code === ERROR_CODES.MISSING_AUTH_TOKEN ||
-                       error.code === ERROR_CODES.INVALID_TOKEN ||
-                       error.code === ERROR_CODES.EXPIRED_TOKEN ||
-                       error.code === ERROR_CODES.INVALID_TOKEN_FORMAT ||
-                       error.code === ERROR_CODES.INVALID_TOKEN_ISSUER ||
-                       error.code === ERROR_CODES.INSUFFICIENT_PERMISSIONS ||
-                       error.code === ERROR_CODES.CONFIGURATION_ERROR ||
-                       error.code === ERROR_CODES.GLOBAL_ERROR;
-
-    // Batch errors are not job-failing errors
-    const isBatchError = error.code === ERROR_CODES.BATCH_ERROR;
-
-    const errorResponse = {
-        statusCode: error.statusCode || 500,
-        body: {
-            error: true,
-            message: error.message,
-            code: error.code || ERROR_CODES.UNKNOWN_ERROR,
-            jobFailed: isJobFailed && !isBatchError,
-            isBatchError: isBatchError,
-            details: error.details || {}
-        }
-    };
-
-    // Log the error with appropriate level based on error type
-    if (isJobFailed && !isBatchError) {
-        logger?.error('Job failed due to critical error:', {
-            message: error.message,
-            code: error.code || ERROR_CODES.UNKNOWN_ERROR,
-            stack: error.stack,
-            context,
-            ...errorResponse.body
-        });
-    } else if (isBatchError) {
-        logger?.warn('Batch error occurred (job continues):', {
-            message: error.message,
-            code: error.code || ERROR_CODES.UNKNOWN_ERROR,
-            context,
-            ...errorResponse.body
-        });
-    } else {
-        logger?.warn('Non-critical error occurred:', {
-            message: error.message,
-            code: error.code || ERROR_CODES.UNKNOWN_ERROR,
-            context,
-            ...errorResponse.body
-        });
-    }
-
-    return errorResponse;
-}
-
-/**
- * Wraps async functions with error handling
- * @param {Function} fn - Async function to wrap
- * @param {Object} logger - Logger instance
- * @param {Object} context - Additional context
- * @returns {Function} Wrapped function
- */
-function withErrorHandling(fn, logger, context = {}) {
-    return async (...args) => {
-        try {
-            return await fn(...args);
-        } catch (error) {
-            const errorResponse = handleError(error, logger, context);
-            
-            // If job should fail, throw the error
-            if (errorResponse.body.jobFailed) {
-                throw new JobFailedError(
-                    error.message,
-                    error.code || ERROR_CODES.UNKNOWN_ERROR,
-                    error.statusCode || 500,
-                    error.details || {}
-                );
-            }
-            
-            // For non-critical errors, return the error response
-            return errorResponse;
-        }
-    };
-}
-
-/**
- * Validates required parameters and throws if missing
- * @param {Object} params - Parameters to validate
- * @param {Array<string>} requiredParams - Array of required parameter names
- * @param {Object} logger - Logger instance
- * @throws {JobFailedError} If required parameters are missing
- */
-function validateRequiredParams(params, requiredParams, logger) {
-    const missingParams = requiredParams.filter(param => !params[param]);
-    
-    if (missingParams.length > 0) {
-        const error = new JobFailedError(
-            `Missing required parameters: ${missingParams.join(', ')}`,
-            ERROR_CODES.VALIDATION_ERROR,
-            400,
-            { missingParams }
-        );
-        logger?.error('Parameter validation failed:', { missingParams });
-        throw error;
-    }
-}
-
-/**
- * Creates a standardized error response
- * @param {string} message - Error message
- * @param {string} code - Error code
- * @param {number} statusCode - HTTP status code
- * @param {Object} details - Additional error details
- * @returns {Object} Error response object
- */
-function createErrorResponse(message, code = ERROR_CODES.UNKNOWN_ERROR, statusCode = 500, details = {}) {
-    const isBatchError = code === ERROR_CODES.BATCH_ERROR;
-    const isJobFailed = statusCode >= 500 || 
-                       code === ERROR_CODES.MISSING_AUTH_TOKEN || 
-                       code === ERROR_CODES.INVALID_TOKEN || 
-                       code === ERROR_CODES.EXPIRED_TOKEN ||
-                       code === ERROR_CODES.INVALID_TOKEN_FORMAT ||
-                       code === ERROR_CODES.INVALID_TOKEN_ISSUER ||
-                       code === ERROR_CODES.INSUFFICIENT_PERMISSIONS ||
-                       code === ERROR_CODES.CONFIGURATION_ERROR ||
-                       code === ERROR_CODES.GLOBAL_ERROR;
-
-    return {
-        statusCode,
-        body: {
-            error: true,
-            message,
-            code,
-            jobFailed: isJobFailed && !isBatchError,
-            isBatchError: isBatchError,
-            details
-        }
-    };
-}
-
-/**
- * Creates a batch error that won't fail the entire job
- * @param {string} message - Error message
- * @param {Object} details - Additional error details
- * @returns {JobFailedError} Batch error instance
+ * Creates a batch-level error (non-critical)
  */
 function createBatchError(message, details = {}) {
-    const error = new JobFailedError(message, ERROR_CODES.BATCH_ERROR, 400, details);
-    error.isJobFailed = false; // Override to prevent job failure
+    const error = new Error(message);
+    error.code = ERROR_CODES.BATCH_ERROR;
+    error.statusCode = 500;
+    error.details = details;
+    error.isJobFailed = false;
     return error;
 }
 
 /**
- * Creates a global error that will fail the entire job
- * @param {string} message - Error message
- * @param {number} statusCode - HTTP status code
- * @param {Object} details - Additional error details
- * @returns {JobFailedError} Global error instance
+ * Creates a global error (critical, should fail the job)
  */
 function createGlobalError(message, statusCode = 500, details = {}) {
     return new JobFailedError(message, ERROR_CODES.GLOBAL_ERROR, statusCode, details);
 }
 
+/**
+ * Determines if an error should cause the job to fail
+ */
+function isCriticalError(error) {
+    if (error.isJobFailed) {
+        return true;
+    }
+    
+    const criticalCodes = [
+        ERROR_CODES.MISSING_AUTH_TOKEN,
+        ERROR_CODES.EXPIRED_TOKEN,
+        ERROR_CODES.INVALID_TOKEN_FORMAT,
+        ERROR_CODES.INVALID_TOKEN_ISSUER,
+        ERROR_CODES.INSUFFICIENT_PERMISSIONS,
+        ERROR_CODES.CONFIGURATION_ERROR,
+        ERROR_CODES.PROCESSING_ERROR,
+        ERROR_CODES.GLOBAL_ERROR
+    ];
+    
+    return criticalCodes.includes(error.code);
+}
+
+/**
+ * Handles errors in AppBuilder actions
+ */
+function handleError(error, logger) {
+    const errorInfo = {
+        message: error.message,
+        code: error.code || ERROR_CODES.UNKNOWN_ERROR,
+        statusCode: error.statusCode || 500,
+        details: error.details || {},
+        stack: error.stack
+    };
+
+    if (isCriticalError(error)) {
+        logger?.error('Critical error occurred:', errorInfo);
+        throw error;
+    } else {
+        logger?.warn('Non-critical error occurred:', errorInfo);
+        return createErrorResponse(error);
+    }
+}
+
+/**
+ * Creates a standardized error response
+ */
+function createErrorResponse(error) {
+    return {
+        error: error.message,
+        code: error.code || ERROR_CODES.UNKNOWN_ERROR,
+        statusCode: error.statusCode || 500,
+        details: error.details || {}
+    };
+}
+
 module.exports = {
     JobFailedError,
     ERROR_CODES,
-    handleError,
-    withErrorHandling,
-    validateRequiredParams,
-    createErrorResponse,
     createBatchError,
-    createGlobalError
+    createGlobalError,
+    isCriticalError,
+    handleError,
+    createErrorResponse
 };
