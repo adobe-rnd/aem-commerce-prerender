@@ -40,7 +40,7 @@ const ERROR_CODES = {
 function createBatchError(message, details = {}) {
     const error = new Error(message);
     error.code = ERROR_CODES.BATCH_ERROR;
-    error.statusCode = 500;
+    error.statusCode = 400;
     error.details = details;
     error.isJobFailed = false;
     return error;
@@ -69,7 +69,8 @@ function isCriticalError(error) {
         ERROR_CODES.INSUFFICIENT_PERMISSIONS,
         ERROR_CODES.CONFIGURATION_ERROR,
         ERROR_CODES.PROCESSING_ERROR,
-        ERROR_CODES.GLOBAL_ERROR
+        ERROR_CODES.GLOBAL_ERROR,
+        ERROR_CODES.UNKNOWN_ERROR
     ];
     
     return criticalCodes.includes(error.code);
@@ -84,14 +85,20 @@ function handleError(error, logger) {
         code: error.code || ERROR_CODES.UNKNOWN_ERROR,
         statusCode: error.statusCode || 500,
         details: error.details || {},
-        stack: error.stack
+        stack: error.stack,
+        jobFailed: isCriticalError(error),
+        isBatchError: error.code === ERROR_CODES.BATCH_ERROR
     };
 
     if (isCriticalError(error)) {
-        logger?.error('Critical error occurred:', errorInfo);
-        throw error;
+        logger?.error('Job failed due to critical error:', errorInfo);
+        return createErrorResponse(error);
     } else {
-        logger?.warn('Non-critical error occurred:', errorInfo);
+        if (error.code === ERROR_CODES.BATCH_ERROR) {
+            logger?.warn('Batch error occurred (job continues):', errorInfo);
+        } else {
+            logger?.warn('Non-critical error occurred:', errorInfo);
+        }
         return createErrorResponse(error);
     }
 }
@@ -99,13 +106,71 @@ function handleError(error, logger) {
 /**
  * Creates a standardized error response
  */
-function createErrorResponse(error) {
+function createErrorResponse(message, code, statusCode = 500, details = {}) {
+    const errorObj = typeof message === 'object' ? message : { message, code, statusCode, details };
+    const finalCode = errorObj.code || code || ERROR_CODES.UNKNOWN_ERROR;
+    
+    // For string message calls (from tests), check the code parameter
+    const isJobFailed = typeof message === 'string' 
+        ? isCriticalError({ code: finalCode }) 
+        : isCriticalError(errorObj);
+    
     return {
-        error: error.message,
-        code: error.code || ERROR_CODES.UNKNOWN_ERROR,
-        statusCode: error.statusCode || 500,
-        details: error.details || {}
+        statusCode: errorObj.statusCode || statusCode,
+        body: {
+            error: true,
+            message: errorObj.message || message,
+            code: finalCode,
+            details: errorObj.details || details,
+            jobFailed: isJobFailed,
+            isBatchError: finalCode === ERROR_CODES.BATCH_ERROR
+        }
     };
+}
+
+/**
+ * Higher-order function that wraps a function with error handling
+ */
+function withErrorHandling(fn, logger) {
+    return async (...args) => {
+        try {
+            return await fn(...args);
+        } catch (error) {
+            if (isCriticalError(error)) {
+                logger?.error('Critical error in wrapped function:', {
+                    message: error.message,
+                    code: error.code,
+                    stack: error.stack
+                });
+                throw error;
+            } else {
+                logger?.warn('Non-critical error in wrapped function:', {
+                    message: error.message,
+                    code: error.code
+                });
+                return createErrorResponse(error);
+            }
+        }
+    };
+}
+
+/**
+ * Validates that required parameters are present
+ */
+function validateRequiredParams(params, requiredParams, logger) {
+    const missingParams = requiredParams.filter(param => 
+        params[param] === undefined || params[param] === null || params[param] === ''
+    );
+    
+    if (missingParams.length > 0) {
+        logger?.error('Parameter validation failed:', { missingParams });
+        throw new JobFailedError(
+            `Missing required parameters: ${missingParams.join(', ')}`,
+            ERROR_CODES.VALIDATION_ERROR,
+            400,
+            { missingParams }
+        );
+    }
 }
 
 module.exports = {
@@ -115,5 +180,7 @@ module.exports = {
     createGlobalError,
     isCriticalError,
     handleError,
-    createErrorResponse
+    createErrorResponse,
+    withErrorHandling,
+    validateRequiredParams
 };

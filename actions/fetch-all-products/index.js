@@ -98,8 +98,8 @@ async function getAllSkus(context) {
 
 async function main(params) {
   try {
-    // Resolve runtime config with token validation
-    const cfg = getRuntimeConfig(params, { validateToken: true });
+    // Resolve runtime config
+    const cfg = getRuntimeConfig(params);
     const logger = Core.Logger('main', { level: cfg.logLevel });
 
     const sharedContext = { ...cfg, logger }
