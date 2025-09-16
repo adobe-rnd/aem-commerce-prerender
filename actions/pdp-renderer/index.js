@@ -15,6 +15,7 @@ const { errorResponse } = require('../utils');
 const { extractPathDetails } = require('./lib');
 const { generateProductHtml } = require('./render');
 const { getRuntimeConfig } = require('../lib/runtimeConfig');
+const { JobFailedError, ERROR_CODES } = require('../lib/errorHandler');
 
 /**
  * Parameters
@@ -47,8 +48,12 @@ async function main (params) {
       locale = result.locale;
     }
 
-    if ((!sku && !urlKey) || !cfg.contentUrl) {
-      return errorResponse(400, 'Invalid path', logger);
+    if (!sku && !urlKey) {
+      throw new JobFailedError(
+        'Missing required parameters: sku or urlKey must be provided',
+        ERROR_CODES.VALIDATION_ERROR,
+        400
+      );
     }
 
     const context = { ...cfg, logger };

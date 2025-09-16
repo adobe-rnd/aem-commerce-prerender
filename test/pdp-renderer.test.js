@@ -61,7 +61,7 @@ describe('pdp-renderer', () => {
         error: {
           statusCode: 400,
           body: {
-            error: 'Invalid path',
+            error: 'Missing required parameters: sku or urlKey must be provided',
           },
         },
       })

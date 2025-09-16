@@ -17,6 +17,7 @@ const { Core, Files } = require('@adobe/aio-sdk')
 const { requestSaaS, FILE_PREFIX } = require('../utils');
 const { Timings } = require('../lib/benchmark');
 const { getRuntimeConfig } = require('../lib/runtimeConfig');
+const { ERROR_CODES } = require('../lib/errorHandler');
 
 async function getSkus(categoryPath, context) {
   let productsResp = await requestSaaS(ProductsQuery, 'getProducts', { currentPage: 1, categoryPath }, context);
@@ -96,33 +97,66 @@ async function getAllSkus(context) {
 }
 
 async function main(params) {
-  // Resolve runtime config (CONTENT_URL/STORE_URL/templates built from ORG/SITE if missing)
-  const cfg = getRuntimeConfig(params);
-  const logger = Core.Logger('main', { level: cfg.logLevel });
-  const sharedContext = { ...cfg, logger }
+  try {
+    // Resolve runtime config with token validation
+    const cfg = getRuntimeConfig(params, { validateToken: true });
+    const logger = Core.Logger('main', { level: cfg.logLevel });
 
-  const results = await Promise.all(
-      cfg.locales.map(async (locale) => {
-        const context = { ...sharedContext };
-        if (locale) {
-            context.locale = locale;
-        }
-        const timings = new Timings();
-        const stateFilePrefix = locale || 'default';
-        const allSkus = await getAllSkus(context);
-        timings.sample('getAllSkus');
-        const filesLib = await Files.init(params.libInit || {});
-        timings.sample('saveFile');
-        const productsFileName = `${FILE_PREFIX}/${stateFilePrefix}-products.json`;
-        await filesLib.write(productsFileName, JSON.stringify(allSkus));
-        return timings.measures;
-      })
-  );
+    const sharedContext = { ...cfg, logger }
 
-  return {
-    statusCode: 200,
-    body: { status: 'completed', timings: results }
-  };
+    const results = await Promise.all(
+        cfg.locales.map(async (locale) => {
+          const context = { ...sharedContext };
+          if (locale) {
+              context.locale = locale;
+          }
+          const timings = new Timings();
+          const stateFilePrefix = locale || 'default';
+          const allSkus = await getAllSkus(context);
+          timings.sample('getAllSkus');
+          const filesLib = await Files.init(params.libInit || {});
+          timings.sample('saveFile');
+          const productsFileName = `${FILE_PREFIX}/${stateFilePrefix}-products.json`;
+          await filesLib.write(productsFileName, JSON.stringify(allSkus));
+          return timings.measures;
+        })
+    );
+
+    return {
+      statusCode: 200,
+      body: { status: 'completed', timings: results }
+    };
+  } catch (error) {
+    // Handle errors and determine if job should fail
+    const logger = Core.Logger('main', { level: 'error' });
+    
+    if (error.isJobFailed || error.code === ERROR_CODES.MISSING_AUTH_TOKEN || 
+        error.code === ERROR_CODES.EXPIRED_TOKEN || error.code === ERROR_CODES.INVALID_TOKEN_FORMAT ||
+        error.code === ERROR_CODES.INVALID_TOKEN_ISSUER || error.code === ERROR_CODES.INSUFFICIENT_PERMISSIONS) {
+      logger.error('Job failed due to critical error:', {
+        message: error.message,
+        code: error.code,
+        statusCode: error.statusCode
+      });
+      throw error;
+    }
+    
+    // For non-critical errors, return error response
+    logger.warn('Non-critical error occurred:', {
+      message: error.message,
+      code: error.code || ERROR_CODES.UNKNOWN_ERROR
+    });
+    
+    return {
+      statusCode: error.statusCode || 500,
+      body: {
+        error: true,
+        message: error.message,
+        code: error.code || ERROR_CODES.UNKNOWN_ERROR,
+        jobFailed: false
+      }
+    };
+  }
 }
 
 exports.main = main

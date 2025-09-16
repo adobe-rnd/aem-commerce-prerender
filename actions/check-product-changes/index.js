@@ -15,45 +15,82 @@ const { poll } = require('./poller');
 const { StateManager } = require('../lib/state');
 const { ObservabilityClient } = require('../lib/observability');
 const { getRuntimeConfig } = require('../lib/runtimeConfig');
+const { ERROR_CODES } = require('../lib/errorHandler');
 
 async function main(params) {
-  const cfg = getRuntimeConfig(params);
-  const logger = Core.Logger('main', { level: cfg.logLevel });
-  const observabilityClient = new ObservabilityClient(logger, {
-    token: cfg.adminAuthToken,
-    endpoint: cfg.logIngestorEndpoint,
-    org: cfg.org,
-    site: cfg.site
-  });
-  const stateLib = await State.init(params.libInit || {});
-  const filesLib = await Files.init(params.libInit || {});
-  const stateMgr = new StateManager(stateLib, { logger });
+  try {
+    // Get runtime config with token validation
+    const cfg = getRuntimeConfig(params, { validateToken: true });
+    const logger = Core.Logger('main', { level: cfg.logLevel });
 
-  let activationResult = null;
+    const observabilityClient = new ObservabilityClient(logger, {
+      token: cfg.adminAuthToken,
+      endpoint: cfg.logIngestorEndpoint,
+      org: cfg.org,
+      site: cfg.site
+    });
+    const stateLib = await State.init(params.libInit || {});
+    const filesLib = await Files.init(params.libInit || {});
+    const stateMgr = new StateManager(stateLib, { logger });
 
-  const running = await stateMgr.get('running');
-  if (running?.value === 'true') {
-    activationResult = { state: 'skipped' };
+    let activationResult = null;
+
+    const running = await stateMgr.get('running');
+    if (running?.value === 'true') {
+      activationResult = { state: 'skipped' };
+      await observabilityClient.sendActivationResult(activationResult);
+      return activationResult;
+    }
+
+    try {
+      // if there is any failure preventing a reset of the 'running' state key to 'false',
+      // this might not be updated and action execution could be permanently skipped
+      // a ttl == function timeout is a mitigation for this risk
+      await stateMgr.put('running', 'true', { ttl: 3600 });
+      activationResult = await poll(
+          cfg,
+          { stateLib: stateMgr, filesLib },
+          logger
+      );
+    } finally {
+      await stateMgr.put('running', 'false');
+    }
+
     await observabilityClient.sendActivationResult(activationResult);
     return activationResult;
+  } catch (error) {
+    // Handle errors and determine if job should fail
+    const logger = Core.Logger('main', { level: 'error' });
+    
+    // Poll errors are always critical since they represent core processing failures
+    if (error.isJobFailed || error.code === ERROR_CODES.MISSING_AUTH_TOKEN || 
+        error.code === ERROR_CODES.EXPIRED_TOKEN || error.code === ERROR_CODES.INVALID_TOKEN_FORMAT ||
+        error.code === ERROR_CODES.INVALID_TOKEN_ISSUER || error.code === ERROR_CODES.INSUFFICIENT_PERMISSIONS ||
+        error.code === ERROR_CODES.PROCESSING_ERROR) {
+      logger.error('Job failed due to critical error:', {
+        message: error.message,
+        code: error.code,
+        statusCode: error.statusCode
+      });
+      throw error;
+    }
+    
+    // For non-critical errors, return error response
+    logger.warn('Non-critical error occurred:', {
+      message: error.message,
+      code: error.code || ERROR_CODES.UNKNOWN_ERROR
+    });
+    
+    return {
+      statusCode: error.statusCode || 500,
+      body: {
+        error: true,
+        message: error.message,
+        code: error.code || ERROR_CODES.UNKNOWN_ERROR,
+        jobFailed: false
+      }
+    };
   }
-
-  try {
-    // if there is any failure preventing a reset of the 'running' state key to 'false',
-    // this might not be updated and action execution could be permanently skipped
-    // a ttl == function timeout is a mitigation for this risk
-    await stateMgr.put('running', 'true', { ttl: 3600 });
-    activationResult = await poll(
-        cfg,
-        { stateLib: stateMgr, filesLib },
-        logger
-    );
-  } finally {
-    await stateMgr.put('running', 'false');
-  }
-
-  await observabilityClient.sendActivationResult(activationResult);
-  return activationResult;
 }
 
 exports.main = main
