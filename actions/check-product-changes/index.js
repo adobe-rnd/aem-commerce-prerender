@@ -15,7 +15,7 @@ const { poll } = require('./poller');
 const { StateManager } = require('../lib/state');
 const { ObservabilityClient } = require('../lib/observability');
 const { getRuntimeConfig } = require('../lib/runtimeConfig');
-const {handleActionError } = require('../lib/errorHandler');
+const { handleActionError } = require('../lib/errorHandler');
 
 async function main(params) {
   try {
