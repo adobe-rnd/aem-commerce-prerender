@@ -17,7 +17,7 @@ const { Core, Files } = require('@adobe/aio-sdk')
 const { requestSaaS, FILE_PREFIX } = require('../utils');
 const { Timings } = require('../lib/benchmark');
 const { getRuntimeConfig } = require('../lib/runtimeConfig');
-const { ERROR_CODES, isCriticalError } = require('../lib/errorHandler');
+const {handleActionError } = require('../lib/errorHandler');
 
 async function getSkus(categoryPath, context) {
   let productsResp = await requestSaaS(ProductsQuery, 'getProducts', { currentPage: 1, categoryPath }, context);
@@ -130,30 +130,10 @@ async function main(params) {
     // Handle errors and determine if job should fail
     const logger = Core.Logger('main', { level: 'error' });
     
-    if (isCriticalError(error)) {
-      logger.error('Job failed due to critical error:', {
-        message: error.message,
-        code: error.code,
-        statusCode: error.statusCode
-      });
-      throw error;
-    }
-    
-    // For non-critical errors, return error response
-    logger.warn('Non-critical error occurred:', {
-      message: error.message,
-      code: error.code || ERROR_CODES.UNKNOWN_ERROR
+    return handleActionError(error, { 
+      logger, 
+      actionName: 'Fetch all products' 
     });
-    
-    return {
-      statusCode: error.statusCode || 500,
-      body: {
-        error: true,
-        message: error.message,
-        code: error.code || ERROR_CODES.UNKNOWN_ERROR,
-        jobFailed: false
-      }
-    };
   }
 }
 

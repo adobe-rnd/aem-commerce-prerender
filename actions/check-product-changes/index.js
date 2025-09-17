@@ -15,7 +15,7 @@ const { poll } = require('./poller');
 const { StateManager } = require('../lib/state');
 const { ObservabilityClient } = require('../lib/observability');
 const { getRuntimeConfig } = require('../lib/runtimeConfig');
-const { ERROR_CODES, isCriticalError } = require('../lib/errorHandler');
+const {handleActionError } = require('../lib/errorHandler');
 
 async function main(params) {
   try {
@@ -63,30 +63,10 @@ async function main(params) {
     const logger = Core.Logger('main', { level: 'error' });
     
     // Poll errors are always critical since they represent core processing failures
-    if (isCriticalError(error)) {
-      logger.error('Job failed due to critical error:', {
-        message: error.message,
-        code: error.code,
-        statusCode: error.statusCode
-      });
-      throw error;
-    }
-    
-    // For non-critical errors, return error response
-    logger.warn('Non-critical error occurred:', {
-      message: error.message,
-      code: error.code || ERROR_CODES.UNKNOWN_ERROR
+    return handleActionError(error, { 
+      logger, 
+      actionName: 'Product changes check' 
     });
-    
-    return {
-      statusCode: error.statusCode || 500,
-      body: {
-        error: true,
-        message: error.message,
-        code: error.code || ERROR_CODES.UNKNOWN_ERROR,
-        jobFailed: false
-      }
-    };
   }
 }
 

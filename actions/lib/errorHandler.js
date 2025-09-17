@@ -129,6 +129,50 @@ function createErrorResponse(message, code, statusCode = 500, details = {}) {
 }
 
 
+/**
+ * Handles errors in AppBuilder action main functions
+ * @param {Error} error - The error to handle
+ * @param {Object} loggerOrOptions - Logger instance or options object
+ * @param {Object} [loggerOrOptions.logger] - Logger instance (if options object)
+ * @param {string} [loggerOrOptions.actionName] - Action name for logging context
+ * @returns {Object|never} Returns error response for non-critical errors, throws for critical errors
+ */
+function handleActionError(error, loggerOrOptions = {}) {
+    // Support both logger directly or options object
+    const logger = loggerOrOptions.logger || loggerOrOptions;
+    const actionName = loggerOrOptions.actionName || 'action';
+    
+    // Create logger if not provided
+    const finalLogger = logger && typeof logger.error === 'function' 
+        ? logger 
+        : require('@adobe/aio-sdk').Core.Logger('main', { level: 'error' });
+    
+    if (isCriticalError(error)) {
+        finalLogger.error(`${actionName} failed due to critical error:`, {
+            message: error.message,
+            code: error.code,
+            statusCode: error.statusCode
+        });
+        throw error;
+    }
+    
+    // For non-critical errors, return error response
+    finalLogger.warn('Non-critical error occurred:', {
+        message: error.message,
+        code: error.code || ERROR_CODES.UNKNOWN_ERROR
+    });
+    
+    return {
+        statusCode: error.statusCode || 500,
+        body: {
+            error: true,
+            message: error.message,
+            code: error.code || ERROR_CODES.UNKNOWN_ERROR,
+            jobFailed: false
+        }
+    };
+}
+
 module.exports = {
     JobFailedError,
     ERROR_CODES,
@@ -136,5 +180,6 @@ module.exports = {
     createGlobalError,
     isCriticalError,
     handleError,
-    createErrorResponse
+    createErrorResponse,
+    handleActionError
 };
