@@ -17,7 +17,7 @@ const { Core, Files } = require('@adobe/aio-sdk')
 const { requestSaaS, FILE_PREFIX } = require('../utils');
 const { Timings } = require('../lib/benchmark');
 const { getRuntimeConfig } = require('../lib/runtimeConfig');
-const { ERROR_CODES } = require('../lib/errorHandler');
+const { ERROR_CODES, isCriticalError } = require('../lib/errorHandler');
 
 async function getSkus(categoryPath, context) {
   let productsResp = await requestSaaS(ProductsQuery, 'getProducts', { currentPage: 1, categoryPath }, context);
@@ -130,9 +130,7 @@ async function main(params) {
     // Handle errors and determine if job should fail
     const logger = Core.Logger('main', { level: 'error' });
     
-    if (error.isJobFailed || error.code === ERROR_CODES.MISSING_AUTH_TOKEN || 
-        error.code === ERROR_CODES.EXPIRED_TOKEN || error.code === ERROR_CODES.INVALID_TOKEN_FORMAT ||
-        error.code === ERROR_CODES.INVALID_TOKEN_ISSUER || error.code === ERROR_CODES.INSUFFICIENT_PERMISSIONS) {
+    if (isCriticalError(error)) {
       logger.error('Job failed due to critical error:', {
         message: error.message,
         code: error.code,

@@ -29,8 +29,8 @@ const ERROR_CODES = {
     AEM_API_ERROR: 'AEM_API_ERROR',
     VALIDATION_ERROR: 'VALIDATION_ERROR',
     PROCESSING_ERROR: 'PROCESSING_ERROR',
-    BATCH_ERROR: 'BATCH_ERROR',           // Ошибка отдельного батча
-    GLOBAL_ERROR: 'GLOBAL_ERROR',          // Глобальная ошибка, которая должна фейлить job
+    BATCH_ERROR: 'BATCH_ERROR',           // Individual batch error
+    GLOBAL_ERROR: 'GLOBAL_ERROR',          // Global error that should fail the job
     UNKNOWN_ERROR: 'UNKNOWN_ERROR'
 };
 
@@ -128,50 +128,6 @@ function createErrorResponse(message, code, statusCode = 500, details = {}) {
     };
 }
 
-/**
- * Higher-order function that wraps a function with error handling
- */
-function withErrorHandling(fn, logger) {
-    return async (...args) => {
-        try {
-            return await fn(...args);
-        } catch (error) {
-            if (isCriticalError(error)) {
-                logger?.error('Critical error in wrapped function:', {
-                    message: error.message,
-                    code: error.code,
-                    stack: error.stack
-                });
-                throw error;
-            } else {
-                logger?.warn('Non-critical error in wrapped function:', {
-                    message: error.message,
-                    code: error.code
-                });
-                return createErrorResponse(error);
-            }
-        }
-    };
-}
-
-/**
- * Validates that required parameters are present
- */
-function validateRequiredParams(params, requiredParams, logger) {
-    const missingParams = requiredParams.filter(param => 
-        params[param] === undefined || params[param] === null || params[param] === ''
-    );
-    
-    if (missingParams.length > 0) {
-        logger?.error('Parameter validation failed:', { missingParams });
-        throw new JobFailedError(
-            `Missing required parameters: ${missingParams.join(', ')}`,
-            ERROR_CODES.VALIDATION_ERROR,
-            400,
-            { missingParams }
-        );
-    }
-}
 
 module.exports = {
     JobFailedError,
@@ -180,7 +136,5 @@ module.exports = {
     createGlobalError,
     isCriticalError,
     handleError,
-    createErrorResponse,
-    withErrorHandling,
-    validateRequiredParams
+    createErrorResponse
 };

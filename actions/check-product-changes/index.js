@@ -15,7 +15,7 @@ const { poll } = require('./poller');
 const { StateManager } = require('../lib/state');
 const { ObservabilityClient } = require('../lib/observability');
 const { getRuntimeConfig } = require('../lib/runtimeConfig');
-const { ERROR_CODES } = require('../lib/errorHandler');
+const { ERROR_CODES, isCriticalError } = require('../lib/errorHandler');
 
 async function main(params) {
   try {
@@ -63,10 +63,7 @@ async function main(params) {
     const logger = Core.Logger('main', { level: 'error' });
     
     // Poll errors are always critical since they represent core processing failures
-    if (error.isJobFailed || error.code === ERROR_CODES.MISSING_AUTH_TOKEN || 
-        error.code === ERROR_CODES.EXPIRED_TOKEN || error.code === ERROR_CODES.INVALID_TOKEN_FORMAT ||
-        error.code === ERROR_CODES.INVALID_TOKEN_ISSUER || error.code === ERROR_CODES.INSUFFICIENT_PERMISSIONS ||
-        error.code === ERROR_CODES.PROCESSING_ERROR) {
+    if (isCriticalError(error)) {
       logger.error('Job failed due to critical error:', {
         message: error.message,
         code: error.code,

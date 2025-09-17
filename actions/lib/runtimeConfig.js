@@ -31,8 +31,9 @@ const DEFAULTS = {
  * @param {Object} params - Configuration parameters
  * @param {Object} options - Options for validation
  * @param {boolean} options.validateToken - Whether to validate the admin token
- * @param {boolean} options.validateTokenWithApi - Whether to validate token against AEM API
+ * @param {boolean} options.validateTokenWithApi - Whether to validate token against AEM API (makes function async)
  * @param {Object} options.logger - Logger instance for validation errors
+ * @returns {Object|Promise<Object>} Configuration object, or Promise if API validation is requested
  */
 function getRuntimeConfig(params = {}, options = {}) {
     const env = process.env || {};
@@ -109,6 +110,20 @@ function getRuntimeConfig(params = {}, options = {}) {
     // URL sanity checks
     validateUrls(cfg);
 
+    // API token validation if requested (makes function async)
+    if (options.validateTokenWithApi && options.logger) {
+        return (async () => {
+            try {
+                await validateConfigTokenWithApi(cfg, options.logger);
+                return cfg;
+            } catch (error) {
+                // Re-throw with additional context
+                error.message = `Runtime config API validation failed: ${error.message}`;
+                throw error;
+            }
+        })();
+    }
+
     return cfg;
 }
 
@@ -158,103 +173,5 @@ function validateUrls(cfg) {
     }
 }
 
-/**
- * Build a normalized runtime config with defaults, templates and API token validation.
- * This is an async version that can validate tokens against AEM API.
- * @param {Object} params - Configuration parameters
- * @param {Object} options - Options for validation
- * @param {boolean} options.validateToken - Whether to validate the admin token
- * @param {boolean} options.validateTokenWithApi - Whether to validate token against AEM API
- * @param {Object} options.logger - Logger instance for validation errors
- * @returns {Promise<Object>} Runtime configuration
- */
-async function getRuntimeConfigWithApiValidation(params = {}, options = {}) {
-    const env = process.env || {};
-    const merged = sanitizeStrings({
-        ...DEFAULTS,
-        ...pickEnv(env, Object.keys(DEFAULTS)),
-        ...params
-    });
 
-    const ORG  = merged.ORG;
-    const SITE = merged.SITE;
-
-    // Minimal presence: CONTENT_URL or (ORG & SITE)
-    if (!merged.CONTENT_URL && (!ORG || !SITE)) {
-        const err = new Error('Missing runtime variables: provide CONTENT_URL or both ORG and SITE');
-        err.statusCode = 400;
-        throw err;
-    }
-
-    const adminToken = merged.AEM_ADMIN_API_AUTH_TOKEN;
-
-    // Validate admin token if requested
-    if (options.validateToken) {
-        try {
-            validateAemAdminToken(adminToken, options.logger);
-        } catch (error) {
-            // Re-throw with additional context
-            error.message = `Runtime config validation failed: ${error.message}`;
-            throw error;
-        }
-    }
-
-    // Expand CONTENT_URL / STORE_URL / PRODUCTS_TEMPLATE
-    if (!merged.CONTENT_URL && ORG && SITE) {
-        merged.CONTENT_URL = expand(merged.CONTENT_URL_TEMPLATE, { org: ORG, site: SITE });
-    }
-    if (!merged.STORE_URL) {
-        merged.STORE_URL = merged.CONTENT_URL
-            ? merged.CONTENT_URL
-            : (ORG && SITE ? expand(merged.STORE_URL_TEMPLATE, { org: ORG, site: SITE }) : undefined);
-    }
-    if (!merged.PRODUCTS_TEMPLATE) {
-        merged.PRODUCTS_TEMPLATE = merged.CONTENT_URL
-            ? joinUrl(merged.CONTENT_URL, 'products/default')
-            : (ORG && SITE ? expand(merged.PRODUCTS_TEMPLATE_TEMPLATE, { org: ORG, site: SITE }) : undefined);
-    }
-
-    // Normalize LOCALES
-    let localesArr = [null];
-    if (Array.isArray(merged.LOCALES)) {
-        localesArr = merged.LOCALES.map(String).map(s => s.trim()).filter(Boolean);
-        if (!localesArr.length) localesArr = [null];
-    } else if (typeof merged.LOCALES === 'string' && merged.LOCALES.trim()) {
-        localesArr = merged.LOCALES.split(',').map(s => s.trim()).filter(Boolean);
-        if (!localesArr.length) localesArr = [null];
-    }
-
-    const cfg = {
-        raw: { ...merged, LOCALES_ARRAY: localesArr },
-        org: ORG,
-        site: SITE,
-        logLevel: merged.LOG_LEVEL,
-        logIngestorEndpoint: merged.LOG_INGESTOR_ENDPOINT,
-        adminAuthToken: adminToken,
-        contentUrl: merged.CONTENT_URL,
-        storeUrl: merged.STORE_URL,
-        productsTemplate: merged.PRODUCTS_TEMPLATE,
-        configName: merged.CONFIG_NAME,
-        configSheet: merged.CONFIG_SHEET,
-        pathFormat: merged.PRODUCT_PAGE_URL_FORMAT,
-        locales: localesArr
-    };
-
-    // URL sanity checks
-    validateUrls(cfg);
-
-    // API token validation if requested
-    if (options.validateTokenWithApi && options.logger) {
-        try {
-            await validateConfigTokenWithApi(cfg, options.logger);
-        } catch (error) {
-            // Re-throw with additional context
-            error.message = `Runtime config API validation failed: ${error.message}`;
-            throw error;
-        }
-    }
-
-    return cfg;
-}
-
-module.exports = { getRuntimeConfig, getRuntimeConfigWithApiValidation, DEFAULTS };
+module.exports = { getRuntimeConfig, DEFAULTS };

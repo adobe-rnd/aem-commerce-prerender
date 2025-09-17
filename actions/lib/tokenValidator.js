@@ -198,7 +198,7 @@ async function validateAemAdminTokenWithApi(token, org, site, logger) {
 
     try {
         // Try to make a simple request to AEM admin API to validate the token
-        const adminUrl = `https://admin.hlx.page/job/${org}/${site}/main/`;
+        const adminUrl = `https://admin.hlx.page/config/${org}/sites/${site}.json`;
         const req = {
             method: 'GET',
             headers: {
