@@ -29,7 +29,7 @@ const DEFAULTS = {
  *  - Require either explicit CONTENT_URL or both ORG & SITE (to derive URLs).
  *  - Admin token is not enforced here; enforce it in actions that need it.
  * @param {Object} params - Configuration parameters
- * @param {Object} options - Options for validation
+ * @param {{validateToken: boolean}} options - Options for validation
  * @param {boolean} options.validateToken - Whether to validate the admin token
  * @param {boolean} options.validateTokenWithApi - Whether to validate token against AEM API (makes function async)
  * @param {Object} options.logger - Logger instance for validation errors
