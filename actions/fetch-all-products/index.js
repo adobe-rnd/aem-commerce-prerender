@@ -17,7 +17,7 @@ const { Core, Files } = require('@adobe/aio-sdk')
 const { requestSaaS, FILE_PREFIX } = require('../utils');
 const { Timings } = require('../lib/benchmark');
 const { getRuntimeConfig } = require('../lib/runtimeConfig');
-const {handleActionError } = require('../lib/errorHandler');
+const { handleActionError } = require('../lib/errorHandler');
 
 async function getSkus(categoryPath, context) {
   let productsResp = await requestSaaS(ProductsQuery, 'getProducts', { currentPage: 1, categoryPath }, context);
