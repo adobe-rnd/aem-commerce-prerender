@@ -96,4 +96,4 @@ async function main(params) {
     }
 }
 
-exports.main = main;
+exports.main = main
