@@ -173,5 +173,4 @@ function validateUrls(cfg) {
     }
 }
 
-
 module.exports = { getRuntimeConfig, DEFAULTS };
