@@ -122,7 +122,7 @@ describe('Poller', () => {
     productsTemplate: 'https://store.com/products/default',
     productPageUrlFormat: 'products/{urlKey}/{sku}',
     configName: 'configName',
-    adminAuthToken: 'token',
+    adminAuthToken: 'valid-token-123456789',
     pathFormat: '/products/{urlKey}/{sku}',
   };
 

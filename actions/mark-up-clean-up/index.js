@@ -76,7 +76,7 @@ async function markUpCleanUP(context, filesLib, logger) {
 }
 
 async function main(params) {
-  const cfg = getRuntimeConfig(params);
+  const cfg = getRuntimeConfig(params, { validateToken: true });
   const logger = Core.Logger('main', { level: cfg.logLevel || 'info' });
   const observabilityClient = new ObservabilityClient(logger, { 
     token: cfg.adminAuthToken, 

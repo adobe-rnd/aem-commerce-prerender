@@ -24,6 +24,7 @@ const {
 } = require('../utils');
 const { GetLastModifiedQuery } = require('../queries');
 const { generateProductHtml } = require('../pdp-renderer/render');
+const { JobFailedError, ERROR_CODES } = require('../lib/errorHandler');
 const crypto = require('crypto');
 const BATCH_SIZE = 50;
 
@@ -141,12 +142,23 @@ function checkParams(params) {
   const requiredParams = ['site', 'org', 'pathFormat', 'adminAuthToken', 'configName', 'contentUrl', 'storeUrl', 'productsTemplate'];
   const missingParams = requiredParams.filter(param => !params[param]);
   if (missingParams.length > 0) {
-    throw new Error(`Missing required parameters: ${missingParams.join(', ')}`);
+    throw new JobFailedError(
+      `Missing required parameters: ${missingParams.join(', ')}`,
+      ERROR_CODES.VALIDATION_ERROR,
+      400,
+      { missingParams }
+    );
   }
 
   if (params.storeUrl && !isValidUrl(params.storeUrl)) {
-    throw new Error('Invalid storeUrl');
+    throw new JobFailedError(
+      'Invalid storeUrl',
+      ERROR_CODES.VALIDATION_ERROR,
+      400
+    );
   }
+
+  // Token validation is handled in getRuntimeConfig, no need to duplicate here
 }
 
 /**
@@ -375,165 +387,218 @@ async function getLastModifiedDates(skus, context) {
 }
 
 async function poll(params, aioLibs, logger) {
-  checkParams(params);
-  
-  const counts = { published: 0, unpublished: 0, ignored: 0, failed: 0 };
-  const {
-    org, site, pathFormat,
-    configName, configSheet,
-    adminAuthToken,
-    productsTemplate, storeUrl, contentUrl,
-    logLevel, logIngestorEndpoint,
-    locales: rawLocales
-  } = params;
-
-  // Normalize locales: accept array or "en,fr" string; default to [null]
-  const locales = Array.isArray(rawLocales)
-      ? rawLocales
-      : (typeof rawLocales === 'string' && rawLocales.trim()
-          ? rawLocales.split(',').map(s => s.trim()).filter(Boolean)
-          : [null]);
-
-  const sharedContext = {
-    storeUrl,
-    contentUrl,
-    configName,
-    configSheet,
-    logger,
-    counts,
-    pathFormat,
-    productsTemplate,
-    aioLibs,
-    logLevel,
-    logIngestorEndpoint
-  };
-
-  const timings = new Timings();
-
-  // Pass the token under the "authToken" key (expected by AdminAPI)
-  const adminApi = new AdminAPI({ org, site }, sharedContext, { authToken: adminAuthToken });
-
-  const { filesLib } = aioLibs;
-
-  logger.info(`Starting poll from ${storeUrl} for locales ${locales}`);
-
-  let stateText = 'completed';
-
   try {
-    // start processing preview and publish queues
-    await adminApi.startProcessing();
+    checkParams(params);
+    
+    const counts = { published: 0, unpublished: 0, ignored: 0, failed: 0 };
+    const {
+      org, site, pathFormat,
+      configName, configSheet,
+      adminAuthToken,
+      productsTemplate, storeUrl, contentUrl,
+      logLevel, logIngestorEndpoint,
+      locales: rawLocales
+    } = params;
 
-    const results = await Promise.all(locales.map(async (locale) => {
-      const timings = new Timings();
-      const context = { ...sharedContext, startTime: new Date() };
-      if (locale) context.locale = locale;
+    // Normalize locales: accept array or "en,fr" string; default to [null]
+    const locales = Array.isArray(rawLocales)
+        ? rawLocales
+        : (typeof rawLocales === 'string' && rawLocales.trim()
+            ? rawLocales.split(',').map(s => s.trim()).filter(Boolean)
+            : [null]);
 
-      logger.info(`Polling for locale ${locale}`);
+    const sharedContext = {
+      storeUrl,
+      contentUrl,
+      configName,
+      configSheet,
+      logger,
+      counts,
+      pathFormat,
+      productsTemplate,
+      aioLibs,
+      logLevel,
+      logIngestorEndpoint
+    };
 
-      // load state
-      const state = await loadState(locale, aioLibs);
+    const timings = new Timings();
 
-      // add newly discovered produts to the state if necessary
-      const productsFileName = getFileLocation(`${locale || 'default'}-products`, 'json');
-      JSON.parse((await filesLib.read(productsFileName)).toString()).forEach(({ sku }) => {
-        if (!state.skus[sku]) {
-          state.skus[sku] = { lastRenderedAt: new Date(0), hash: null };
+    // Pass the token under the "authToken" key (expected by AdminAPI)
+    const adminApi = new AdminAPI({ org, site }, sharedContext, { authToken: adminAuthToken });
+
+    const { filesLib } = aioLibs;
+
+    logger.info(`Starting poll from ${storeUrl} for locales ${locales}`);
+
+    let stateText = 'completed';
+
+    try {
+      // start processing preview and publish queues
+      await adminApi.startProcessing();
+
+      const results = await Promise.all(locales.map(async (locale) => {
+        const timings = new Timings();
+        const context = { ...sharedContext, startTime: new Date() };
+        if (locale) context.locale = locale;
+
+        logger.info(`Polling for locale ${locale}`);
+
+        // load state
+        const state = await loadState(locale, aioLibs);
+
+        // add newly discovered produts to the state if necessary
+        const productsFileName = getFileLocation(`${locale || 'default'}-products`, 'json');
+        JSON.parse((await filesLib.read(productsFileName)).toString()).forEach(({ sku }) => {
+          if (!state.skus[sku]) {
+            state.skus[sku] = { lastRenderedAt: new Date(0), hash: null };
+          }
+        });
+        timings.sample('get-discovered-products');
+
+        // get last modified dates, filter out products that don't need to be (re)rendered
+        const knownSkus = Object.keys(state.skus);
+        let products = await getLastModifiedDates(knownSkus, context);
+        logger.info(`Fetched last modified date for ${products.length} skus, total ${knownSkus.length}`);
+        products = products.map(product => enrichProductWithMetadata(product, state, context));
+        ({ included: products } = filterProducts(shouldRender, products, knownSkus, context));
+        timings.sample('get-changed-products');
+
+        // create batches of products to preview and publish
+        const pendingBatches = createBatches(products).map((batch, batchNumber) => {
+          return Promise.all(batch.map(product => enrichProductWithRenderedHash(product, context)))
+            .then(async (enrichedProducts) => {
+              const { included: productsToPublish, ignored: productsToIgnore } = filterProducts(shouldPreviewAndPublish, enrichedProducts, knownSkus, context);
+
+              // update the lastRenderedAt for the products to ignore anyway, to avoid re-rendering them everytime after
+              // the lastModifiedAt changed once
+              if (productsToIgnore.length) {
+                productsToIgnore.forEach(product => {
+                  state.skus[product.sku].lastRenderedAt = product.renderedAt;
+                });
+                await saveState(state, aioLibs);
+              }
+
+              return productsToPublish;
+            })
+            .then(products => {
+              if (products.length) {
+                const records = products.map(({ sku, path, renderedAt }) => (({ sku, path, renderedAt })));
+                return adminApi.previewAndPublish(records, locale, batchNumber + 1)
+                  .then(publishedBatch => processPublishedBatch(publishedBatch, state, counts, products, aioLibs))
+                  .catch(error => {
+                    // Handle batch errors gracefully - don't fail the entire job
+                    if (error.code === ERROR_CODES.BATCH_ERROR) {
+                      logger.warn(`Batch ${batchNumber + 1} failed, continuing with other batches:`, {
+                        error: error.message,
+                        details: error.details
+                      });
+                      // Update counts to reflect failed batch
+                      counts.failed += products.length;
+                      return { failed: true, batchNumber: batchNumber + 1, error: error.message };
+                    } else {
+                      // Re-throw global errors
+                      throw error;
+                    }
+                  });
+              } else {
+                return Promise.resolve();
+              }
+            });
+        });
+        products = null;
+        await Promise.all(pendingBatches);
+        timings.sample('published-products');
+
+        // if there are still knownSkus left, they were not in Catalog Service anymore and may have been disabled/deleted
+        if (knownSkus.length) {
+          await processDeletedProducts(knownSkus, state, context, adminApi);
+          timings.sample('unpublished-products');
+        } else {
+          timings.sample('unpublished-products', 0);
         }
-      });
-      timings.sample('get-discovered-products');
 
-      // get last modified dates, filter out products that don't need to be (re)rendered
-      const knownSkus = Object.keys(state.skus);
-      let products = await getLastModifiedDates(knownSkus, context);
-      logger.info(`Fetched last modified date for ${products.length} skus, total ${knownSkus.length}`);
-      products = products.map(product => enrichProductWithMetadata(product, state, context));
-      ({ included: products } = filterProducts(shouldRender, products, knownSkus, context));
-      timings.sample('get-changed-products');
+        return timings.measures;
+      }));
 
-      // create batches of products to preview and publish
-      const pendingBatches = createBatches(products).map((batch, batchNumber) => {
-        return Promise.all(batch.map(product => enrichProductWithRenderedHash(product, context)))
-          .then(async (enrichedProducts) => {
-            const { included: productsToPublish, ignored: productsToIgnore } = filterProducts(shouldPreviewAndPublish, enrichedProducts, knownSkus, context);
+      await adminApi.stopProcessing();
 
-            // update the lastRenderedAt for the products to ignore anyway, to avoid re-rendering them everytime after
-            // the lastModifiedAt changed once
-            if (productsToIgnore.length) {
-              productsToIgnore.forEach(product => {
-                state.skus[product.sku].lastRenderedAt = product.renderedAt;
-              });
-              await saveState(state, aioLibs);
-            }
-
-            return productsToPublish;
-          })
-          .then(products => {
-            if (products.length) {
-              const records = products.map(({ sku, path, renderedAt }) => (({ sku, path, renderedAt })));
-              return adminApi.previewAndPublish(records, locale, batchNumber + 1)
-                .then(publishedBatch => processPublishedBatch(publishedBatch, state, counts, products, aioLibs));
-            } else {
-              return Promise.resolve();
-            }
-          });
-      });
-      products = null;
-      await Promise.all(pendingBatches);
-      timings.sample('published-products');
-
-      // if there are still knownSkus left, they were not in Catalog Service anymore and may have been disabled/deleted
-      if (knownSkus.length) {
-        await processDeletedProducts(knownSkus, state, context, adminApi);
-        timings.sample('unpublished-products');
-      } else {
-        timings.sample('unpublished-products', 0);
+      // aggregate timings
+      for (const measure of results) {
+        for (const [name, value] of Object.entries(measure)) {
+          if (!timings.measures[name]) timings.measures[name] = [];
+          if (!Array.isArray(timings.measures[name])) timings.measures[name] = [timings.measures[name]];
+          timings.measures[name].push(value);
+        }
       }
-
-      return timings.measures;
-    }));
-
-    await adminApi.stopProcessing();
-
-    // aggregate timings
-    for (const measure of results) {
-      for (const [name, value] of Object.entries(measure)) {
-        if (!timings.measures[name]) timings.measures[name] = [];
-        if (!Array.isArray(timings.measures[name])) timings.measures[name] = [timings.measures[name]];
-        timings.measures[name].push(value);
+      for (const [name, values] of Object.entries(timings.measures)) {
+        timings.measures[name] = aggregate(values);
       }
+      timings.measures.previewDuration = aggregate(adminApi.previewDurations);
+    } catch (e) {
+      logger.error('Error during poll processing:', {
+        message: e.message,
+        code: e.code,
+        stack: e.stack
+      });
+      // wait for queues to finish, even in error case
+      await adminApi.stopProcessing();
+      stateText = 'failure';
+      
+      // If it's a JobFailedError, re-throw it
+      if (e.isJobFailed) {
+        throw e;
+      }
+      
+      // For other errors, wrap them as JobFailedError
+      throw new JobFailedError(
+        `Poll processing failed: ${e.message}`,
+        e.code || ERROR_CODES.PROCESSING_ERROR,
+        e.statusCode || 500,
+        { originalError: e.message }
+      );
     }
-    for (const [name, values] of Object.entries(timings.measures)) {
-      timings.measures[name] = aggregate(values);
+
+    // get memory usage
+    const memoryData = process.memoryUsage();
+    const memoryUsage = {
+      rss: `${formatMemoryUsage(memoryData.rss)}`,
+      heapTotal: `${formatMemoryUsage(memoryData.heapTotal)}`,
+      heapUsed: `${formatMemoryUsage(memoryData.heapUsed)}`,
+      external: `${formatMemoryUsage(memoryData.external)}`,
+    };
+    logger.info(`Memory usage: ${JSON.stringify(memoryUsage)}`);
+
+    const elapsed = new Date() - timings.now;
+
+    logger.info(`Finished polling, elapsed: ${elapsed}ms`);
+
+    return {
+      state: stateText,
+      elapsed,
+      status: { ...counts },
+      timings: timings.measures,
+      memoryUsage,
+    };
+  } catch (error) {
+    logger.error('Poll failed with error:', {
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    });
+
+    // If it's a JobFailedError, re-throw it
+    if (error.isJobFailed) {
+      throw error;
     }
-    timings.measures.previewDuration = aggregate(adminApi.previewDurations);
-  } catch (e) {
-    logger.error(e);
-    // wait for queues to finish, even in error case
-    await adminApi.stopProcessing();
-    stateText = 'failure';
+
+    // For other errors, wrap them as JobFailedError
+    throw new JobFailedError(
+      `Poll operation failed: ${error.message}`,
+      error.code || ERROR_CODES.PROCESSING_ERROR,
+      error.statusCode || 500,
+      { originalError: error.message }
+    );
   }
-
-  // get memory usage
-  const memoryData = process.memoryUsage();
-  const memoryUsage = {
-    rss: `${formatMemoryUsage(memoryData.rss)}`,
-    heapTotal: `${formatMemoryUsage(memoryData.heapTotal)}`,
-    heapUsed: `${formatMemoryUsage(memoryData.heapUsed)}`,
-    external: `${formatMemoryUsage(memoryData.external)}`,
-  };
-  logger.info(`Memory usage: ${JSON.stringify(memoryUsage)}`);
-
-  const elapsed = new Date() - timings.now;
-
-  logger.info(`Finished polling, elapsed: ${elapsed}ms`);
-
-  return {
-    state: stateText,
-    elapsed,
-    status: { ...counts },
-    timings: timings.measures,
-    memoryUsage,
-  };
 }
 
 module.exports = {

@@ -11,6 +11,7 @@ governing permissions and limitations under the License.
 */
 
 const { request } = require('../utils');
+const { createBatchError, createGlobalError, ERROR_CODES } = require('./errorHandler');
 
 /**
  * Creates an instance of AdminAPI.
@@ -233,8 +234,35 @@ class AdminAPI {
         return request(name, path, req);
     }
 
-    async runWithRetry(fn, name) {
+    /**
+     * Handles final retry failure by throwing appropriate error type
+     * @param {boolean} isBatch - Whether this is a batch operation
+     * @param {string} name - Operation name
+     * @param {Error} originalError - The original error that caused failure
+     * @param {Object} logger - Logger instance
+     */
+    handleRetryFailure(isBatch, name, originalError, logger) {
+        const errorDetails = {
+            operation: name,
+            attempts: this.MAX_RETRIES,
+            originalError: originalError.message
+        };
+
+        if (isBatch) {
+            logger.warn(`Batch operation failed after ${this.MAX_RETRIES} retries: ${name}`);
+            throw createBatchError(`Batch operation failed: ${name}`, errorDetails);
+        } else {
+            logger.error(`Global operation failed after ${this.MAX_RETRIES} retries: ${name}`);
+            throw createGlobalError(`Global operation failed: ${name}`, 500, errorDetails);
+        }
+    }
+
+    async runWithRetry(fn, options) {
         const { logger } = this.context;
+        // Support both old (string) and new (object) API
+        const name = typeof options === 'string' ? options : options.name;
+        const isBatch = typeof options === 'object' ? options.isBatch : false;
+        
         for (let attempt = 1; attempt <= this.MAX_RETRIES; attempt++) {
             try {
                 return await fn();
@@ -245,6 +273,8 @@ class AdminAPI {
                     const delay = this.RETRY_DELAY * attempt;
                     logger.info(`Retrying to run ${name} in ${delay}ms...`);
                     await new Promise(resolve => setTimeout(resolve, delay));
+                } else {
+                    this.handleRetryFailure(isBatch, name, e, logger);
                 }
             }
         }
@@ -257,7 +287,7 @@ class AdminAPI {
                 async () => {
                     return await this.execAdminRequest('GET', 'job', `/${job.topic}/${job.name}`);
                 },
-                `getting status for ${job.topic}/${job.name}`
+                { name: `getting status for ${job.topic}/${job.name}`, isBatch: false }
             );
             if (responseBody.progress) {
                 logger.debug(`Progress for ${job.topic}/${job.name}: ${responseBody.progress.processed}/${responseBody.progress.total}`);
@@ -276,7 +306,7 @@ class AdminAPI {
                             async () => {
                                 return await this.execAdminRequestByPath('jobDetails', 'GET', responseBody.links.details);
                             },
-                            `getting job details for ${job.topic}/${job.name}`
+                            { name: `getting job details for ${job.topic}/${job.name}`, isBatch: false }
                         );
 
                         return response?.data?.resources
@@ -313,28 +343,47 @@ class AdminAPI {
             };
             const start = new Date();
 
-            // Try to preview the batch using bulk preview API
-            const response = await this.runWithRetry(
-                async () => {
-                    return await this.execAdminRequest('POST', 'preview', '/*', body);
-                },
-                `preview batch number ${batchNumber} for locale ${locale}`
-            );
+            try {
+                // Try to preview the batch using bulk preview API
+                const response = await this.runWithRetry(
+                    async () => {
+                        return await this.execAdminRequest('POST', 'preview', '/*', body);
+                    },
+                    { name: `preview batch number ${batchNumber} for locale ${locale}`, isBatch: true }
+                );
 
-            if (response?.job) {
-                logger.info(`Previewed batch number ${batchNumber} for locale ${locale}`);
-                const successPaths = await this.checkJobStatus(response.job);
-                batch.records.forEach(record => {
-                    if (successPaths.includes(record.path)) {
-                        record.previewedAt = new Date();
-                    }
-                });
+                if (response?.job) {
+                    logger.info(`Previewed batch number ${batchNumber} for locale ${locale}`);
+                    const successPaths = await this.checkJobStatus(response.job);
+                    batch.records.forEach(record => {
+                        if (successPaths.includes(record.path)) {
+                            record.previewedAt = new Date();
+                        }
+                    });
 
-                this.publishQueue.push(batch);
-            } else {
-                logger.error(`Error previewing batch number ${batchNumber} for locale ${locale}`);
-                // Resolve the original promises in case of an error
-                batch.resolve({records, locale, batchNumber});
+                    this.publishQueue.push(batch);
+                } else {
+                    logger.error(`Error previewing batch number ${batchNumber} for locale ${locale}`);
+                    // Resolve the original promises in case of an error
+                    batch.resolve({records, locale, batchNumber});
+                }
+            } catch (error) {
+                // Handle batch errors gracefully
+                if (error.code === ERROR_CODES.BATCH_ERROR) {
+                    logger.warn(`Batch preview failed for batch ${batchNumber}, continuing with other batches:`, {
+                        error: error.message,
+                        details: error.details
+                    });
+                    // Mark all records in this batch as failed
+                    batch.records.forEach(record => {
+                        record.failed = true;
+                        record.error = error.message;
+                    });
+                    batch.resolve({records, locale, batchNumber, failed: true});
+                } else {
+                    // Re-throw global errors
+                    throw error;
+                }
             }
 
             // Complete the batch preview
@@ -367,7 +416,7 @@ class AdminAPI {
                 async () => {
                     return await this.execAdminRequest('POST', 'preview', '/*', body);
                 },
-                `preview batch number ${batchNumber} for locale ${locale}`
+                { name: `preview batch number ${batchNumber} for locale ${locale}`, isBatch: true }
             );
 
             if (response?.job) {
@@ -416,7 +465,7 @@ class AdminAPI {
                 async () => {
                     return await this.execAdminRequest('POST', 'live', '/*', body);
                 },
-                `publish batch number ${batchNumber} for locale ${locale}`
+                { name: `publish batch number ${batchNumber} for locale ${locale}`, isBatch: true }
             );
 
             if (response?.job) {
@@ -461,7 +510,7 @@ class AdminAPI {
                 async () => {
                     return await this.execAdminRequest('POST', 'live', '/*', body);
                 },
-                `publish batch number ${batchNumber} for locale ${locale}`
+                { name: `publish batch number ${batchNumber} for locale ${locale}`, isBatch: true }
             );
 
             if (response?.job) {
@@ -510,7 +559,7 @@ class AdminAPI {
                 async () => {
                     return await this.execAdminRequest('POST', route, '/*', body);
                 },
-                `unpublish ${route} batch number ${batchNumber} for locale ${locale}`
+                { name: `unpublish ${route} batch number ${batchNumber} for locale ${locale}`, isBatch: true }
             );
 
             if (response?.job) {
@@ -572,7 +621,7 @@ class AdminAPI {
                 async () => {
                     return await this.execAdminRequest('POST', route, '/*', body);
                 },
-                `unpublish ${route} batch number ${batchNumber} for locale ${locale}`
+                { name: `unpublish ${route} batch number ${batchNumber} for locale ${locale}`, isBatch: true }
             );
 
             if (response?.job) {

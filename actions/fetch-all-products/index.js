@@ -17,6 +17,7 @@ const { Core, Files } = require('@adobe/aio-sdk')
 const { requestSaaS, FILE_PREFIX } = require('../utils');
 const { Timings } = require('../lib/benchmark');
 const { getRuntimeConfig } = require('../lib/runtimeConfig');
+const { handleActionError } = require('../lib/errorHandler');
 
 async function getSkus(categoryPath, context) {
   let productsResp = await requestSaaS(ProductsQuery, 'getProducts', { currentPage: 1, categoryPath }, context);
@@ -96,33 +97,44 @@ async function getAllSkus(context) {
 }
 
 async function main(params) {
-  // Resolve runtime config (CONTENT_URL/STORE_URL/templates built from ORG/SITE if missing)
-  const cfg = getRuntimeConfig(params);
-  const logger = Core.Logger('main', { level: cfg.logLevel });
-  const sharedContext = { ...cfg, logger }
+  try {
+    // Resolve runtime config
+    const cfg = getRuntimeConfig(params);
+    const logger = Core.Logger('main', { level: cfg.logLevel });
 
-  const results = await Promise.all(
-      cfg.locales.map(async (locale) => {
-        const context = { ...sharedContext };
-        if (locale) {
-            context.locale = locale;
-        }
-        const timings = new Timings();
-        const stateFilePrefix = locale || 'default';
-        const allSkus = await getAllSkus(context);
-        timings.sample('getAllSkus');
-        const filesLib = await Files.init(params.libInit || {});
-        timings.sample('saveFile');
-        const productsFileName = `${FILE_PREFIX}/${stateFilePrefix}-products.json`;
-        await filesLib.write(productsFileName, JSON.stringify(allSkus));
-        return timings.measures;
-      })
-  );
+    const sharedContext = { ...cfg, logger }
 
-  return {
-    statusCode: 200,
-    body: { status: 'completed', timings: results }
-  };
+    const results = await Promise.all(
+        cfg.locales.map(async (locale) => {
+          const context = { ...sharedContext };
+          if (locale) {
+              context.locale = locale;
+          }
+          const timings = new Timings();
+          const stateFilePrefix = locale || 'default';
+          const allSkus = await getAllSkus(context);
+          timings.sample('getAllSkus');
+          const filesLib = await Files.init(params.libInit || {});
+          timings.sample('saveFile');
+          const productsFileName = `${FILE_PREFIX}/${stateFilePrefix}-products.json`;
+          await filesLib.write(productsFileName, JSON.stringify(allSkus));
+          return timings.measures;
+        })
+    );
+
+    return {
+      statusCode: 200,
+      body: { status: 'completed', timings: results }
+    };
+  } catch (error) {
+    // Handle errors and determine if job should fail
+    const logger = Core.Logger('main', { level: 'error' });
+    
+    return handleActionError(error, { 
+      logger, 
+      actionName: 'Fetch all products' 
+    });
+  }
 }
 
 exports.main = main
