@@ -53,6 +53,10 @@ application:
             annotations:
               final: true
 #        triggers:
+#          queueProcessorTrigger:
+#            feed: "/whisk.system/alarms/interval"
+#            inputs:
+#              seconds: 30  # Process queue every 30 seconds
 #          productPollerTrigger:
 #            feed: "/whisk.system/alarms/interval"
 #            inputs:
@@ -66,6 +70,9 @@ application:
 #            inputs:
 #              minutes: 60
 #        rules:
+#          queueProcessorRule:
+#            trigger: "queueProcessorTrigger"
+#            action: "events-handler"
 #          productPollerRule:
 #            trigger: "productPollerTrigger"
 #            action: "check-product-changes"

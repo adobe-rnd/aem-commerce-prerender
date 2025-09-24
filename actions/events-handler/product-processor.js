@@ -19,7 +19,7 @@ governing permissions and limitations under the License.
 
 const crypto = require('crypto');
 const { AdminAPI } = require('../lib/aem');
-const { generateProductHtml } = require('../pdp-renderer/render');
+const { generateProductHtml } = require('./render');
 const { 
   getProductUrl,
     PDP_FILE_EXT,
@@ -37,8 +37,7 @@ async function getProductData(sku, context) {
   try {
     logger.debug('Fetching product data', { sku });
     
-    const query = GetLastModifiedQuery([sku]);
-    const response = await requestSaaS(query, context);
+    const response = await requestSaaS(GetLastModifiedQuery, 'getLastModified', { skus: [sku] }, context);
     
     if (!response?.data?.products?.length) {
       logger.warn('Product not found in catalog', { sku });

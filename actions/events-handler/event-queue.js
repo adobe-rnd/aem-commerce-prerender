@@ -17,7 +17,6 @@ governing permissions and limitations under the License.
  * deduplication, and priority handling.
  */
 
-const { State } = require('@adobe/aio-lib-state');
 
 /**
  * Event Queue Manager
@@ -64,10 +63,21 @@ class EventQueue {
 
   async _doInit() {
     try {
-      this.state = new State();
-      this.config.logger.debug && this.config.logger.debug('Event queue State service initialized');
+      // Use in-memory storage for event queue
+      this.state = {
+        data: new Map(),
+        async get(key) {
+          const value = this.data.get(key);
+          return { value: value || null };
+        },
+        async put(key, value, options = {}) {
+          this.data.set(key, value);
+          return true;
+        }
+      };
+      this.config.logger.debug && this.config.logger.debug('Event queue in-memory storage initialized');
     } catch (error) {
-      this.config.logger.error && this.config.logger.error('Failed to initialize Event queue State service', error);
+      this.config.logger.error && this.config.logger.error('Failed to initialize Event queue storage', error);
       throw error;
     }
   }

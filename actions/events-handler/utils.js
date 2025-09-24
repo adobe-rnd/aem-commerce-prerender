@@ -48,9 +48,9 @@ const DEFAULT_CONFIG = {
   // Authentication configuration - disabled by default for webhook compatibility
   ENABLE_SIGNATURE_VALIDATION: false, // TODO: when we have real commerce + eds project.
   
-  // Rate limiting configuration (max 20 requests per second)
-  RATE_LIMIT_MAX_TOKENS: 20,
-  RATE_LIMIT_REFILL_RATE: 20,
+  // Rate limiting configuration (max 18 requests per second)
+  RATE_LIMIT_MAX_TOKENS: 18,
+  RATE_LIMIT_REFILL_RATE: 18,
   
   // Event processing configuration
   ENABLE_RATE_LIMITING: true,
@@ -61,8 +61,8 @@ const DEFAULT_CONFIG = {
   SKU_FILTER_PRESET: 'PRODUCTS_ONLY', // or 'ALLOW_ALL', 'SPECIFIC_PREFIXES'
   
   // Event queue configuration
-  EVENT_QUEUE_MAX_SIZE: 1000,
-  EVENT_QUEUE_BATCH_SIZE: 5,
+  EVENT_QUEUE_MAX_SIZE: 5000,  // Increased for testing
+  EVENT_QUEUE_BATCH_SIZE: 20,  // Process more per batch
   EVENT_QUEUE_MAX_RETRIES: 3,
   EVENT_QUEUE_RETRY_DELAY: 1000,
   EVENT_QUEUE_DEDUP_WINDOW: 300000, // 5 minutes

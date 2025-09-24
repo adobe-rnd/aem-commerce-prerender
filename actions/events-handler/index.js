@@ -75,7 +75,39 @@ async function main(params) {
     });
     logger.debug('Parameter details', filteredParams);
     
-    // Step 4: Validate CloudEvent structure
+    // Step 4: Check if this is a queue processing trigger or a real event
+    if (params.__OW_TRIGGER_NAME === 'queueProcessorTrigger') {
+      logger.info('Queue processing trigger activated');
+      
+      // Only process queued events, no main event processing
+      try {
+        const queueProcessingResult = await processQueuedEvents(params, aioLibs);
+        
+        logger.info('Scheduled queue processing completed', {
+          processed: queueProcessingResult.processed,
+          failed: queueProcessingResult.failed,
+          remainingInQueue: queueProcessingResult.queueSize
+        });
+        
+        return {
+          success: true,
+          message: 'Queue processing completed',
+          processed: queueProcessingResult.processed,
+          failed: queueProcessingResult.failed,
+          queueSize: queueProcessingResult.queueSize,
+          timestamp: new Date().toISOString()
+        };
+      } catch (error) {
+        logger.error('Scheduled queue processing failed', error);
+        return {
+          success: false,
+          error: error.message,
+          timestamp: new Date().toISOString()
+        };
+      }
+    }
+    
+    // Step 5: Validate CloudEvent structure for normal events
     // According to Adobe I/O Events documentation, events are passed in the action parameters
     const event = params;
     
@@ -95,7 +127,7 @@ async function main(params) {
       return createEventResponse(event, errorResult, Date.now() - startTime, false);
     }
 
-    // Step 5: Adobe digital signature validation
+    // Step 6: Adobe digital signature validation
     const authResult = await authenticateEvent(event, params, runtimeConfig);
     if (!authResult.authenticated) {
       logger.error('Authentication failed', {
@@ -113,7 +145,7 @@ async function main(params) {
     
     logger.info('Authentication passed', { reason: authResult.reason });
 
-    // Step 6: Log event details
+    // Step 7: Log event details
     logger.info('CloudEvent details', {
       type: event.type,
       id: event.id,
@@ -123,7 +155,7 @@ async function main(params) {
       datacontenttype: event.datacontenttype
     });
     
-    // Step 7: Process event with all controls (rate limiting, filtering, queuing)
+    // Step 8: Process event with all controls (rate limiting, filtering, queuing)
     logger.info('Processing event with control systems');
     const processingResult = await processEventWithControls(event, params, aioLibs, runtimeConfig);
     
@@ -138,7 +170,7 @@ async function main(params) {
       stage: processingResult.stage
     });
     
-    // Step 8: Process any queued events (background processing)
+    // Step 9: Process any queued events (background processing)
     try {
       const queueProcessingResult = await processQueuedEvents(params, aioLibs);
       if (queueProcessingResult.processed > 0) {
@@ -155,7 +187,7 @@ async function main(params) {
     
     logger.info('=== Events Handler Finished ===');
     
-    // Step 9: Return detailed response for Adobe I/O Events
+    // Step 10: Return detailed response for Adobe I/O Events
     return createEventResponse(event, processingResult, processingTime, processingResult.success);
     
   } catch (error) {

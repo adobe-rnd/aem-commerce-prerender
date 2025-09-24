@@ -13,21 +13,20 @@ governing permissions and limitations under the License.
 /**
  * Rate Limiter for Publishing Events
  * 
- * Manages rate limiting to ensure no more than 20 publishing requests per second
- * Uses token bucket algorithm with Adobe I/O Runtime State for persistence
+ * Manages rate limiting to ensure no more than 18 publishing requests per second
+ * Uses token bucket algorithm with in-memory storage
  */
 
-const { State } = require('@adobe/aio-lib-state');
 
 /**
  * Token Bucket Rate Limiter
- * Implements rate limiting using token bucket algorithm with persistent state
+ * Implements rate limiting using token bucket algorithm with in-memory state
  */
 class RateLimiter {
   constructor(config = {}) {
     this.config = {
-      maxTokens: 20, // Maximum tokens (requests per second)
-      refillRate: 20, // Tokens refilled per second
+      maxTokens: 18, // Maximum tokens (requests per second)
+      refillRate: 18, // Tokens refilled per second
       keyPrefix: 'rate_limiter_',
       bucketKey: 'publishing_bucket',
       logger: console,
@@ -52,16 +51,27 @@ class RateLimiter {
 
   async _doInit() {
     try {
-      this.state = new State();
-      this.config.logger.debug && this.config.logger.debug('Rate limiter State service initialized');
+      // Use in-memory storage for rate limiting
+      this.state = {
+        data: new Map(),
+        async get(key) {
+          const value = this.data.get(key);
+          return { value: value || null };
+        },
+        async put(key, value, options = {}) {
+          this.data.set(key, value);
+          return true;
+        }
+      };
+      this.config.logger.debug && this.config.logger.debug('Rate limiter in-memory storage initialized');
     } catch (error) {
-      this.config.logger.error && this.config.logger.error('Failed to initialize Rate limiter State service', error);
+      this.config.logger.error && this.config.logger.error('Failed to initialize Rate limiter storage', error);
       throw error;
     }
   }
 
   /**
-   * Get current bucket state from persistent storage
+   * Get current bucket state from in-memory storage
    */
   async _getBucketState() {
     await this._init();
