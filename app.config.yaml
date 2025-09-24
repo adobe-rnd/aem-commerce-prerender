@@ -22,6 +22,36 @@ application:
             runtime: "nodejs:22"
             annotations:
               final: true
+          pdp-renderer:
+            function: "actions/pdp-renderer/index.js"
+            web: "yes"
+            runtime: "nodejs:22"
+            annotations:
+              final: true
+          check-product-changes:
+            function: "actions/check-product-changes/index.js"
+            web: "no"
+            runtime: "nodejs:22"
+            annotations:
+              final: true
+          fetch-all-products:
+            function: "actions/fetch-all-products/index.js"
+            web: "no"
+            runtime: "nodejs:22"
+            annotations:
+              final: true
+          get-overlay-url:
+            function: "actions/get-overlay-url/index.js"
+            web: "yes"
+            runtime: "nodejs:22"
+            annotations:
+              final: true
+          mark-up-clean-up:
+            function: "actions/mark-up-clean-up/index.js"
+            web: "no"
+            runtime: "nodejs:22"
+            annotations:
+              final: true
 #        triggers:
 #          productPollerTrigger:
 #            feed: "/whisk.system/alarms/interval"
