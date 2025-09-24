@@ -15,6 +15,7 @@ application:
           STORE_URL: "${STORE_URL}"
           CONFIG_NAME: "config"
           LOCALES: "${LOCALES}"
+        actions:
           events-handler:
             function: "actions/events-handler/index.js"
             web: "no"
