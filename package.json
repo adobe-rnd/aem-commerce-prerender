@@ -7,6 +7,7 @@
   },
   "dependencies": {
     "@adobe/aio-lib-runtime": "^7.1.2",
+    "@adobe/aio-lib-state": "^5.1.0",
     "@adobe/aio-sdk": "^6.0.0",
     "@adobe/helix-shared-string": "^2.1.0",
     "@fastify/deepmerge": "^3.1.0",
@@ -17,13 +18,13 @@
     "diff": "^8.0.2",
     "dotenv-stringify": "^3.0.1",
     "handlebars": "^4.7.8",
+    "itty-router": "^5.0.0",
     "js-yaml": "^4.1.0",
-    "node-fetch": "^2.6.0",
+    "node-fetch": "^2.7.0",
     "p-limit": "^6.2.0",
     "striptags": "^3.2.0",
     "vega": "^6.0.0",
-    "vega-lite": "^6.0.0",
-    "itty-router": "^5.0.0"
+    "vega-lite": "^6.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

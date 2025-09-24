@@ -15,46 +15,10 @@ application:
           STORE_URL: "${STORE_URL}"
           CONFIG_NAME: "config"
           LOCALES: "${LOCALES}"
-        actions:
-          pdp-renderer:
-            function: "actions/pdp-renderer/index.js"
-            web: "yes"
-            runtime: "nodejs:22"
-            annotations:
-              final: true
-            include:
-              - - "actions/pdp-renderer/templates/*.hbs"
-                - "templates/"
-          check-product-changes:
-            function: "actions/check-product-changes/index.js"
+          events-handler:
+            function: "actions/events-handler/index.js"
             web: "no"
             runtime: "nodejs:22"
-            include:
-              - - "actions/pdp-renderer/templates/*.hbs"
-                - "templates/"
-            limits:
-              memorySize: 256
-              timeout: 3600000
-            inputs:
-              AEM_ADMIN_API_AUTH_TOKEN: "${AEM_ADMIN_API_AUTH_TOKEN}"
-            annotations:
-              final: true
-          fetch-all-products:
-            function: "actions/fetch-all-products/index.js"
-            web: "yes"
-            runtime: "nodejs:22"
-            annotations:
-              final: true
-          get-overlay-url:
-            function: "actions/get-overlay-url/index.js"
-            runtime: "nodejs:22"
-            annotations:
-              final: true
-          mark-up-clean-up:
-            function: "actions/mark-up-clean-up/index.js"
-            runtime: "nodejs:22"
-            inputs:
-              AEM_ADMIN_API_AUTH_TOKEN: "${AEM_ADMIN_API_AUTH_TOKEN}"
             annotations:
               final: true
 #        triggers:
