@@ -46,7 +46,7 @@ const DEFAULT_CONFIG = {
   CLIENT_ID: 'd0e28b9a5f9e4d029531f243e5a160a8',
   
   // Authentication configuration - disabled by default for webhook compatibility
-  ENABLE_SIGNATURE_VALIDATION: false, // TODO: Enable after Event Registration is updated
+  ENABLE_SIGNATURE_VALIDATION: false, // TODO: when we have real commerce + eds project.
   
   // Rate limiting configuration (max 20 requests per second)
   RATE_LIMIT_MAX_TOKENS: 20,
