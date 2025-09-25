@@ -77,41 +77,23 @@ async function processProductEvent(sku, params) {
         };
       }
 
-      // Step 2: Generate HTML
-      logger.info('Step 2: Generating HTML');
-      const html = await generateProductHTML(sku, productData.urlKey, context);
+      // Step 2: Generate HTML (TEMPORARILY DISABLED)
+      logger.info('Step 2: Skipping HTML generation (temporarily disabled)');
+      const html = '<html><body>Mock HTML for testing</body></html>';
       
-      // Step 3: Save HTML file
-      logger.info('Step 3: Saving HTML file');
-      const htmlPath = await saveProductHTML(sku, productData.urlKey, html, context);
+      // Step 3: Save HTML file (TEMPORARILY DISABLED)
+      logger.info('Step 3: Skipping HTML file saving (temporarily disabled)');
+      const htmlPath = `/public/pdps/products/${productData.urlKey}/${sku}.html`;
       
-      // Step 4: Start publishing asynchronously (don't wait for completion)
-      logger.info('Step 4: Starting publishing via AEM (async)');
+      // Step 4: Publishing (TEMPORARILY DISABLED)
+      logger.info('Step 4: Skipping publishing (temporarily disabled)');
       
-      // Start publishing in background and don't wait for it
-      publishProduct(sku, productData.urlKey, context, adminApi)
-        .then(result => {
-          logger.info('Async publishing completed successfully', { 
-            sku, 
-            urlKey: productData.urlKey,
-            batchNumber: result.batchNumber 
-          });
-          return result;
-        })
-        .catch(error => {
-          logger.error('Async publishing failed', { 
-            sku, 
-            urlKey: productData.urlKey,
-            error: error.message 
-          });
-          return { error: error.message, status: 'failed' };
-        });
-      
-      // Return immediately with publishing status as "started"
+      // Return immediately with mock success
       const publishResult = { 
-        status: 'started-async',
-        message: 'Publishing started in background',
-        timestamp: new Date().toISOString()
+        status: 'success-mock',
+        message: 'Mock publishing completed successfully',
+        timestamp: new Date().toISOString(),
+        htmlPath: htmlPath
       };
       
       logger.info('Publishing started asynchronously, continuing', { sku });

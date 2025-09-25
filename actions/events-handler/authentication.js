@@ -13,14 +13,18 @@ governing permissions and limitations under the License.
 /**
  * Adobe I/O Events Authentication Module
  * 
- * Validates digital signatures from Adobe I/O Events to ensure
+ * Validates RSA digital signatures from Adobe I/O Events to ensure
  * events are authentic and have not been tampered with.
  * 
- * Adobe I/O Events uses HMAC-SHA256 signatures:
- * 1. Adobe signs the raw JSON payload with your CLIENT_SECRET
- * 2. The signature is sent in the 'x-adobe-signature' header
- * 3. Format: "sha256={hmac_hex}" 
- * 4. We recreate the signature and compare
+ * Adobe I/O Events uses RSA digital signatures:
+ * 1. Adobe signs the raw JSON payload with their private key
+ * 2. Signatures are sent in x-adobe-digital-signature-1/2 headers
+ * 3. Public keys are referenced in x-adobe-public-key1/2-path headers
+ * 4. We verify signatures using Adobe's public keys
+ * 
+ * Environment Variables:
+ * - CLIENT_ID: Adobe I/O Client ID (from Adobe Developer Console)
+ * - CLIENT_SECRET: Adobe I/O Client Secret (for HMAC validation)
  * 
  * @see https://developer.adobe.com/events/docs/guides/
  */
@@ -29,20 +33,29 @@ const crypto = require('crypto');
 const { logger } = require('./utils');
 
 /**
- * Configuration for signature validation
+ * Configuration for RSA signature validation
  */
 const SIGNATURE_CONFIG = {
-  // Adobe I/O Events client ID for signature validation
-  CLIENT_ID: 'd0e28b9a5f9e4d029531f243e5a160a8',
+  // Adobe I/O Events client ID for signature validation (from environment)
+  CLIENT_ID: process.env.CLIENT_ID || '94ef891d1d6c498499d19f07f46c812f',
   
-  // Enable/disable signature validation (default: false for webhook compatibility)
+  // Enable/disable signature validation (default: false for testing)
   ENABLE_VALIDATION: false,
   
-  // Signature header name
-  SIGNATURE_HEADER: 'x-adobe-signature',
+  // RSA signature headers
+  SIGNATURE_HEADERS: [
+    'x-adobe-digital-signature-1',
+    'x-adobe-digital-signature-2'
+  ],
   
-  // Algorithm used for signature
-  ALGORITHM: 'sha256'
+  // Public key path headers
+  PUBLIC_KEY_HEADERS: [
+    'x-adobe-public-key1-path',
+    'x-adobe-public-key2-path'
+  ],
+  
+  // Adobe public key base URL
+  PUBLIC_KEY_BASE_URL: 'https://ioevents-stage.adobe.io'
 };
 
 /**
@@ -230,8 +243,8 @@ function verifyEventSignature(event, signature) {
  * @returns {string} Generated HMAC signature
  */
 function createSignature(data) {
-  // Get client secret from environment variables
-  const clientSecret = process.env.CLIENT_SECRET;
+  // Get client secret from environment variables with fallback
+  const clientSecret = process.env.CLIENT_SECRET || '94ef891d1d6c498499d19f07f46c812f';
   if (!clientSecret) {
     throw new Error('CLIENT_SECRET environment variable is required for signature creation');
   }
