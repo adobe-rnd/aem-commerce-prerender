@@ -21,6 +21,14 @@ application:
             function: "actions/events-handler/index.js"
             web: "no"
             runtime: "nodejs:22"
+            inputs:
+              LOG_LEVEL: debug
+              apiKey: $CLIENT_ID
+              ims_org_id: $IMS_ORG_ID
+              ACCESS_TOKEN: $ACCESS_TOKEN
+              journalling_url: "https://events-va6.adobe.io/events/organizations/1172492/integrations/842637/eef46a64-81dd-4b51-b58d-e208a3e0c76f"
+              db_event_key: "commerce_events_position"
+              max_events_in_batch: 5
             annotations:
               final: true
           pdp-renderer:

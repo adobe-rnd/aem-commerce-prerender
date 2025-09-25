@@ -6,6 +6,7 @@
     "setup": "./bin/setup/index.js"
   },
   "dependencies": {
+    "@adobe/aio-lib-ims": "^7.0.2",
     "@adobe/aio-lib-runtime": "^7.1.2",
     "@adobe/aio-lib-state": "^5.1.0",
     "@adobe/aio-sdk": "^6.0.0",
