@@ -11,29 +11,15 @@ governing permissions and limitations under the License.
 */
 
 /**
- * Events Handler - Adobe I/O Events Integration
+ * Adobe Commerce Events Handler
  * 
- * Simple Runtime Action for Adobe I/O Events integration.
- * According to Adobe App Builder documentation:
- * https://developer.adobe.com/app-builder/docs/intro_and_overview/
- * 
- * This is a NON-WEB action designed to receive events directly from Adobe I/O Events.
+ * Processes product update and price update events from Adobe Commerce
+ * and generates/publishes corresponding product pages.
  */
 
-// Import modules
-const { 
-  logger, 
-  buildRuntimeConfig, 
-  initAIOLibs, 
-  validateCloudEvent, 
-  logConfiguration, 
-  logEnvironmentVariables, 
-  createEventResponse 
-} = require('./utils');
-
-const { authenticateEvent } = require('./adobe-auth');
-const { processEventWithControls } = require('./event-processor');
-const { processQueuedEvents } = require('./control-systems');
+const { logger, validateCloudEvent, createResponse } = require('./utils');
+const { processProductEvent } = require('./product-processor');
+const { validateSignature } = require('./authentication');
 
 /**
  * Main action function
@@ -43,172 +29,105 @@ const { processQueuedEvents } = require('./control-systems');
 async function main(params) {
   const startTime = Date.now();
   
-  logger.info('=== Events Handler Started ===');
-  logger.info('Action invocation details', {
-    timestamp: new Date().toISOString(),
-    activationId: process.env.__OW_ACTIVATION_ID || 'unknown',
-    namespace: process.env.__OW_NAMESPACE || 'unknown'
-  });
+  logger.info('=== Adobe Commerce Events Handler Started ===');
   
   try {
-    // Step 1: Build runtime configuration from parameters
-    const runtimeConfig = buildRuntimeConfig(params);
-    logConfiguration(runtimeConfig);
-    logEnvironmentVariables();
-    
-    // Step 2: Initialize AIO libraries for file operations
-    const aioLibs = await initAIOLibs(params);
-    if (!aioLibs) {
-      throw new Error('AIO Files library not available - cannot process events');
-    }
-    
-    // Step 3: Log received parameters (with filtering for sensitive data)
-    const filteredParams = { ...params };
-    delete filteredParams.STORE_URL;
-    delete filteredParams.CONTENT_URL;
-    delete filteredParams.AEM_ADMIN_API_AUTH_TOKEN;
-    
-    logger.info('Received parameters', {
-      parameterCount: Object.keys(params).length,
-      hasData: !!(params.data),
-      eventType: params.type
-    });
-    logger.debug('Parameter details', filteredParams);
-    
-    // Step 4: Check if this is a queue processing trigger or a real event
-    if (params.__OW_TRIGGER_NAME === 'queueProcessorTrigger') {
-      logger.info('Queue processing trigger activated');
-      
-      // Only process queued events, no main event processing
-      try {
-        const queueProcessingResult = await processQueuedEvents(params, aioLibs);
-        
-        logger.info('Scheduled queue processing completed', {
-          processed: queueProcessingResult.processed,
-          failed: queueProcessingResult.failed,
-          remainingInQueue: queueProcessingResult.queueSize
-        });
-        
-        return {
-          success: true,
-          message: 'Queue processing completed',
-          processed: queueProcessingResult.processed,
-          failed: queueProcessingResult.failed,
-          queueSize: queueProcessingResult.queueSize,
-          timestamp: new Date().toISOString()
-        };
-      } catch (error) {
-        logger.error('Scheduled queue processing failed', error);
-        return {
-          success: false,
-          error: error.message,
-          timestamp: new Date().toISOString()
-        };
-      }
-    }
-    
-    // Step 5: Validate CloudEvent structure for normal events
-    // According to Adobe I/O Events documentation, events are passed in the action parameters
-    const event = params;
-    
-    const validation = validateCloudEvent(event);
+    // Step 1: Validate CloudEvent structure
+    const validation = validateCloudEvent(params);
     if (!validation.valid) {
-      logger.error('Invalid CloudEvent received', { 
-        missingFields: validation.missingFields,
-        receivedFields: Object.keys(event)
-      });
-      
-      const errorResult = {
+      logger.error('Invalid CloudEvent structure', validation);
+      return createResponse(params, {
         success: false,
-        error: 'Invalid CloudEvent format',
-        details: `Missing required fields: ${validation.missingFields.join(', ')}`
-      };
-      
-      return createEventResponse(event, errorResult, Date.now() - startTime, false);
+        error: 'Invalid CloudEvent structure',
+        details: validation.missingFields
+      }, Date.now() - startTime);
     }
 
-    // Step 6: Adobe digital signature validation
-    const authResult = await authenticateEvent(event, params, runtimeConfig);
+    // Step 2: Validate digital signature
+    const authResult = validateSignature(params, params);
     if (!authResult.authenticated) {
-      logger.error('Authentication failed', {
+      logger.warn('Authentication failed', {
         reason: authResult.reason,
-        eventId: event.id
+        eventId: params.id,
+        method: authResult.method
       });
-      
-      const errorResult = {
+      return createResponse(params, {
+        success: false,
         error: 'Authentication failed',
-        details: authResult.reason
-      };
-      
-      return createEventResponse(event, errorResult, Date.now() - startTime, false);
+        reason: authResult.reason
+      }, Date.now() - startTime);
     }
-    
-    logger.info('Authentication passed', { reason: authResult.reason });
 
-    // Step 7: Log event details
-    logger.info('CloudEvent details', {
-      type: event.type,
-      id: event.id,
-      source: event.source,
-      time: event.time,
-      specversion: event.specversion,
-      datacontenttype: event.datacontenttype
+    logger.info('Authentication successful', { 
+      method: authResult.method,
+      reason: authResult.reason 
     });
-    
-    // Step 8: Process event with all controls (rate limiting, filtering, queuing)
-    logger.info('Processing event with control systems');
-    const processingResult = await processEventWithControls(event, params, aioLibs, runtimeConfig);
-    
+
+    // Step 3: Check event type
+    const supportedTypes = [
+      'com.adobe.commerce.storefront.events.product.update',
+      'com.adobe.commerce.storefront.events.price.update'
+    ];
+
+    if (!supportedTypes.includes(params.type)) {
+      logger.warn('Unsupported event type', { 
+        eventType: params.type,
+        supportedTypes 
+      });
+      return createResponse(params, {
+        success: false,
+        error: 'Unsupported event type',
+        eventType: params.type
+      }, Date.now() - startTime);
+    }
+
+    // Step 4: Extract SKU from event data
+    const sku = params.data?.sku;
+    if (!sku) {
+      logger.error('Missing SKU in event data', { eventId: params.id });
+      return createResponse(params, {
+        success: false,
+        error: 'Missing SKU in event data'
+      }, Date.now() - startTime);
+    }
+
+    logger.info('Processing Commerce event', {
+      eventId: params.id,
+      eventType: params.type,
+      sku: sku,
+      source: params.source
+    });
+
+    // Step 5: Process the product event
+    const result = await processProductEvent(sku, params);
+
     const processingTime = Date.now() - startTime;
     
     logger.info('Event processing completed', {
-      success: processingResult.success,
-      eventId: event.id,
-      eventType: event.type,
-      processingTimeMs: processingTime,
-      sku: processingResult.sku || null,
-      stage: processingResult.stage
+      success: result.success,
+      eventId: params.id,
+      sku: sku,
+      processingTimeMs: processingTime
     });
-    
-    // Step 9: Process any queued events (background processing)
-    try {
-      const queueProcessingResult = await processQueuedEvents(params, aioLibs);
-      if (queueProcessingResult.processed > 0) {
-        logger.info('Background queue processing completed', {
-          processed: queueProcessingResult.processed,
-          failed: queueProcessingResult.failed,
-          remainingInQueue: queueProcessingResult.queueSize
-        });
-      }
-    } catch (queueError) {
-      logger.warn('Background queue processing failed', { error: queueError.message });
-      // Don't fail the main event processing because of queue processing errors
-    }
-    
-    logger.info('=== Events Handler Finished ===');
-    
-    // Step 10: Return detailed response for Adobe I/O Events
-    return createEventResponse(event, processingResult, processingTime, processingResult.success);
-    
+
+    logger.info('=== Adobe Commerce Events Handler Finished ===');
+
+    return createResponse(params, result, processingTime);
+
   } catch (error) {
     const processingTime = Date.now() - startTime;
     
-    logger.error('Unexpected error in events handler', error);
-    logger.error('Action execution details', {
-      processingTimeMs: processingTime,
-      paramsReceived: Object.keys(params).length > 0,
-      timestamp: new Date().toISOString()
-    });
-    
-    logger.info('=== Events Handler Failed ===');
-    
-    const errorResult = {
+    logger.error('Event processing failed', {
       error: error.message,
-      stack: error.stack
-    };
-    
-    const event = params; // Use params as event for error response
-    return createEventResponse(event, errorResult, processingTime, false);
+      stack: error.stack,
+      eventId: params.id,
+      processingTimeMs: processingTime
+    });
+
+    return createResponse(params, {
+      success: false,
+      error: error.message
+    }, processingTime);
   }
 }
 
