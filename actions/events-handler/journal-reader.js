@@ -13,7 +13,6 @@
  */
 
 const fetch = require('node-fetch');
-const { StateManager } = require('../lib/state');
 
 /**
  * Journal Reader class

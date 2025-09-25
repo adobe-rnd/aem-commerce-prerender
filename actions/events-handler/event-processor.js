@@ -147,7 +147,7 @@ class EventProcessor {
    * @param {Object} options - Processing options
    * @returns {Promise<Object>} Processing result
    */
-  async processSku(sku, options = {}) {
+  async processSku(sku) {
     const skuStart = Date.now();
     console.log(`Processing SKU: ${sku}`);
     

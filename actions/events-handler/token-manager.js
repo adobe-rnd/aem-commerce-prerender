@@ -12,7 +12,6 @@
  */
 
 const fetch = require('node-fetch');
-const { StateManager } = require('../lib/state');
 
 /**
  * Token Manager class
