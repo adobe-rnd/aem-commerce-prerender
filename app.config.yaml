@@ -15,6 +15,7 @@ application:
           STORE_URL: "${STORE_URL}"
           CONFIG_NAME: "config"
           LOCALES: "${LOCALES}"
+          JOURNAL_URL: "https://events-va6.adobe.io/events/organizations/1172492/integrations/842637/eef46a64-81dd-4b51-b58d-e208a3e0c76f"
         actions:
           events-handler:
             function: "actions/events-handler/index.js"
@@ -52,11 +53,11 @@ application:
             runtime: "nodejs:22"
             annotations:
               final: true
-#        triggers:
-#          queueProcessorTrigger:
-#            feed: "/whisk.system/alarms/interval"
-#            inputs:
-#              seconds: 30  # Process queue every 30 seconds
+        triggers:
+          eventsHandlerTrigger:
+            feed: "/whisk.system/alarms/interval"
+            inputs:
+              minutes: 5  # Process events every 5 minutes
 #          productPollerTrigger:
 #            feed: "/whisk.system/alarms/interval"
 #            inputs:
@@ -69,10 +70,10 @@ application:
 #            feed: "/whisk.system/alarms/interval"
 #            inputs:
 #              minutes: 60
-#        rules:
-#          queueProcessorRule:
-#            trigger: "queueProcessorTrigger"
-#            action: "events-handler"
+        rules:
+          eventsHandlerRule:
+            trigger: "eventsHandlerTrigger"
+            action: "events-handler"
 #          productPollerRule:
 #            trigger: "productPollerTrigger"
 #            action: "check-product-changes"

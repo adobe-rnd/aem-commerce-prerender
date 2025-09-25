@@ -69,7 +69,7 @@ class StateManager {
             } catch (error) {
                 lastError = error;
                 attempt++;
-                this.logger.warning(`State error encountered, attempting retry ${attempt}: ${error.message}`);
+                this.logger.warn(`State error encountered, attempting retry ${attempt}: ${error.message}`);
                 await new Promise((r) => setTimeout(r, this.retryDelay));
             }
         }

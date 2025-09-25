@@ -1,117 +1,216 @@
-/*
-Copyright 2025 Adobe. All rights reserved.
-This file is licensed to you under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License. You may obtain a copy
-of the License at http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software distributed under
-the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR REPRESENTATIONS
-OF ANY KIND, either express or implied. See the License for the specific language
-governing permissions and limitations under the License.
-*/
-
 /**
- * Adobe Commerce Events Handler
+ * Adobe Commerce Events Handler - Main Entry Point
  * 
- * Processes product update and price update events from Adobe Commerce
- * and generates/publishes corresponding product pages.
+ * Processes Adobe Commerce events from Adobe I/O Events Journal.
+ * Runs as a scheduled action (cron) to pull events, generate HTML markup,
+ * and publish products.
+ * 
+ * Features:
+ * - Pull-based event consumption from Adobe I/O Events Journal
+ * - Automatic access token management
+ * - Rate-limited processing (10 req/sec)
+ * - Cursor-based position tracking
+ * - Batch processing with error handling
+ * - Comprehensive logging and statistics
+ * 
+ * Scheduled to run every 5 minutes via Adobe I/O Runtime triggers.
  */
 
-const { logger, validateCloudEvent, createResponse } = require('./utils');
-const { processProductEvent } = require('./product-processor');
-// const { validateSignature } = require('./authentication'); // Disabled for now
+const { Core, State, Files } = require('@adobe/aio-sdk');
+const { StateManager } = require('../lib/state');
+const { TokenManager } = require('./token-manager');
+const { JournalReader } = require('./journal-reader');
+const { RateLimiterManager } = require('./rate-limiter');
+const { EventProcessor } = require('./event-processor');
 
 /**
- * Main action function
- * @param {object} params - Action parameters from Adobe I/O Events
- * @returns {object} Processing result
+ * Main entry point for Adobe I/O Runtime action
+ * @param {Object} params - Action parameters from Adobe I/O Runtime
+ * @returns {Object} Action result
  */
 async function main(params) {
-  const startTime = Date.now();
+  const executionStart = Date.now();
+  console.log('Events Handler started');
+  console.log('========================');
   
-  logger.info('=== Adobe Commerce Events Handler Started ===');
-  
+  // Initialize result object
+  const result = {
+    success: false,
+    timestamp: new Date().toISOString(),
+    executionTime: 0,
+    eventsRead: 0,
+    eventsProcessed: 0,
+    errors: [],
+    stats: {}
+  };
+
   try {
-    // Step 1: Validate CloudEvent structure
-    const validation = validateCloudEvent(params);
-    if (!validation.valid) {
-      logger.error('Invalid CloudEvent structure', validation);
-      return createResponse(params, {
-        success: false,
-        error: 'Invalid CloudEvent structure',
-        details: validation.missingFields
-      }, Date.now() - startTime);
-    }
-
-    // Step 2: Skip authentication for now (RSA signatures need special handling)
-    logger.info('Skipping authentication - RSA signature validation not implemented yet');
-
-    // Step 3: Check event type
-    const supportedTypes = [
-      'com.adobe.commerce.storefront.events.product.update',
-      'com.adobe.commerce.storefront.events.price.update'
-    ];
-
-    if (!supportedTypes.includes(params.type)) {
-      logger.warn('Unsupported event type', { 
-        eventType: params.type,
-        supportedTypes 
-      });
-      return createResponse(params, {
-        success: false,
-        error: 'Unsupported event type',
-        eventType: params.type
-      }, Date.now() - startTime);
-    }
-
-    // Step 4: Extract SKU from event data
-    const sku = params.data?.sku;
-    if (!sku) {
-      logger.error('Missing SKU in event data', { eventId: params.id });
-      return createResponse(params, {
-        success: false,
-        error: 'Missing SKU in event data'
-      }, Date.now() - startTime);
-    }
-
-    logger.info('Processing Commerce event', {
-      eventId: params.id,
-      eventType: params.type,
-      sku: sku,
-      source: params.source
-    });
-
-    // Step 5: Process the product event
-    const result = await processProductEvent(sku, params);
-
-    const processingTime = Date.now() - startTime;
+    // Step 1: Initialize Adobe I/O SDK and components
+    console.log('Initializing components...');
     
-    logger.info('Event processing completed', {
-      success: result.success,
-      eventId: params.id,
-      sku: sku,
-      processingTimeMs: processingTime
+    const logger = Core.Logger('events-handler', { level: params.LOG_LEVEL || 'info' });
+    const stateLib = await State.init(params.libInit || {});
+    const filesLib = await Files.init(params.libInit || {});
+    const stateManager = new StateManager(stateLib, { logger });
+    
+    const tokenManager = new TokenManager(params, stateManager, logger);
+    const journalReader = new JournalReader(params, stateManager, logger);
+    const rateLimiterManager = new RateLimiterManager();
+    const eventProcessor = new EventProcessor(params, filesLib);
+    
+    // Set up dependencies
+    journalReader.setTokenManager(tokenManager);
+    eventProcessor.setRateLimiterManager(rateLimiterManager);
+    eventProcessor.setFilesLib(filesLib);
+    
+    console.log('Components initialized');
+    
+    // Step 2: Verify token access
+    console.log('Verifying access token...');
+    const tokenInfo = await tokenManager.getTokenInfo();
+    console.log(`Token status: ${tokenInfo.status}`);
+    
+    if (tokenInfo.status === 'expired') {
+      console.log('Refreshing expired token...');
+      await tokenManager.refreshToken();
+    }
+    
+    // Step 3: Read events from journal
+    console.log('Reading events from journal...');
+    const batchResult = await journalReader.processBatch({
+      limit: 100 // Read up to 100 events per execution
     });
-
-    logger.info('=== Adobe Commerce Events Handler Finished ===');
-
-    return createResponse(params, result, processingTime);
-
+    
+    if (!batchResult.success) {
+      throw new Error(`Failed to read events: ${batchResult.error}`);
+    }
+    
+    result.eventsRead = batchResult.totalRead;
+    console.log(`Read ${batchResult.totalRead} events from journal`);
+    
+    // If no events, we're done
+    if (batchResult.totalRead === 0) {
+      console.log('No new events to process');
+      result.success = true;
+      result.message = 'No new events found';
+      result.executionTime = Date.now() - executionStart;
+      return result;
+    }
+    
+    // Step 4: Process events
+    console.log('Processing events...');
+    const processingResult = await eventProcessor.processBatch(batchResult.events, {
+      maxConcurrency: 1 // Process sequentially to respect rate limits
+    });
+    
+    result.eventsProcessed = processingResult.processedEvents;
+    result.errors = processingResult.errors;
+    
+    if (processingResult.failedEvents > 0) {
+      console.warn(`Warning: ${processingResult.failedEvents} events failed to process`);
+    }
+    
+    // Step 5: Collect statistics
+    result.stats = {
+      journal: await journalReader.getStatus(),
+      processor: eventProcessor.getStats(),
+      rateLimiter: rateLimiterManager.getStatus(),
+      token: tokenInfo
+    };
+    
+    // Determine overall success
+    result.success = batchResult.success && (processingResult.failedEvents === 0);
+    result.executionTime = Date.now() - executionStart;
+    
+    // Log summary
+    console.log('Execution Summary:');
+    console.log(`   Events read: ${result.eventsRead}`);
+    console.log(`   Events processed: ${result.eventsProcessed}`);
+    console.log(`   Events failed: ${processingResult.failedEvents}`);
+    console.log(`   Execution time: ${result.executionTime}ms`);
+    console.log(`   Success rate: ${eventProcessor.getStats().successRate}%`);
+    
+    if (result.success) {
+      console.log('Events Handler completed successfully');
+    } else {
+      console.log('Warning: Events Handler completed with errors');
+    }
+    
+    return result;
+    
   } catch (error) {
-    const processingTime = Date.now() - startTime;
+    console.error('Events Handler failed:', error.message);
     
-    logger.error('Event processing failed', {
-      error: error.message,
-      stack: error.stack,
-      eventId: params.id,
-      processingTimeMs: processingTime
+    result.success = false;
+    result.error = error.message;
+    result.executionTime = Date.now() - executionStart;
+    result.errors.push({
+      type: 'system_error',
+      message: error.message,
+      stack: error.stack
     });
-
-    return createResponse(params, {
-      success: false,
-      error: error.message
-    }, processingTime);
+    
+    return result;
   }
 }
 
-exports.main = main;
+/**
+ * Health check function for debugging
+ * @param {Object} params - Action parameters
+ * @returns {Object} Health check result
+ */
+async function healthCheck(params) {
+  console.log('Events Handler Health Check');
+  
+  try {
+    const logger = Core.Logger('events-handler-health', { level: 'info' });
+    const stateLib = await State.init(params.libInit || {});
+    const filesLib = await Files.init(params.libInit || {});
+    const stateManager = new StateManager(stateLib, { logger });
+    
+    const tokenManager = new TokenManager(params, stateManager, logger);
+    const journalReader = new JournalReader(params, stateManager, logger);
+    const rateLimiterManager = new RateLimiterManager();
+    const eventProcessor = new EventProcessor(params, filesLib);
+    
+    // Set up dependencies
+    journalReader.setTokenManager(tokenManager);
+    eventProcessor.setRateLimiterManager(rateLimiterManager);
+    eventProcessor.setFilesLib(filesLib);
+    
+    const health = {
+      timestamp: new Date().toISOString(),
+      status: 'healthy',
+      components: {
+        tokenManager: await tokenManager.getTokenInfo(),
+        journalReader: await journalReader.getStatus(),
+        rateLimiterManager: rateLimiterManager.getStatus(),
+        eventProcessor: eventProcessor.getStats()
+      },
+      configuration: {
+        journalUrl: params.JOURNAL_URL || 'not_configured',
+        clientId: params.CLIENT_ID ? 'configured' : 'not_configured',
+        runtimeConfig: 'available'
+      }
+    };
+    
+    console.log('Health check completed');
+    return health;
+    
+  } catch (error) {
+    console.error('Health check failed:', error.message);
+    return {
+      timestamp: new Date().toISOString(),
+      status: 'unhealthy',
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Adobe I/O Runtime action exports
+ */
+module.exports = {
+  main,
+  healthCheck
+};
