@@ -255,29 +255,6 @@ function createSignature(data) {
   return `sha256=${hash}`;
 }
 
-/**
- * Enable or disable signature validation
- * @param {boolean} enabled - Whether to enable validation
- */
-function setValidationEnabled(enabled) {
-  SIGNATURE_CONFIG.ENABLE_VALIDATION = enabled;
-  logger.info('Signature validation toggled', { enabled });
-}
-
-/**
- * Get current authentication configuration
- * @returns {object} Configuration object
- */
-function getConfig() {
-  return {
-    clientId: SIGNATURE_CONFIG.CLIENT_ID,
-    validationEnabled: SIGNATURE_CONFIG.ENABLE_VALIDATION,
-    algorithm: SIGNATURE_CONFIG.ALGORITHM
-  };
-}
-
 module.exports = {
-  validateSignature,
-  setValidationEnabled,
-  getConfig
+  validateSignature
 };

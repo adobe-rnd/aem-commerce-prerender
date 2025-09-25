@@ -89,7 +89,7 @@ async function processProductEvent(sku, params) {
       logger.info('Step 4: Starting publishing via AEM (async)');
       
       // Start publishing in background and don't wait for it
-      const publishPromise = publishProduct(sku, productData.urlKey, context, adminApi)
+      publishProduct(sku, productData.urlKey, context, adminApi)
         .then(result => {
           logger.info('Async publishing completed successfully', { 
             sku, 
