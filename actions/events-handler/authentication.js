@@ -15,6 +15,14 @@ governing permissions and limitations under the License.
  * 
  * Validates digital signatures from Adobe I/O Events to ensure
  * events are authentic and have not been tampered with.
+ * 
+ * Adobe I/O Events uses HMAC-SHA256 signatures:
+ * 1. Adobe signs the raw JSON payload with your CLIENT_SECRET
+ * 2. The signature is sent in the 'x-adobe-signature' header
+ * 3. Format: "sha256={hmac_hex}" 
+ * 4. We recreate the signature and compare
+ * 
+ * @see https://developer.adobe.com/events/docs/guides/
  */
 
 const crypto = require('crypto');
@@ -184,22 +192,26 @@ function validateClientId(event) {
  */
 function verifyEventSignature(event, signature) {
   try {
-    // Create canonical string from event data
-    const canonicalString = createCanonicalString(event);
-    logger.debug('Created canonical string', { 
-      length: canonicalString.length,
-      preview: canonicalString.substring(0, 100) + '...'
+    // Adobe I/O Events typically signs the raw JSON payload
+    const rawPayload = JSON.stringify(event);
+    logger.debug('Using raw payload for signature verification', { 
+      length: rawPayload.length,
+      preview: rawPayload.substring(0, 100) + '...'
     });
 
-    // Create expected signature
-    const expectedSignature = createSignature(canonicalString);
+    // Create expected signature using raw payload
+    const expectedSignature = createSignature(rawPayload);
     
-    // Compare signatures
-    const isValid = signature === expectedSignature;
+    // Normalize signatures (remove sha256= prefix if present)
+    const normalizedProvided = signature.startsWith('sha256=') ? signature.substring(7) : signature;
+    const normalizedExpected = expectedSignature.startsWith('sha256=') ? expectedSignature.substring(7) : expectedSignature;
+    
+    // Compare signatures (case-insensitive)
+    const isValid = normalizedProvided.toLowerCase() === normalizedExpected.toLowerCase();
     
     logger.debug('Signature comparison', {
-      provided: signature.substring(0, 20) + '...',
-      expected: expectedSignature.substring(0, 20) + '...',
+      provided: normalizedProvided.substring(0, 16) + '...',
+      expected: normalizedExpected.substring(0, 16) + '...',
       isValid
     });
 
@@ -211,48 +223,26 @@ function verifyEventSignature(event, signature) {
   }
 }
 
-/**
- * Create canonical string representation of event for signature verification
- * @param {object} event - CloudEvent
- * @returns {string} Canonical string
- */
-function createCanonicalString(event) {
-  // Create deterministic string from event properties
-  const canonicalData = {
-    id: event.id,
-    source: event.source,
-    type: event.type,
-    time: event.time,
-    data: event.data
-  };
-
-  // Sort keys and create JSON string
-  const sortedKeys = Object.keys(canonicalData).sort();
-  const canonicalParts = sortedKeys.map(key => {
-    const value = canonicalData[key];
-    if (typeof value === 'object') {
-      return `${key}:${JSON.stringify(value)}`;
-    }
-    return `${key}:${value}`;
-  });
-
-  return canonicalParts.join('|');
-}
 
 /**
- * Create signature for given data
+ * Create HMAC signature for given data using CLIENT_SECRET
  * @param {string} data - Data to sign
- * @returns {string} Generated signature
+ * @returns {string} Generated HMAC signature
  */
 function createSignature(data) {
-  // In a real implementation, this would use a secret key
-  // For now, create a simple hash-based signature
-  const hash = crypto
-    .createHash(SIGNATURE_CONFIG.ALGORITHM)
-    .update(data + SIGNATURE_CONFIG.CLIENT_ID)
+  // Get client secret from environment variables
+  const clientSecret = process.env.CLIENT_SECRET;
+  if (!clientSecret) {
+    throw new Error('CLIENT_SECRET environment variable is required for signature creation');
+  }
+
+  // Create HMAC signature using CLIENT_SECRET (standard for webhook validation)
+  const hmac = crypto
+    .createHmac(SIGNATURE_CONFIG.ALGORITHM, clientSecret)
+    .update(data, 'utf8')
     .digest('hex');
 
-  return `sha256=${hash}`;
+  return `sha256=${hmac}`;
 }
 
 module.exports = {
