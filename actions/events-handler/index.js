@@ -77,7 +77,7 @@ async function getLatestEventPosition(stateManager, dbEventKey) {
  * @param {Object} params - Action parameters
  * @param {string} token - Access token
  * @param {string} since - Position to start from
- * @returns {Array} Array of events
+ * @returns {Promise<Array>} Array of events
  */
 async function fetchEvents(params, token, since) {
   const eventsClient = await Events.init(params.ims_org_id, params.apiKey, token);
@@ -110,18 +110,18 @@ function extractUniqueSKUs(events) {
 }
 
 /**
- * Processes a single SKU - generates HTML and publishes
+ * Generate HTML for a single SKU
  * @param {string} sku - Product SKU
  * @param {Object} context - Processing context
  * @param {Object} filesLib - Files library instance
- * @returns {Object} Processing result
+ * @returns {Object} Processing result with HTML path
  */
-async function processSKU(sku, context, filesLib) {
+async function generateSKUHtml(sku, context, filesLib) {
   const { logger } = context;
   const startTime = Date.now();
   
   try {
-    logger.info(`Processing SKU: ${sku}`);
+    logger.info(`Generating HTML for SKU: ${sku}`);
     
     // Generate HTML using pdp-renderer
     const html = await generateProductHtml(sku, null, context);
@@ -146,31 +146,17 @@ async function processSKU(sku, context, filesLib) {
     
     logger.info(`HTML generated and saved: ${htmlPath}`);
     
-    // Publish product
-    const config = getRuntimeConfig(context, { validateToken: true });
-    const adminApi = new AdminAPI({
-      adminToken: config.AEM_ADMIN_API_AUTH_TOKEN,
-      contentUrl: config.CONTENT_URL,
-      logger: logger
-    });
-    
-    const publishResult = await adminApi.publish([htmlPath]);
-    
-    if (publishResult && publishResult.success) {
-      logger.info(`Product published: ${sku} -> ${htmlPath}`);
-      return {
-        success: true,
-        sku: sku,
-        htmlPath: htmlPath,
-        publishResult: publishResult,
-        processingTime: Date.now() - startTime
-      };
-    } else {
-      throw new Error(publishResult?.error || 'Publishing failed with unknown error');
-    }
+    return {
+      success: true,
+      sku: sku,
+      htmlPath: htmlPath,
+      path: productUrl, // path without /public/pdps prefix for publishing
+      renderedAt: new Date(),
+      processingTime: Date.now() - startTime
+    };
     
   } catch (error) {
-    logger.error(`Error processing SKU ${sku}:`, error.message);
+    logger.error(`Error generating HTML for SKU ${sku}:`, error.message);
     return {
       success: false,
       error: error.message,
@@ -178,6 +164,142 @@ async function processSKU(sku, context, filesLib) {
       processingTime: Date.now() - startTime
     };
   }
+}
+
+/**
+ * Process a batch of SKUs - generates HTML and publishes in batch
+ * @param {Array} skuBatch - Array of SKUs to process
+ * @param {Object} context - Processing context
+ * @param {Object} filesLib - Files library instance
+ * @param {Object} rateLimiter - Rate limiter for GraphQL requests
+ * @param {number} batchNumber - Batch number for logging
+ * @returns {Object} Batch processing result
+ */
+async function processBatch(skuBatch, context, filesLib, rateLimiter, batchNumber) {
+  const { logger } = context;
+  const batchStart = Date.now();
+  
+  logger.info(`Processing batch ${batchNumber} with ${skuBatch.length} SKUs: [${skuBatch.join(', ')}]`);
+  
+  try {
+    // Step 1: Generate HTML for all SKUs with rate limiting
+    const htmlResults = [];
+    
+    for (const sku of skuBatch) {
+      await rateLimiter(); // Rate limit GraphQL requests
+      const htmlResult = await generateSKUHtml(sku, context, filesLib);
+      htmlResults.push(htmlResult);
+    }
+    
+    // Step 2: Filter successful HTML generations
+    const successfulResults = htmlResults.filter(result => result.success);
+    const failedResults = htmlResults.filter(result => !result.success);
+    
+    if (successfulResults.length === 0) {
+      return {
+        success: false,
+        batchNumber,
+        error: 'No successful HTML generations in batch',
+        failed: failedResults.length,
+        processingTime: Date.now() - batchStart
+      };
+    }
+    
+    // Step 3: Publish all successful results in one batch
+    const config = getRuntimeConfig(context, { validateToken: true });
+    
+    if (!config.AEM_ADMIN_API_AUTH_TOKEN) {
+      logger.warn(`No AEM_ADMIN_API_AUTH_TOKEN - skipping batch publish`);
+      return {
+        success: true,
+        batchNumber,
+        processed: successfulResults.length,
+        failed: failedResults.length,
+        skipped: successfulResults.length,
+        reason: 'No auth token',
+        processingTime: Date.now() - batchStart
+      };
+    }
+    
+    const adminApi = new AdminAPI({
+      adminToken: config.AEM_ADMIN_API_AUTH_TOKEN,
+      contentUrl: config.CONTENT_URL,
+      logger: logger
+    });
+    
+    // Prepare records for batch publishing (like check-product-changes)
+    const records = successfulResults.map(({ sku, path, renderedAt }) => ({
+      sku,
+      path,
+      renderedAt
+    }));
+    
+    logger.info(`Publishing batch ${batchNumber} with ${records.length} records`);
+    
+    // Start admin API processing
+    await adminApi.startProcessing();
+    
+    const publishedBatch = await adminApi.previewAndPublish(records, null, batchNumber);
+    
+    // Stop admin API processing
+    await adminApi.stopProcessing();
+    
+    // Process the published batch result (like check-product-changes)
+    const { records: publishedRecords } = publishedBatch;
+    let publishedCount = 0;
+    let failedPublishCount = 0;
+    
+    publishedRecords.forEach((record) => {
+      if (record.previewedAt && record.publishedAt) {
+        publishedCount++;
+        logger.debug(`Successfully published: ${record.sku} -> ${record.path}`);
+      } else {
+        failedPublishCount++;
+        logger.warn(`Failed to publish: ${record.sku} -> ${record.path}`);
+      }
+    });
+    
+    logger.info(`Batch ${batchNumber} published: ${publishedCount} successful, ${failedPublishCount} failed`);
+    
+    return {
+      success: true,
+      batchNumber,
+      processed: successfulResults.length,
+      failed: failedResults.length,
+      published: publishedCount,
+      publishFailed: failedPublishCount,
+      publishedBatch: publishedBatch,
+      processingTime: Date.now() - batchStart
+    };
+    
+  } catch (error) {
+    logger.error(`Error processing batch ${batchNumber}:`, error.message);
+    return {
+      success: false,
+      batchNumber,
+      error: error.message,
+      failed: skuBatch.length,
+      processingTime: Date.now() - batchStart
+    };
+  }
+}
+
+// Batch processing configuration
+const BATCH_SIZE = 10; // Smaller batches for events processing
+
+/**
+ * Creates batches of SKUs for processing
+ * @param {Array} skus - Array of SKUs to batch
+ * @returns {Array} Array of batches
+ */
+function createBatches(skus) {
+  return skus.reduce((acc, sku) => {
+    if (!acc.length || acc[acc.length - 1].length === BATCH_SIZE) {
+      acc.push([]);
+    }
+    acc[acc.length - 1].push(sku);
+    return acc;
+  }, []);
 }
 
 /**
@@ -239,6 +361,8 @@ async function main(params) {
     let totalEventsNum = 0;
     let processedSKUs = 0;
     let failedSKUs = 0;
+    let publishedSKUs = 0;
+    let publishFailedSKUs = 0;
     
     // Process events in batches
     const journallingUrl = params.journalling_url || params.JOURNAL_URL;
@@ -260,26 +384,45 @@ async function main(params) {
       const skus = extractUniqueSKUs(events);
       logger.info(`Found ${skus.length} unique SKUs: ${skus.join(', ')}`);
       
-      // Process each SKU with rate limiting
-      const config = getRuntimeConfig(params);
-      const processingContext = {
-        ...config,
-        logger,
-        aioLibs: { filesLib }
-      };
-      
-      for (const sku of skus) {
-        await rateLimiter(); // Apply rate limiting
+      // Process SKUs in batches like check-product-changes
+      if (skus.length > 0) {
+        const config = getRuntimeConfig(params);
+        const processingContext = {
+          ...config,
+          logger,
+          aioLibs: { filesLib }
+        };
         
-        const result = await processSKU(sku, processingContext, filesLib);
+        // Create batches of SKUs
+        const skuBatches = createBatches(skus);
+        logger.info(`Processing ${skus.length} SKUs in ${skuBatches.length} batches (batch size: ${BATCH_SIZE})`);
         
-        if (result.success) {
-          processedSKUs++;
-          logger.info(`Successfully processed SKU: ${sku} (${result.processingTime}ms)`);
-        } else {
-          failedSKUs++;
-          logger.error(`Failed to process SKU: ${sku} - ${result.error}`);
+        // Process each batch
+        const batchResults = [];
+        
+        for (let i = 0; i < skuBatches.length; i++) {
+          const batchNumber = i + 1;
+          const skuBatch = skuBatches[i];
+          
+          const batchResult = await processBatch(skuBatch, processingContext, filesLib, rateLimiter, batchNumber);
+          batchResults.push(batchResult);
+          
+          if (batchResult.success) {
+            processedSKUs += batchResult.processed || 0;
+            failedSKUs += batchResult.failed || 0;
+            publishedSKUs += batchResult.published || 0;
+            publishFailedSKUs += batchResult.publishFailed || 0;
+            logger.info(`Batch ${batchNumber} completed: ${batchResult.processed} processed, ${batchResult.failed} failed, ${batchResult.published} published (${batchResult.processingTime}ms)`);
+          } else {
+            failedSKUs += batchResult.failed || skuBatch.length;
+            logger.error(`Batch ${batchNumber} failed: ${batchResult.error}`);
+          }
         }
+        
+        // Log batch summary
+        const successfulBatches = batchResults.filter(r => r.success).length;
+        const failedBatches = batchResults.filter(r => !r.success).length;
+        logger.info(`Batch processing summary: ${successfulBatches} successful, ${failedBatches} failed batches`);
       }
       
       totalEventsNum += events.length;
@@ -302,7 +445,9 @@ async function main(params) {
         events_fetched: totalEventsNum,
         fetch_batches: fetchCount,
         processed_skus: processedSKUs,
-        failed_skus: failedSKUs
+        failed_skus: failedSKUs,
+        published_skus: publishedSKUs,
+        publish_failed_skus: publishFailedSKUs
       }
     };
     
