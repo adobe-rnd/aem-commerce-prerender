@@ -316,5 +316,6 @@ module.exports = {
     validateAemAdminToken,
     validateAemAdminTokenWithApi,
     validateConfigToken,
+    validateConfigTokenWithApi,
     checkTokenExpiration
 };
