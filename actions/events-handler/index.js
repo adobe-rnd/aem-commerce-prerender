@@ -9,6 +9,8 @@
 
 const { Core, Events, State, Files } = require('@adobe/aio-sdk');
 const { StateManager } = require('../lib/state');
+const { TokenManager } = require('./token-manager');
+const { ObservabilityClient } = require('../lib/observability');
 const { getRuntimeConfig } = require('../lib/runtimeConfig');
 const { generateProductHtml } = require('../pdp-renderer/render');
 const { AdminAPI } = require('../lib/aem');
@@ -331,6 +333,17 @@ function createRateLimiter(requestsPerSecond = 10) {
 async function main(params) {
   const logger = Core.Logger('events-handler', { level: params.LOG_LEVEL || 'info' });
   
+  // Load runtime configuration
+  const cfg = getRuntimeConfig(params);
+  
+  // Initialize observability (best-effort usage later)
+  const observabilityClient = new ObservabilityClient(logger, {
+    token: cfg.AEM_ADMIN_API_AUTH_TOKEN,
+    endpoint: cfg.logIngestorEndpoint,
+    org: cfg.ORG,
+    site: cfg.SITE
+  });
+  
   try {
     logger.info('Starting Adobe I/O Events Handler');
     
@@ -339,8 +352,17 @@ async function main(params) {
     const filesLib = await Files.init(params.libInit || {});
     const stateManager = new StateManager(stateLib, { logger });
     
-    // Use access token from environment variables or params
-    const token = params.ACCESS_TOKEN || process.env.ACCESS_TOKEN;
+    // Initialize token manager for automatic token refresh
+    const tokenManager = new TokenManager(params, stateManager, logger);
+    
+    // Get access token (will be refreshed automatically if expired)
+    const token = await tokenManager.getAccessToken();
+    
+    if (!token) {
+      throw new Error('Failed to obtain Adobe I/O access token');
+    }
+    
+    logger.info('Adobe I/O access token obtained successfully');
     
     // Configuration
     const dbEventKey = params.db_event_key || 'events_position';
@@ -367,8 +389,8 @@ async function main(params) {
     // Process events in batches
     const journallingUrl = params.journalling_url || params.JOURNAL_URL;
     const eventParams = {
-      ims_org_id: params.ims_org_id || params.IMS_ORG_ID,
-      apiKey: params.apiKey || params.CLIENT_ID,
+      ims_org_id: params.IMS_ORG_ID,
+      apiKey: params.CLIENT_ID,
       journalling_url: journallingUrl
     };
     
@@ -452,15 +474,33 @@ async function main(params) {
     };
     
     logger.info('Events processing completed', result.statistics);
+    
+    // Send observability data (best-effort)
+    try {
+      await observabilityClient.sendActivationResult(result);
+    } catch (obsErr) {
+      logger.warn('Failed to send activation result.', obsErr);
+    }
+    
     return result;
     
   } catch (error) {
     logger.error('Events handler error:', error);
-    return {
+    
+    const errorResult = {
       status: 'error',
       error: error.message,
       stack: error.stack
     };
+    
+    // Send error observability data (best-effort)
+    try {
+      await observabilityClient.sendActivationResult(errorResult);
+    } catch (obsErr) {
+      logger.warn('Failed to send error activation result.', obsErr);
+    }
+    
+    return errorResult;
   }
 }
 

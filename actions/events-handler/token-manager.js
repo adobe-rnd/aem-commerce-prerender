@@ -60,7 +60,16 @@ class TokenManager {
       }
 
       // Try to get token from persistent storage
-      const storedToken = this.stateManager ? await this.stateManager.get(this.stateKey) : null;
+      const storedTokenString = this.stateManager ? await this.stateManager.get(this.stateKey) : null;
+      let storedToken = null;
+      
+      if (storedTokenString) {
+        try {
+          storedToken = JSON.parse(storedTokenString);
+        } catch (error) {
+          console.warn('Error parsing stored token, will fetch new one:', error.message);
+        }
+      }
       
       if (storedToken && this.isTokenValid(storedToken)) {
         this.tokenCache = storedToken;
@@ -73,7 +82,7 @@ class TokenManager {
       // Store in cache and persistent storage
       this.tokenCache = newToken;
       if (this.stateManager) {
-        await this.stateManager.put(this.stateKey, newToken);
+        await this.stateManager.put(this.stateKey, JSON.stringify(newToken));
       }
       
       return newToken.access_token;
@@ -184,7 +193,16 @@ class TokenManager {
    */
   async getTokenInfo() {
     try {
-      const storedToken = this.stateManager ? await this.stateManager.get(this.stateKey) : null;
+      const storedTokenString = this.stateManager ? await this.stateManager.get(this.stateKey) : null;
+      let storedToken = null;
+      
+      if (storedTokenString) {
+        try {
+          storedToken = JSON.parse(storedTokenString);
+        } catch (error) {
+          return { status: 'parse_error', error: error.message };
+        }
+      }
       
       if (!storedToken) {
         return { status: 'no_token' };
