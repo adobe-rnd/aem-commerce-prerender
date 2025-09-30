@@ -173,8 +173,8 @@ async function generateSKUHtml(sku, context, filesLib, locale = null) {
     // Generate path using the same logic as check-product-changes
     // getProductUrl already returns the full path according to PRODUCT_PAGE_URL_FORMAT template
     const rawPath = getProductUrl(productData, localeContext, false);
-    // Keep SKU in original case, make everything else lowercase
-    const productPath = rawPath.toLowerCase().replace(`/${productData.sku.toLowerCase()}`, `/${productData.sku}`);
+    // Make entire path lowercase including SKU
+    const productPath = rawPath.toLowerCase();
     const htmlPath = `/public/pdps${productPath}.${PDP_FILE_EXT}`;
     
     // Save HTML file
@@ -245,8 +245,8 @@ async function unpublishNonExistentProducts(failedResults, context, filesLib) {
       // Try to generate path with just SKU (fallback for non-existent products)
       // getProductUrl returns the full path according to PRODUCT_PAGE_URL_FORMAT template
       const rawPath = getProductUrl({ sku }, localeContext, false);
-      // Keep SKU in original case, make everything else lowercase
-      const productPath = rawPath.toLowerCase().replace(`/${sku.toLowerCase()}`, `/${sku}`);
+      // Make entire path lowercase including SKU
+      const productPath = rawPath.toLowerCase();
       return {
         sku,
         path: productPath,
