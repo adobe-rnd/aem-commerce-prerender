@@ -63,7 +63,8 @@ async function main (params) {
     }
 
     // Retrieve base product
-    const productHtml = await generateProductHtml(sku, urlKey, context);
+    const result = await generateProductHtml(sku, urlKey, context);
+    const productHtml = result.html;
 
     const response = {
       statusCode: 200,

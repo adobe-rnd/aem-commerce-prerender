@@ -7,6 +7,9 @@ const DEFAULTS = {
     CONFIG_NAME: 'configs',
     CONFIG_SHEET: undefined,
     PRODUCT_PAGE_URL_FORMAT: undefined,
+    // Organization and site identifiers
+    ORG: undefined,
+    SITE: undefined,
     // Only this token is supported
     AEM_ADMIN_API_AUTH_TOKEN: undefined,
     // Static default

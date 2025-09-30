@@ -27,7 +27,12 @@ class StateManager {
      * @throws {Error} - If the operation fails after all retry attempts.
      */
     async get(key) {
-        return this._retry(async () => await this.state.get(key));
+        return this._retry(async () => {
+            const result = await this.state.get(key);
+            // Adobe I/O State returns { value: "...", ttl: ... } format
+            // Return just the value for backward compatibility
+            return result && typeof result === 'object' && 'value' in result ? result.value : result;
+        });
     }
 
     /**
@@ -69,7 +74,7 @@ class StateManager {
             } catch (error) {
                 lastError = error;
                 attempt++;
-                this.logger.warning(`State error encountered, attempting retry ${attempt}: ${error.message}`);
+                this.logger.warn(`State error encountered, attempting retry ${attempt}: ${error.message}`);
                 await new Promise((r) => setTimeout(r, this.retryDelay));
             }
         }

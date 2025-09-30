@@ -239,7 +239,8 @@ async function enrichProductWithRenderedHash(product, context) {
 
   return (await renderLimit$)(async () => {
     try {
-      const productHtml = await generateProductHtml(sku, urlKey, context);
+      const result = await generateProductHtml(sku, urlKey, context);
+      const productHtml = result.html;
       product.renderedAt = new Date();
       product.newHash = crypto.createHash('sha256').update(productHtml).digest('hex');
 

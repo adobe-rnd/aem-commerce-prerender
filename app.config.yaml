@@ -15,68 +15,77 @@ application:
           STORE_URL: "${STORE_URL}"
           CONFIG_NAME: "config"
           LOCALES: "${LOCALES}"
+          JOURNAL_URL: "https://events-va6.adobe.io/events/organizations/1172492/integrations/842637/eef46a64-81dd-4b51-b58d-e208a3e0c76f"
         actions:
+          events-handler:
+            function: "actions/events-handler/index.js"
+            web: "no"
+            runtime: "nodejs:22"
+            limits:
+              memorySize: 512
+              timeout: 5400000
+            inputs:
+              LOG_LEVEL: debug
+              CLIENT_ID: $CLIENT_ID
+              CLIENT_SECRET: $CLIENT_SECRET
+              IMS_ORG_ID: $IMS_ORG_ID
+              ims_org_id: $IMS_ORG_ID
+              journalling_url: "https://events-va6.adobe.io/events/organizations/1172492/integrations/843799/dd5a42de-5a55-4f1b-b4c5-9ca813f941cd"
+              db_event_key: "commerce_events_position"
+              max_events_in_batch: 5
+              locales: $LOCALES
+              ORG: $ORG
+              SITE: $SITE
+              CONTENT_URL: $CONTENT_URL
+              AEM_ADMIN_API_AUTH_TOKEN: $AEM_ADMIN_API_AUTH_TOKEN
+              STORE_URL: $STORE_URL
+              PRODUCTS_TEMPLATE: $PRODUCTS_TEMPLATE
+              PRODUCT_PAGE_URL_FORMAT: "/products/{urlKey}/{sku}"
+            include:
+              - - "actions/pdp-renderer/templates/*.hbs"
+                - "templates/"  
+            annotations:
+              final: true
           pdp-renderer:
             function: "actions/pdp-renderer/index.js"
             web: "yes"
             runtime: "nodejs:22"
-            annotations:
-              final: true
             include:
               - - "actions/pdp-renderer/templates/*.hbs"
                 - "templates/"
+            annotations:
+              final: true
           check-product-changes:
             function: "actions/check-product-changes/index.js"
             web: "no"
             runtime: "nodejs:22"
-            include:
-              - - "actions/pdp-renderer/templates/*.hbs"
-                - "templates/"
-            limits:
-              memorySize: 256
-              timeout: 3600000
-            inputs:
-              AEM_ADMIN_API_AUTH_TOKEN: "${AEM_ADMIN_API_AUTH_TOKEN}"
             annotations:
               final: true
           fetch-all-products:
             function: "actions/fetch-all-products/index.js"
-            web: "yes"
+            web: "no"
             runtime: "nodejs:22"
             annotations:
               final: true
           get-overlay-url:
             function: "actions/get-overlay-url/index.js"
+            web: "yes"
             runtime: "nodejs:22"
             annotations:
               final: true
           mark-up-clean-up:
             function: "actions/mark-up-clean-up/index.js"
+            web: "no"
             runtime: "nodejs:22"
-            inputs:
-              AEM_ADMIN_API_AUTH_TOKEN: "${AEM_ADMIN_API_AUTH_TOKEN}"
             annotations:
               final: true
-#        triggers:
-#          productPollerTrigger:
-#            feed: "/whisk.system/alarms/interval"
-#            inputs:
-#              minutes: 5
-#          productScraperTrigger:
-#            feed: "/whisk.system/alarms/interval"
-#            inputs:
-#              minutes: 60
-#         markUpCleanUpTrigger:
-#            feed: "/whisk.system/alarms/interval"
-#            inputs:
-#              minutes: 60
-#        rules:
-#          productPollerRule:
-#            trigger: "productPollerTrigger"
-#            action: "check-product-changes"
-#          productScraperRule:
-#            trigger: "productScraperTrigger"
-#            action: "fetch-all-products"
-#          markUpCleanUpRule:
-#            trigger: "markUpCleanUpTrigger"
-#            action: "mark-up-clean-up"
+        triggers:
+          eventsHandlerTrigger:
+            feed: "/whisk.system/alarms/alarm"
+            inputs:
+              cron: "* * * * *"  # Every minute
+              timezone: "UTC"
+        rules:
+          eventsHandlerRule:
+            trigger: "eventsHandlerTrigger"
+            action: "events-handler"
