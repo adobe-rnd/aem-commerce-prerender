@@ -88,7 +88,7 @@ class AdminAPI {
 
     async processQueuesWithPromiseChain() {
         const { logger } = this.context;
-        
+        await this.delay(10000);
         while (!this.shouldStop) {
             if (!this.hasWorkToDo()) {
                 // No work to do, exit the loop
@@ -99,7 +99,7 @@ class AdminAPI {
                 await this.processNextBatch();
                 
                 // Small delay to prevent overwhelming the system
-                await this.delay(100);
+                await this.delay(1000);
                 
                 // Log status periodically
                 if (this.lastStatusLog < new Date() - 1000) {
@@ -109,7 +109,7 @@ class AdminAPI {
             } catch (error) {
                 logger.error('Error in processing chain:', error);
                 // Continue processing even if one batch fails
-                await this.delay(1000); // Longer delay on error
+                await this.delay(5000); // Longer delay on error
             }
         }
         

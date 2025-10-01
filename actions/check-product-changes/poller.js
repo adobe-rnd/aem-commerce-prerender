@@ -434,7 +434,7 @@ async function poll(params, aioLibs, logger) {
 
     try {
       // start processing preview and publish queues
-      await adminApi.startProcessing();
+      adminApi.startProcessing();
 
       const results = await Promise.all(locales.map(async (locale) => {
         const timings = new Timings();
