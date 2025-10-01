@@ -95,7 +95,7 @@ async function fetchEvents(params, token, since) {
   
   
   let options = { limit: 100 };
-  if (since) {
+  if (since && since !== 'END' && since !== 'BEGINNING') {
     options.since = since;
   }
   
