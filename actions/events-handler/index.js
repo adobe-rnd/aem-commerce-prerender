@@ -77,15 +77,17 @@ async function getLatestEventPosition(stateManager, dbEventKey) {
 /**
  * Fetches events from Adobe I/O Events Journal
  * @param {Object} params - Action parameters
- * @param {string} token - Access token
+ * @param {Object} tokenManager - Token manager for automatic token refresh
  * @param {string} since - Position to start from
  * @returns {Promise<Array>} Array of events
  */
-async function fetchEvents(params, token, since) {
-  if (!params.ims_org_id || !params.apiKey || !token) {
-    throw new Error(`Missing required parameters for Events SDK: imsOrgId=${!!params.ims_org_id}, apiKey=${!!params.apiKey}, token=${!!token}`);
+async function fetchEvents(params, tokenManager, since) {
+  if (!params.ims_org_id || !params.apiKey || !tokenManager) {
+    throw new Error(`Missing required parameters for Events SDK: imsOrgId=${!!params.ims_org_id}, apiKey=${!!params.apiKey}, tokenManager=${!!tokenManager}`);
   }
   
+  // Get fresh token (will be refreshed automatically if expired)
+  const token = await tokenManager.getAccessToken();
   
   const eventsClient = await Events.init(
     params.ims_org_id,  // organizationId
@@ -600,10 +602,10 @@ async function main(params) {
     // Initialize token manager for automatic token refresh
     const tokenManager = new TokenManager(params, stateManager, logger);
     
-    // Get access token (will be refreshed automatically if expired)
-    const token = await tokenManager.getAccessToken();
+    // Verify token manager is working (will be refreshed automatically as needed)
+    const initialToken = await tokenManager.getAccessToken();
     
-    if (!token) {
+    if (!initialToken) {
       throw new Error('Failed to obtain Adobe I/O access token');
     }
     
@@ -653,7 +655,7 @@ async function main(params) {
       journalling_url: journallingUrl
     };
     
-    let events = await fetchEvents(eventParams, token, latestEventPos);
+    let events = await fetchEvents(eventParams, tokenManager, latestEventPos);
     
     if (events && events.length > 0) {
       
