@@ -42,13 +42,11 @@ class AdminAPI {
         this.publishBatchSize = publishBatchSize;
         this.authToken = authToken;
         this.context = context;
-        this.isProcessing = false;
-        this.processingPromise = null;
-        this.shouldStop = false;
+        this.onQueuesProcessed = null;
+        this.stopProcessing$ = null;
         this.lastStatusLog = 0;
         this.previewDurations = [];
         this.queue = [];
-        this.processingChain = null;
     }
 
     previewAndPublish(records, locale, batchNumber) {
@@ -64,109 +62,38 @@ class AdminAPI {
     }
 
     async startProcessing() {
-        if (this.isProcessing) {
-            return this.processingPromise;
+        if (this.stopProcessing$) {
+            // only restart processing after awaiting stopProcessing
+            await this.stopProcessing$;
+        }       
+        if (!this.interval) {
+            this.interval = setInterval(() => this.processQueues(), 1000);
         }
-
-        this.isProcessing = true;
-        this.shouldStop = false;
-        
-        this.processingPromise = this.processQueuesWithPromiseChain();
-        return this.processingPromise;
     }
 
     async stopProcessing() {
-        this.shouldStop = true;
-        
-        if (this.processingPromise) {
-            await this.processingPromise;
-        }
-        
-        this.isProcessing = false;
-        this.processingPromise = null;
-    }
-
-    async processQueuesWithPromiseChain() {
-        const { logger } = this.context;
-        
-        while (!this.shouldStop) {
-            if (!this.hasWorkToDo()) {
-                // No work to do, exit the loop
-                break;
-            }
-            
-            try {
-                await this.processNextBatch();
-                
-                // Small delay to prevent overwhelming the system
-                await this.delay(100);
-                
-                // Log status periodically
-                if (this.lastStatusLog < new Date() - 1000) {
-                    this.logQueueStatus();
-                    this.lastStatusLog = new Date();
-                }
-            } catch (error) {
-                logger.error('Error in processing chain:', error);
-                // Continue processing even if one batch fails
-                await this.delay(1000); // Longer delay on error
-            }
-        }
-        
-        logger.info('Processing chain completed');
-        
-        // Reset processing state when chain completes
-        this.isProcessing = false;
-        this.processingPromise = null;
-    }
-
-    hasWorkToDo() {
-        return this.previewQueue.length > 0 || 
-               this.publishQueue.length > 0 || 
-               this.unpublishQueue.length > 0 || 
-               this.unpublishPreviewQueue.length > 0 || 
-               this.inflight.length > 0;
-    }
-
-    async processNextBatch() {
-        // Process queues in priority order
-        if (this.publishQueue.length > 0) {
-            const batch = this.publishQueue.shift();
-            await this.doBatchPublishAsync(batch);
+        if (!this.interval) {
             return;
         }
+        // stopProcessing only once by keeping a single promise resolving after all queues are processed
+        if (!this.stopProcessing$) {
+            this.stopProcessing$ = new Promise((resolve) => {
+                this.onQueuesProcessed = () => {
+                    if (this.previewQueue.length + this.publishQueue.length + this.unpublishQueue.length + this.unpublishPreviewQueue.length + this.inflight.length > 0) {
+                        // still running
+                        return;
+                    }
 
-        if (this.previewQueue.length > 0) {
-            const batch = this.previewQueue.shift();
-            await this.doBatchPreviewAsync(batch);
-            return;
+                    // reset callback
+                    clearInterval(this.interval);
+                    this.onQueuesProcessed = null;
+                    this.stopProcessing$ = null;
+                    this.interval = null;
+                    resolve();
+                };
+            });
         }
-
-        if (this.unpublishQueue.length > 0) {
-            const batch = this.unpublishQueue.shift();
-            await this.doBatchUnpublishAsync(batch, 'live');
-            return;
-        }
-
-        if (this.unpublishPreviewQueue.length > 0) {
-            const batch = this.unpublishPreviewQueue.shift();
-            await this.doBatchUnpublishAsync(batch, 'preview');
-            return;
-        }
-    }
-
-    logQueueStatus() {
-        const { logger } = this.context;
-        logger.info(`Queues: preview=${this.previewQueue.length},`
-            + ` publish=${this.publishQueue.length},`
-            + ` unpublish live=${this.unpublishQueue.length},`
-            + ` unpublish preview=${this.unpublishPreviewQueue.length},`
-            + ` inflight=${this.inflight.length},`
-            + ` in queue=${this.queue.length}`);
-    }
-
-    delay(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
+        return this.stopProcessing$;
     }
 
     trackInFlight(name, callback) {
@@ -392,56 +319,6 @@ class AdminAPI {
         });
     }
 
-    async doBatchPreviewAsync(batch) {
-        const { logger } = this.context;
-        const { records, locale, batchNumber } = batch;
-        const paths = records.map(record => record.path);
-
-        if (paths.length === 0) {
-            logger.info(`Skipping preview for batch id=${batchNumber} for locale=${locale}: no paths to process.`);
-            batch.resolve({ records, locale, batchNumber });
-            return;
-        }
-
-        const body = {
-            forceUpdate: true,
-            paths,
-            delete: false
-        };
-        const start = new Date();
-
-        try {
-            // Try to preview the batch using bulk preview API
-            const response = await this.runWithRetry(
-                async () => {
-                    return await this.execAdminRequest('POST', 'preview', '/*', body);
-                },
-                { name: `preview batch number ${batchNumber} for locale ${locale}`, isBatch: true }
-            );
-
-            if (response?.job) {
-                logger.info(`Previewed batch number ${batchNumber} for locale ${locale}`);
-                const successPaths = await this.checkJobStatus(response.job);
-                batch.records.forEach(record => {
-                    if (successPaths.includes(record.path)) {
-                        record.previewedAt = new Date();
-                    }
-                });
-
-                this.publishQueue.push(batch);
-            } else {
-                logger.error(`Error previewing batch number ${batchNumber} for locale ${locale}`);
-                batch.resolve({records, locale, batchNumber});
-            }
-        } catch (error) {
-            logger.error(`Error in preview batch ${batchNumber}:`, error);
-            batch.resolve({records, locale, batchNumber});
-        }
-
-        // Complete the batch preview
-        this.previewDurations.push(new Date() - start);
-    }
-
     doBatchPublish(batch) {
         this.trackInFlight('publish', async (complete) => {
             const { logger } = this.context;
@@ -487,51 +364,6 @@ class AdminAPI {
         });
     }
 
-    async doBatchPublishAsync(batch) {
-        const { logger } = this.context;
-        const { records, locale, batchNumber } = batch;
-        const paths = records.filter(record => record.previewedAt).map(record => record.path);
-
-        if (paths.length === 0) {
-            logger.info(`Skipping publish in batch id=${batchNumber} for locale=${locale}: no paths to process.`);
-            batch.resolve({ records, locale, batchNumber });
-            return;
-        }
-
-        const body = {
-            forceUpdate: true,
-            paths,
-            delete: false
-        };
-
-        try {
-            // Try to publish the batch using bulk publish API
-            const response = await this.runWithRetry(
-                async () => {
-                    return await this.execAdminRequest('POST', 'live', '/*', body);
-                },
-                { name: `publish batch number ${batchNumber} for locale ${locale}`, isBatch: true }
-            );
-
-            if (response?.job) {
-                logger.info(`Published batch number ${batchNumber} for locale ${locale}`);
-                const successPaths = await this.checkJobStatus(response.job);
-                batch.records.forEach(record => {
-                    if (successPaths.includes(record.path)) {
-                        record.publishedAt = new Date();
-                    }
-                });
-            } else {
-                logger.error(`Error publishing batch number ${batchNumber} for locale ${locale}`);
-            }
-        } catch (error) {
-            logger.error(`Error in publish batch ${batchNumber}:`, error);
-        }
-
-        // Resolve the original promises
-        batch.resolve({records, locale, batchNumber});
-    }
-
     doBatchUnpublish(batch, route) {
         this.trackInFlight('unpublish', async (complete) => {
             const { logger } = this.context;
@@ -559,7 +391,7 @@ class AdminAPI {
                 async () => {
                     return await this.execAdminRequest('POST', route, '/*', body);
                 },
-                { name: `unpublish ${route} batch number ${batchNumber} for locale ${locale}`, isBatch: true }
+                `unpublish ${route} batch number ${batchNumber} for locale ${locale}`
             );
 
             if (response?.job) {
@@ -593,70 +425,6 @@ class AdminAPI {
                 batch.resolve({records, locale, batchNumber});
             }
         });
-    }
-
-    async doBatchUnpublishAsync(batch, route) {
-        const { logger } = this.context;
-        const { records, locale, batchNumber } = batch;
-
-        const paths = route === 'live'
-            ? records.map(record => record.path)
-            : records.filter(record => record.liveUnpublishedAt).map(record => record.path);
-
-        if (paths.length === 0) {
-            logger.info(`Skipping unpublish for route=${route} in batch id=${batchNumber} for locale=${locale}: no paths to process.`);
-            batch.resolve({ records, locale, batchNumber });
-            return;
-        }
-
-        const body = {
-            forceUpdate: true,
-            paths,
-            delete: true,
-        };
-
-        try {
-            // Try to unpublish live the batch using bulk publish API
-            const response = await this.runWithRetry(
-                async () => {
-                    return await this.execAdminRequest('POST', route, '/*', body);
-                },
-                { name: `unpublish ${route} batch number ${batchNumber} for locale ${locale}`, isBatch: true }
-            );
-
-            if (response?.job) {
-                logger.info(`Unpublished ${route} batch number ${batchNumber} for locale ${locale}`);
-                const successPaths = await this.checkJobStatus(response.job);
-                batch.records.forEach(record => {
-                    if (successPaths.includes(record.path)) {
-                        if (route === 'live') {
-                            record.liveUnpublishedAt = new Date();
-                        } else {
-                            record.previewUnpublishedAt = new Date();
-                        }
-                    }
-                });
-
-                if (route === 'live') {
-                    this.unpublishPreviewQueue.push(batch);
-                }
-            } else {
-                logger.error(`Error unpublishing ${route} batch number ${batchNumber} for locale ${locale}`);
-                if (route === 'live') {
-                    batch.resolve({records, locale, batchNumber});
-                }
-            }
-        } catch (error) {
-            logger.error(`Error in unpublish batch ${batchNumber} for route ${route}:`, error);
-            if (route === 'live') {
-                batch.resolve({records, locale, batchNumber});
-            }
-        }
-
-        // Resolve the original promises
-        if (route === 'preview') {
-            batch.resolve({records, locale, batchNumber});
-        }
     }
 
     processQueues() {
