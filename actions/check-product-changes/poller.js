@@ -14,13 +14,13 @@ const { Timings, aggregate } = require('../lib/benchmark');
 const { AdminAPI } = require('../lib/aem');
 const {
   requestSaaS,
-  requestSpreadsheet,
   isValidUrl,
   getProductUrl,
   formatMemoryUsage,
   FILE_PREFIX,
   STATE_FILE_EXT,
   PDP_FILE_EXT,
+  requestPublishedProductsIndex,
 } = require('../utils');
 const { GetLastModifiedQuery } = require('../queries');
 const { generateProductHtml } = require('../pdp-renderer/render');
@@ -293,7 +293,7 @@ async function processDeletedProducts(remainingSkus, state, context, adminApi) {
   const { filesLib } = aioLibs;
 
   try {
-    const deletedProducts = (await requestSpreadsheet('published-products-index', null, context))
+    const deletedProducts = (await requestPublishedProductsIndex(context))
       .data.filter(({ sku }) => remainingSkus.includes(sku));
 
     // Process in batches

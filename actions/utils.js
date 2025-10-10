@@ -11,11 +11,28 @@ governing permissions and limitations under the License.
 */
 const deepmerge = require('@fastify/deepmerge')();
 const helixSharedStringLib = require('@adobe/helix-shared-string');
+const BATCH_SIZE = 50;
 
 /* This file exposes some common utilities for your actions */
 
 const FILE_PREFIX = 'check-product-changes';
 const [STATE_FILE_EXT, PDP_FILE_EXT] = ['csv', 'html'];
+
+/**
+ * Creates batches of products for processing
+ * @param products
+ * @param context
+ * @returns {*}
+ */
+function createBatches(products) {
+  return products.reduce((acc, product) => {
+    if (!acc.length || acc[acc.length - 1].length === BATCH_SIZE) {
+      acc.push([]);
+    }
+    acc[acc.length - 1].push(product);
+    return acc;
+  }, []);
+}
 
 /**
  *
@@ -176,13 +193,42 @@ async function request(name, url, req, timeout = 60000) {
  *
  * @returns {Promise<object>} spreadsheet data as JSON.
  */
-async function requestSpreadsheet(name, sheet, context) {
+async function requestSpreadsheet(name, sheet, context, offset = 0) {
   const { contentUrl } = context;
   let sheetUrl = `${contentUrl}/${name}.json`
+  const requestURL = new URL(sheetUrl);
+
   if (sheet) {
-    sheetUrl += `?sheet=${sheet}`;
+    requestURL.searchParams.set('sheet', sheet);
   }
-  return request('spreadsheet', sheetUrl);
+
+  if (offset > 0) {
+    requestURL.searchParams.set('offset', offset);
+  }
+
+  return request('spreadsheet', requestURL.toString());
+}
+
+/**
+ * Requests the published products index from the site.
+ *
+ * @param {string} name file name of the spreadsheet.
+ * @param {string} [sheet] optional sheet name.
+ * @param {object} context the context object.
+ *
+ * @returns {Promise<object>} spreadsheet data as JSON.
+ */
+async function requestPublishedProductsIndex(context) {
+  
+  const publishedProductsIndex = await requestSpreadsheet('published-products-index', null, context, 0);
+
+  for (let offset = 1000; offset < publishedProductsIndex.total; offset += 1000) {
+    const tempPublishedProductsIndex = await requestSpreadsheet('published-products-index', null, context, offset);
+    publishedProductsIndex.data.push(...tempPublishedProductsIndex.data);
+  }
+  publishedProductsIndex.limit = publishedProductsIndex.total;
+  
+  return publishedProductsIndex;
 }
 
 async function requestConfigService(context) {
@@ -391,6 +437,7 @@ function formatMemoryUsage(data) {
 }
 
 module.exports = {
+  createBatches,
   errorResponse,
   getBearerToken,
   checkMissingRequestInputs,
@@ -402,6 +449,7 @@ module.exports = {
   getProductUrl,
   getDefaultStoreURL,
   formatMemoryUsage,
+  requestPublishedProductsIndex,
   FILE_PREFIX,
   PDP_FILE_EXT,
   STATE_FILE_EXT,
