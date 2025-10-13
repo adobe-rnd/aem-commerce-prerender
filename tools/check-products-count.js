@@ -15,7 +15,7 @@ require('dotenv').config();
 const fs = require('fs');
 const yaml = require('js-yaml');
 const path = require('path');
-const { requestSaaS, requestSpreadsheet } = require('../actions/utils');
+const { requestSaaS, requestPublishedProductsIndex } = require('../actions/utils');
 const { GetAllSkusPaginatedQuery } = require('../actions/queries');
 const filePath = path.resolve(__dirname, '..', 'app.config.yaml');
 
@@ -42,7 +42,7 @@ async function main() {
     } = process.env;
 
     const context = { storeCode: options.storecode, storeUrl: options.url, configName: options.config };
-    const { total: actualCount } = await requestSpreadsheet('published-products-index', context);
+    const { total: actualCount } = await requestPublishedProductsIndex(context);
     let [productsCount, currentPage, expectedCount] = [-1, 1, 0];
     while (productsCount !== 0) {
         const { data: { productSearch: { items: products } } } = await requestSaaS(GetAllSkusPaginatedQuery, 'getAllSkusPaginated', { currentPage }, context);

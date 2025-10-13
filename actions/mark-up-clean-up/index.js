@@ -14,10 +14,12 @@ const { Core, Files } = require('@adobe/aio-sdk');
 const { ObservabilityClient } = require('../lib/observability');
 const { GetUrlKeyQuery } = require('../queries');
 const { getRuntimeConfig } = require('../lib/runtimeConfig');
+const { AdminAPI } = require('../lib/aem');
 const {
   requestSaaS,
-  requestSpreadsheet,
+  requestPublishedProductsIndex,
   PDP_FILE_EXT,
+  createBatches,
 } = require('../utils');
 
 /**
@@ -43,13 +45,13 @@ function urlkeymatch(publishedProduct, queriedProducts){
  * @param {Object} context - The context object with logger and other utilities
  * @param {Object} filesLib - The files library instance from '@adobe/aio-sdk'
  */
-async function markUpCleanUP(context, filesLib, logger) {
+async function markUpCleanUP(context, filesLib, logger, adminApi) {
   
   try {    
-    const publishedProducts = await requestSpreadsheet('published-products-index', null, context);  
+    const publishedProducts = await requestPublishedProductsIndex(context);  
     const publishedSkus = publishedProducts.data.map((product) => product.sku);
     let queryResult = await requestSaaS(GetUrlKeyQuery, 'getUrlKey', { skus: publishedSkus }, context);
-    queryResult = queryResult.data.products    
+    queryResult = queryResult.data.products;
 
     const redundantpublishedProducts = publishedProducts.data.filter((product) => !urlkeymatch(product, queryResult))
     context.counts.detected = redundantpublishedProducts.length;
@@ -68,6 +70,20 @@ async function markUpCleanUP(context, filesLib, logger) {
         }
       }
     };    
+    const pendingJobs = [];
+    const unpublishJobsBatches = createBatches(redundantpublishedProducts);
+    for (let batchNumber = 0; batchNumber < unpublishJobsBatches.length; batchNumber++) {
+      const batch = unpublishJobsBatches[batchNumber].map((product) => {
+        return {
+          sku: product.sku,
+          path: product.path,
+        };
+      });
+      const pendingJob =  adminApi.unpublishAndDelete(batch, context.locale, batchNumber);
+      context.counts.unpublished += batch.length;
+      pendingJobs.push(pendingJob);
+    }    
+    await Promise.all(pendingJobs);
   } catch (e) {
     logger.error('Error while cleanning up markup storage', e);
   }
@@ -99,7 +115,7 @@ async function main(params) {
     logIngestorEndpoint,
   } = cfg;
 
-  const counts = { detected: 0, deleted: 0 };
+  const counts = { detected: 0, deleted: 0, unpublished: 0 };
 
   const sharedContext = {
     storeUrl,
@@ -113,22 +129,30 @@ async function main(params) {
     logLevel,
     logIngestorEndpoint,
   }
+  const adminApi = new AdminAPI({ org: params.ORG, site: params.SITE }, sharedContext, { authToken: params.AEM_ADMIN_AUTH_TOKEN });
 
   let activationResult = {status: {}};
 
-  for (const locale of locales) {    
-    const context = { ...sharedContext, startTime: new Date() };
-    let tempLocale = 'default';
-    if (locale) {
-      context.locale = locale;
-      tempLocale = locale;
-    } 
+  try {
+    adminApi.startProcessing();
 
-    activationResult.status[tempLocale] = await markUpCleanUP(context, filesLib, logger);
+    for (const locale of locales) {    
+      const context = { ...sharedContext, startTime: new Date() };
+      let tempLocale = 'default';
+      if (locale) {
+        context.locale = locale;
+        tempLocale = locale;
+      } 
+      activationResult.status[tempLocale] = await markUpCleanUP(context, filesLib, logger);
+   }
+
+    await observabilityClient.sendActivationResult(activationResult);
+    return activationResult;
+  } catch (e) {
+    logger.error(e);
+  } finally {
+    await adminApi.stopProcessing();
   }
-
-  await observabilityClient.sendActivationResult(activationResult);
-  return activationResult;
 }
 
 exports.main = main
