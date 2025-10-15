@@ -31,9 +31,9 @@ const {
  */
 function urlkeymatch(publishedProduct, queriedProducts){
   let path = publishedProduct.path.split('/');
-  path = path.pop();  
+  
   const result = queriedProducts.some((product) => { 
-    if (path === product.urlKey) {
+    if (path.includes(product.urlKey)) {
       return true;
     }    
   });  
@@ -55,7 +55,7 @@ async function markUpCleanUP(context, filesLib, logger, adminApi) {
 
     const redundantpublishedProducts = publishedProducts.data.filter((product) => !urlkeymatch(product, queryResult))
     context.counts.detected = redundantpublishedProducts.length;
-    
+
     for (const product of redundantpublishedProducts) {
       try {        
         const result = await filesLib.delete(`/public/pdps${product.path}.${PDP_FILE_EXT}`);
