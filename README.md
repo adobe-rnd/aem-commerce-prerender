@@ -1,33 +1,55 @@
 # AEM Commerce Prerender
 
-Pluggable prerendering stack for ahead-of-time data fetching and embedding in Product Pages and framework for defining rendering templates and rules.
+The AEM Commerce Prerenderer is a tool to generate static product detail pages from dynamic data sources like Adobe Commerce Catalog Service for publishing via [AEM Edge Delivery Services](https://www.aem.live/). It integrates with [BYOM (Bring Your Own Markup)](https://www.aem.live/docs/byo-markup) and EDS indexes to deliver fast, SEO-friendly pages.
 
-* ⚡️ Boost SEO by pre-rendering human-readable product data in the markup
-* 💉 Inject JSON-LD Structured data in the page source code
-* 📈 Aggregate data sources and inject resulting data ahead-of-time
-* ⚙️ Define your custom rendering logic
-* 🧠 Offload intensive computation to the rendering phase
+## Key Benefits
 
-## Principle of Operation & Architecture
+* ⚡️ **Boost SEO** by delivering prerendered, human-readable HTML for critical page content directly to the client, ensuring that search engines and AI agents receive essential information instantly, without relying on client-side rendering
+* 🤖 **AI-Ready Content** - Make content accessible for AI agents and parsers that cannot execute JavaScript, ensuring they can read both the visible page content and embedded JSON-LD data without additional processing
+* 💉 **Enhanced Search Visibility** - Inject JSON-LD structured data directly into the page source code
+* 📈 **Flexible Data Integration** - Aggregate, modify, and enrich data from multiple sources before rendering
+* ⚙️ **Customizable Rendering** - Define your custom rendering logic and templates
+* 🧠 **Performance Optimization** - Offload intensive computation to the rendering phase
+
+## Architecture Overview
 
 ![Principle of Operation](/docs/principle-of-operation.jpg)
 
+The Prerenderer fetches products from the Catalog Service, detects changes, and generates HTML with meta tags, markup, and JSON-LD. This HTML is stored in an S3 bucket linked to your App Builder project and then published by merging it with the original page.
+
 <details>
-  <summary>Expand the diagram</summary>
+  <summary>View detailed architecture diagram</summary>
 
   ![Architecture](/docs/architecture-overview.jpg)
 
 </details>
 
-## Getting started
+## Prerequisites
 
-  Setup of prerequisites and Edge Delivery Services is guided and some steps are automated.
+Before you begin, make sure you have:
 
-### Configuration Wizard
+* **Node.js** (LTS version recommended)
+* **Adobe I/O App Builder CLI** (`aio`) - [Installation guide](https://developer.adobe.com/app-builder/docs/getting_started/first_app/#1-install-aio-cli)
+* **Developer or System Administrator role** in your Adobe IMS organization to manage Developer Console projects and App Builder access - [See documentation](https://helpx.adobe.com/enterprise/using/manage-developers.html)
+* **Access to Adobe Commerce** with Catalog Service enabled
+* **AEM Edge Delivery Services site** configured
 
-  1. In case you do not have an App Builder environment JSON file, follow the [App Builder Setup Guide](#app-builder-setup)
-  1. [Create a repo](https://github.com/new?template_name=aem-commerce-prerender&template_owner=adobe-rnd) from template in your org. Clone the new repo to your local machine
-  1. Download your AppBuilder project JSON file, you will use it to perform the initial setup wizard that will show up in the browser
+## Quick Start
+
+1. [Create a repository](https://github.com/new?template_name=aem-commerce-prerender&template_owner=adobe-rnd) from the provided template in your organization and clone it to your local machine
+2. In the cloned repository, run `npm install` to install dependencies
+3. Run `npm run setup` to onboard and configure your environment (follow the setup wizard)
+4. Run `npm run deploy` to deploy your project
+
+For detailed setup instructions, see the [Step-by-Step Configuration](#step-by-step-configuration) section below.
+
+## Detailed Setup
+
+### Step-by-Step Configuration
+
+  1. **App Builder Setup**: If you do not have an App Builder environment JSON file, follow the [App Builder Setup Guide](#app-builder-setup) to create your project and download the configuration file
+  1. **Repository Setup**: [Create a repository](https://github.com/new?template_name=aem-commerce-prerender&template_owner=adobe-rnd) from the template in your organization and clone it to your local machine. Run `npm install` to install dependencies
+  1. **Download Configuration**: Download your App Builder project JSON file from the Developer Console (click "Download All" in the top-right)
   1. Run `npm run setup` to onboard and configure your environment. The wizard will guide you through the configuration process:
      * **Step 1-2**: Provide your App Builder credentials and site information
      * **Step 3 - Advanced Settings**: The wizard will automatically detect and populate default values for `CONTENT_URL`, `STORE_URL`, `PRODUCTS_TEMPLATE`, and `PRODUCT_PAGE_URL_FORMAT` based on your site configuration. You can review and customize these settings in the advanced settings section. A `.env` file will be created with all necessary environment variables.
