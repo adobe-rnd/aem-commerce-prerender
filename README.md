@@ -28,10 +28,10 @@ Pluggable prerendering stack for ahead-of-time data fetching and embedding in Pr
   1. In case you do not have an App Builder environment JSON file, follow the [App Builder Setup Guide](#app-builder-setup)
   1. [Create a repo](https://github.com/new?template_name=aem-commerce-prerender&template_owner=adobe-rnd) from template in your org. Clone the new repo to your local machine
   1. Download your AppBuilder project JSON file, you will use it to perform the initial setup wizard that will show up in the browser
-  1. Run `npm run setup` to onboard and configure your environment. The wizard will automatically populate configuration values from your site and create a `.env` file with the necessary environment variables.
+  1. Run `npm run setup` to onboard and configure your environment. The wizard will automatically detect and populate default values for `CONTENT_URL`, `STORE_URL`, `PRODUCTS_TEMPLATE`, and `PRODUCT_PAGE_URL_FORMAT` based on your site configuration. You can review and modify these values during the setup process. A `.env` file will be created with all necessary environment variables.
   1. **Step 3 - Advanced Settings**: The wizard will populate default values for most configuration fields based on your organization and site information. If you need to customize these settings, expand the advanced settings section:
      * **Template URL**: By default, the wizard auto-populates the template URL based on your site name and organization. If your site has localized templates with URLs like `https://main--site--org.aem.page/en-us/products/default`, you can use the `{locale}` token to create a URL pattern: `https://main--site--org.aem.page/{locale}/products/default`. This token will be dynamically replaced with the actual locale values during rendering.
-     * **Product Page URL Format** (`pathPrefix`): This defines the path pattern under which product pages will be served. You can use the following tokens: `{locale}`, `{urlKey}`, `{sku}`. The default pattern is typically `/{locale}/products/{urlKey}`. If deploying to a live environment and you need logical separation from existing pages, consider using a different path prefix such as `/{locale}/products-prerendered/{urlKey}`. When ready to switch traffic, update the path format in `app.config.yaml` and run `aio app deploy` again.
+     * **Product Page URL Format** (`pathPrefix`): This defines the path pattern under which product pages will be served. You can use the following tokens: `{locale}`, `{urlKey}`, `{sku}`. The default pattern is typically `/{locale}/products/{urlKey}`. If deploying to a live environment and you need logical separation from existing pages, consider using a different path prefix such as `/{locale}/products-prerendered/{urlKey}`. When ready to switch traffic, update the `PRODUCT_PAGE_URL_FORMAT` in your `.env` file and run `aio app deploy` again.
      * **Locales**: If your site is localized, specify the locales (e.g., `en-us,en-gb,fr-fr`). Leave empty if your site is not localized.
   1. **Configuration Variables**: After completing the setup wizard, the solution will use two types of configuration:
      
@@ -92,9 +92,28 @@ Pluggable prerendering stack for ahead-of-time data fetching and embedding in Pr
          action: "mark-up-clean-up"
      ```
      Then redeploy the solution: `npm run deploy`
-  1. Go to the [Storefront Prerender](https://prerender.aem-storefront.com/#/change-detector) and check that the rules for change detector are enabled (green circles).
-  1. The system is now up and running. In the first cycle of operation, it will publish all products in the catalog. Subsequent runs will only process products that have changed. You can browse and count them from [the Management UI](https://prerender.aem-storefront.com/#/products)
-  1. From within the same UI, in the "Markup Storage" tab, you can browse the generated HTML files. You can also reset the state of the Change Detector ("Reset Products List") and force republish of all the products ("Trigger Product Scraping" button).
+  1. **Management UI Overview**: Navigate to the [Storefront Prerender Management UI](https://prerender.aem-storefront.com) to monitor and manage your prerender deployment. The UI provides several tabs:
+     
+     * **Published Products** (`#/products`): Displays the list of products published on your store, as retrieved from your site's `published-products-index.json`. For sites with over a thousand products, use the pagination interface to navigate through results. The search functionality allows you to filter products on the current page.
+     
+     * **Change Detector** (`#/change-detector`): Allows you to start or stop the regularly scheduled polling and rerendering of product data. Check that the rules are enabled (green circles). This tab also displays the timestamp of the last execution.
+     
+     * **Renderer** (`#/renderer`): Provides detailed information about your generated markup. Enter a product path in the format `/products/{urlKey}/{sku}` to view product data. Note that SKU is case-sensitive (e.g., `/products/access-at-adobe-sticker/ADB111` or `/products/itt743/ITT743`).
+     
+     * **Logs and Activations** (`#/logs`): Allows you to access the prerender's logs by entering your organization and site information along with the log's activation ID.
+     
+     * **Markup Storage** (`#/markup-storage`): Displays the 1,000 most recently created markup files, along with product lists and state files. This tab provides several actions:
+       - **Refresh**: Reloads the list of generated files
+       - **Reset Products List**: Clears the App Builder storage of all files
+       - **Trigger Product Scraping**: Manually queries the site's Catalog Service for product information and generates product lists for all locales. This process also runs automatically every hour.
+       
+       Key files in Markup Storage:
+       - **Product List** (`check-product-change/{locale}-products.json`): Contains all product SKUs and URL keys for that locale/store, queried from the Catalog Service endpoint as defined in your site's `config.json`.
+       - **State File** (`check-product-change/{locale}.json`): Tracks all generated markups for that locale. Each entry includes the product SKU, last rendered time (in epoch time), and a hash of the markup file. This file is updated as the prerender creates, updates, or removes markup.
+     
+     * **Settings** (`#/settings`): Allows you to access and modify your personal context file. The context file contains information about the prerender app's namespace, authentication token, and the currently active Helix token. Editing the context file enables you to use the prerender UI to manage other App Builder applications.
+  
+  1. The system is now up and running. In the first cycle of operation, it will publish all products in the catalog. Subsequent runs will only process products that have changed.
 
 ### Management UI Setup
 
