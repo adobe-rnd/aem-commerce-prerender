@@ -28,11 +28,9 @@ Pluggable prerendering stack for ahead-of-time data fetching and embedding in Pr
   1. In case you do not have an App Builder environment JSON file, follow the [App Builder Setup Guide](#app-builder-setup)
   1. [Create a repo](https://github.com/new?template_name=aem-commerce-prerender&template_owner=adobe-rnd) from template in your org. Clone the new repo to your local machine
   1. Download your AppBuilder project JSON file, you will use it to perform the initial setup wizard that will show up in the browser
-  1. Run `npm run setup` to onboard and configure your environment. The wizard will automatically detect and populate default values for `CONTENT_URL`, `STORE_URL`, `PRODUCTS_TEMPLATE`, and `PRODUCT_PAGE_URL_FORMAT` based on your site configuration. You can review and modify these values during the setup process. A `.env` file will be created with all necessary environment variables.
-  1. **Step 3 - Advanced Settings**: The wizard will populate default values for most configuration fields based on your organization and site information. If you need to customize these settings, expand the advanced settings section:
-     * **Template URL**: By default, the wizard auto-populates the template URL based on your site name and organization. If your site has localized templates with URLs like `https://main--site--org.aem.page/en-us/products/default`, you can use the `{locale}` token to create a URL pattern: `https://main--site--org.aem.page/{locale}/products/default`. This token will be dynamically replaced with the actual locale values during rendering.
-     * **Product Page URL Format** (`pathPrefix`): This defines the path pattern under which product pages will be served. You can use the following tokens: `{locale}`, `{urlKey}`, `{sku}`. The default pattern is typically `/{locale}/products/{urlKey}`. If deploying to a live environment and you need logical separation from existing pages, consider using a different path prefix such as `/{locale}/products-prerendered/{urlKey}`. When ready to switch traffic, update the `PRODUCT_PAGE_URL_FORMAT` in your `.env` file and run `aio app deploy` again.
-     * **Locales**: If your site is localized, specify the locales (e.g., `en-us,en-gb,fr-fr`). Leave empty if your site is not localized.
+  1. Run `npm run setup` to onboard and configure your environment. The wizard will guide you through the configuration process:
+     * **Step 1-2**: Provide your App Builder credentials and site information
+     * **Step 3 - Advanced Settings**: The wizard will automatically detect and populate default values for `CONTENT_URL`, `STORE_URL`, `PRODUCTS_TEMPLATE`, and `PRODUCT_PAGE_URL_FORMAT` based on your site configuration. You can review and customize these settings in the advanced settings section. A `.env` file will be created with all necessary environment variables.
   1. **Configuration Variables**: After completing the setup wizard, the solution will use two types of configuration:
      
      **Static Configuration** (defined in `app.config.yaml`):
@@ -43,11 +41,11 @@ Pluggable prerendering stack for ahead-of-time data fetching and embedding in Pr
      **Environment-Specific Configuration** (stored in `.env` file):
      * `ORG`: Your GitHub organization or username
      * `SITE`: Your site/repository name
-     * `PRODUCT_PAGE_URL_FORMAT`: The URL pattern for product pages (e.g., `/products/{urlKey}/{sku}`)
+     * `CONTENT_URL`: Your AEM content URL (auto-populated by wizard)
+     * `STORE_URL`: Your Commerce store URL (auto-populated by wizard)
+     * `PRODUCTS_TEMPLATE`: The template URL for product pages (auto-populated by wizard). For localized sites with URLs like `https://main--site--org.aem.page/en-us/products/default`, you can use the `{locale}` token: `https://main--site--org.aem.page/{locale}/products/default`
+     * `PRODUCT_PAGE_URL_FORMAT`: The URL pattern for product pages (auto-populated by wizard). Supports tokens: `{locale}`, `{urlKey}`, `{sku}`. Default pattern: `/{locale}/products/{urlKey}`. For live environments, consider using a different prefix like `/{locale}/products-prerendered/{urlKey}` for logical separation
      * `LOCALES`: Comma-separated list of locales (e.g., `en-us,en-gb,fr-fr`) or empty for non-localized sites
-     * `CONTENT_URL`: Your AEM content URL
-     * `PRODUCTS_TEMPLATE`: The template URL for product pages
-     * `STORE_URL`: Your Commerce store URL
      * `AEM_ADMIN_API_AUTH_TOKEN`: Long-lived authentication token for AEM Admin API (valid for 1 year). During setup, the wizard will exchange your temporary 24-hour token from [admin.hlx.page](https://admin.hlx.page/) for this long-lived token automatically.
      
      You can modify the environment-specific variables by editing the `.env` file directly or by re-running the setup wizard with `npm run setup`.
@@ -143,11 +141,9 @@ Starting with the [October 2025 Adobe Commerce Storefront release](https://exper
 * If your `PRODUCT_PAGE_URL_FORMAT` (configured in `.env` after setup) includes the `{sku}` token, any SKU containing uppercase letters or unsupported characters will be automatically sanitized to lowercase.
 * **Example**: A product with SKU `MY_PRODUCT_123` will generate the URL path `/products/my-product-123`.
 
-**Important**: Because SKUs in URLs are transformed to lowercase, always retrieve the original product SKU from the `<meta name="sku">` tag in the page `<head>` rather than parsing it from the URL. This ensures your frontend code can query Commerce Services with the correct SKU format.
+**Important**: In the prerendered PDPs, the SKU - originally parsed from the URL - can be retrieved from the meta tag `<meta name="sku">`. This way of retrieving the SKU is generally more robust and becomes a requirement when the SKU is sanitized, and therefore it is not possible to query the actual product using it, because the transformed SKU is not in Commerce Services.
 
 ### PDP Drop-in (Frontend Integration)
-
-* In the prerendered PDPs, the SKU - originally parsed from the URL - can be retrieved from the meta tag `meta[name="sku"]`. This way of retrieving the SKU is generally more robust and becomes a requirement when the SKU is sanitized, and therefore it is not possible to query the actual product using it, because the transformed SKU is not in Commerce Services.
 * One requirement could be to hide the prerendered semantic markup (the one coming from the templates and in general, the pdp-renderer action) and the advised way to do it is to simply replace the contents of `.product-details` block with the decorated HTML hosting the PDP drop-in.
 * In fact, this semantic HTML provides rich information and context to LLM crawlers as well as search engine crawlers not supporting JavaScript: having JS replace that code with the UI meant for client-side rendering, means that if no JS is available the semantic HTML operates as a natural fallback.
 
