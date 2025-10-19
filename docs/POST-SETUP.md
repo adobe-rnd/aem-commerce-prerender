@@ -1,7 +1,10 @@
 # Configure CI/CD
 
   * Clone your fork and open it in your favourite code editor.
-      * Go to the repository settings and under "Secrets and variables → Actions" add the following secrets:
+      * Go to the repository settings and under "Secrets and variables → Actions" add the following secrets.
+      
+      **Note**: The following secrets are required if you want to set up two environments (Stage and Production):
+      
           * **Runtime Configuration:**
             * `AIO_RUNTIME_AUTH_PROD`
             * `AIO_RUNTIME_NAMESPACE_PROD`
@@ -17,6 +20,12 @@
           * You can retrieve the runtime values (`namespace` and `auth`) from the JSON files you downloaded earlier, from the corresponding workspace (Stage or Prod).
             Just install [jq](https://github.com/jqlang/jq) and execute `cat /path/to/my/AppBuilder-Project-file.json | jq '.project.workspace.details.runtime.namespaces[0]'`
           * The project configuration values should match your environment-specific settings from the `.env` file.
+          
+      **Optional**: If you want to create additional environments (e.g., Dev, QA), you can:
+          * Add corresponding secrets following the same naming pattern (e.g., `AIO_RUNTIME_AUTH_DEV`, `PROJECT_ORG_DEV`, etc.)
+          * Create additional deployment scripts in the `.github/workflows` folder based on the existing Stage and Production workflows
+          * Configure triggers for your custom environments (e.g., specific branches or tags)
+          
       * Make sure you activate the GitHub Actions. The deployment scripts are located in the `.github` folder. By default, any commit to the main branch of your project will be deployed to the staging workspace of your AppBuilder project. Any release will [trigger](https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows#release) a deployment to the production workspace. We recommend to stick to this workflow.
 
 # Initial Rollout of Product Pages

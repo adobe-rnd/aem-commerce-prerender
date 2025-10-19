@@ -33,7 +33,24 @@ Pluggable prerendering stack for ahead-of-time data fetching and embedding in Pr
      * **Template URL**: By default, the wizard auto-populates the template URL based on your site name and organization. If your site has localized templates with URLs like `https://main--site--org.aem.page/en-us/products/default`, you can use the `{locale}` token to create a URL pattern: `https://main--site--org.aem.page/{locale}/products/default`. This token will be dynamically replaced with the actual locale values during rendering.
      * **Product Page URL Format** (`pathPrefix`): This defines the path pattern under which product pages will be served. You can use the following tokens: `{locale}`, `{urlKey}`, `{sku}`. The default pattern is typically `/{locale}/products/{urlKey}`. If deploying to a live environment and you need logical separation from existing pages, consider using a different path prefix such as `/{locale}/products-prerendered/{urlKey}`. When ready to switch traffic, update the path format in `app.config.yaml` and run `aio app deploy` again.
      * **Locales**: If your site is localized, specify the locales (e.g., `en-us,en-gb,fr-fr`). Leave empty if your site is not localized.
-  1. **Environment Variables**: After completing the setup wizard, all configuration values (except `LOG_LEVEL`, `LOG_INGESTOR_ENDPOINT`, and `CONFIG_NAME` which are defined in `app.config.yaml`) will be stored in the `.env` file in your project root. You can modify these values by editing the `.env` file directly.
+  1. **Configuration Variables**: After completing the setup wizard, the solution will use two types of configuration:
+     
+     **Static Configuration** (defined in `app.config.yaml`):
+     * `LOG_LEVEL`: Controls the logging verbosity (default: "error")
+     * `LOG_INGESTOR_ENDPOINT`: The endpoint for sending logs and statistics
+     * `CONFIG_NAME`: The name of the configuration sheet (default: "config")
+     
+     **Environment-Specific Configuration** (stored in `.env` file):
+     * `ORG`: Your GitHub organization or username
+     * `SITE`: Your site/repository name
+     * `PRODUCT_PAGE_URL_FORMAT`: The URL pattern for product pages (e.g., `/products/{urlKey}/{sku}`)
+     * `LOCALES`: Comma-separated list of locales (e.g., `en-us,en-gb,fr-fr`) or empty for non-localized sites
+     * `CONTENT_URL`: Your AEM content URL
+     * `PRODUCTS_TEMPLATE`: The template URL for product pages
+     * `STORE_URL`: Your Commerce store URL
+     * `AEM_ADMIN_API_AUTH_TOKEN`: Long-lived authentication token for AEM Admin API (valid for 1 year). During setup, the wizard will exchange your temporary 24-hour token from [admin.hlx.page](https://admin.hlx.page/) for this long-lived token automatically.
+     
+     You can modify the environment-specific variables by editing the `.env` file directly or by re-running the setup wizard with `npm run setup`.
   1. At the end of the process a Site Context will be created and stored in your localStorage: this will be the authentication medium required to operate the <https://prerender.aem-storefront.com> management interface (you will be redirected to this address).
   1. [Customize the code](/docs/CUSTOMIZE.md) that contains the rendering logic according to your requirements, for [structured data](/actions/pdp-renderer/ldJson.js), [markup](/actions/pdp-renderer/render.js) and [templates](https://github.com/adobe-rnd/aem-commerce-prerender/tree/main/actions/pdp-renderer/templates)
   1. Deploy the solution with `npm run deploy`
@@ -78,27 +95,6 @@ Pluggable prerendering stack for ahead-of-time data fetching and embedding in Pr
   1. Go to the [Storefront Prerender](https://prerender.aem-storefront.com/#/change-detector) and check that the rules for change detector are enabled (green circles).
   1. The system is now up and running. In the first cycle of operation, it will publish all products in the catalog. Subsequent runs will only process products that have changed. You can browse and count them from [the Management UI](https://prerender.aem-storefront.com/#/products)
   1. From within the same UI, in the "Markup Storage" tab, you can browse the generated HTML files. You can also reset the state of the Change Detector ("Reset Products List") and force republish of all the products ("Trigger Product Scraping" button).
-
-### Configuration Variables
-
-The solution uses two types of configuration:
-
-1. **Static Configuration** (defined in `app.config.yaml`):
-   * `LOG_LEVEL`: Controls the logging verbosity (default: "error")
-   * `LOG_INGESTOR_ENDPOINT`: The endpoint for sending logs and statistics
-   * `CONFIG_NAME`: The name of the configuration sheet (default: "config")
-
-2. **Environment-Specific Configuration** (stored in `.env` file after setup):
-   * `ORG`: Your GitHub organization or username
-   * `SITE`: Your site/repository name
-   * `PRODUCT_PAGE_URL_FORMAT`: The URL pattern for product pages (e.g., `/products/{urlKey}/{sku}`)
-   * `LOCALES`: Comma-separated list of locales (e.g., `en-us,en-gb,fr-fr`) or empty for non-localized sites
-   * `CONTENT_URL`: Your AEM content URL
-   * `PRODUCTS_TEMPLATE`: The template URL for product pages
-   * `STORE_URL`: Your Commerce store URL
-   * `AEM_ADMIN_API_AUTH_TOKEN`: Long-lived authentication token for AEM Admin API (valid for 1 year). During setup, the wizard will exchange your temporary 24-hour token from [admin.hlx.page](https://admin.hlx.page/) for this long-lived token automatically.
-
-These variables can be modified by editing the `.env` file directly or by re-running the setup wizard with `npm run setup`.
 
 ### Management UI Setup
 
