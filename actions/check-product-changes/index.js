@@ -15,6 +15,7 @@ const { StateManager } = require('../lib/state');
 const { ObservabilityClient } = require('../lib/observability');
 const { getRuntimeConfig } = require('../lib/runtimeConfig');
 const { handleActionError } = require('../lib/errorHandler');
+const { checkAndAlertTokenExpiration } = require('../lib/tokenExpirationMonitor');
 
 /**
  * Entry point for the "Product changes check" action.
@@ -63,6 +64,9 @@ async function main(params) {
             // Mark job as running with TTL to avoid permanent lock on unexpected failures
             await stateMgr.put('running', 'true', { ttl: 3600 });
 
+            // Check API key expiration once per day
+            await checkAndAlertTokenExpiration(cfg.adminAuthToken, stateMgr, observabilityClient, logger);
+
             // Core logic
             activationResult = await poll(cfg, { stateLib: stateMgr, filesLib }, logger);
         } finally {
@@ -96,4 +100,4 @@ async function main(params) {
     }
 }
 
-exports.main = main
+exports.main = main;
