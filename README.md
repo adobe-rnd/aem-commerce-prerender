@@ -15,7 +15,7 @@ The AEM Commerce Prerenderer is a tool to generate static product detail pages f
 
 ![Principle of Operation](/docs/principle-of-operation.jpg)
 
-The Prerenderer fetches products from the Catalog Service, detects changes, and generates HTML with meta tags, markup, and JSON-LD. This HTML is stored in an S3 bucket linked to your App Builder project and then published by merging it with the original page.
+The Prerenderer fetches products from the Catalog Service, detects changes, and generates HTML with meta tags, markup, and JSON-LD. This HTML is stored in App Builder storage (Azure Blob Storage) and then published by merging it with the original page.
 
 <details>
   <summary>View detailed architecture diagram</summary>
@@ -65,7 +65,7 @@ For detailed setup instructions, see the [Step-by-Step Configuration](#step-by-s
      * `SITE`: Your site/repository name
      * `CONTENT_URL`: Your AEM content URL (auto-populated by wizard)
      * `STORE_URL`: Your Commerce store URL (auto-populated by wizard)
-     * `PRODUCTS_TEMPLATE`: The template URL for product pages (auto-populated by wizard). For localized sites with URLs like `https://main--site--org.aem.page/en-us/products/default`, you can use the `{locale}` token: `https://main--site--org.aem.page/{locale}/products/default`
+     * `PRODUCTS_TEMPLATE`: The URL for the product template page (auto-populated by wizard). For localized sites with URLs like `https://main--site--org.aem.page/en-us/products/default`, you can use the `{locale}` token: `https://main--site--org.aem.page/{locale}/products/default`
      * `PRODUCT_PAGE_URL_FORMAT`: The URL pattern for product pages (auto-populated by wizard). Supports tokens: `{locale}`, `{urlKey}`, `{sku}`. Default pattern: `/{locale}/products/{urlKey}`. For live environments, consider using a different prefix like `/{locale}/products-prerendered/{urlKey}` for logical separation
      * `LOCALES`: Comma-separated list of locales (e.g., `en-us,en-gb,fr-fr`) or empty for non-localized sites
      * `AEM_ADMIN_API_AUTH_TOKEN`: Long-lived authentication token for AEM Admin API (valid for 1 year). During setup, the wizard will exchange your temporary 24-hour token from [admin.hlx.page](https://admin.hlx.page/) for this long-lived token automatically.

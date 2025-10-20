@@ -3,7 +3,7 @@
   * Clone your fork and open it in your favourite code editor.
       * Go to the repository settings and under "Secrets and variables → Actions" add the following secrets.
       
-      **Note**: The following secrets are required if you want to set up two environments (Stage and Production):
+      **Note**: The following set of secrets are required for each environment. By default, the repository includes two environments (Production and Stage) with deployment workflows located in the `.github` folder:
       
           * **Runtime Configuration:**
             * `AIO_RUNTIME_AUTH_PROD`
