@@ -77,13 +77,13 @@ For detailed setup instructions, see the [Step-by-Step Configuration](#step-by-s
   1. **Testing Actions Manually**: Before enabling automated triggers, verify that each action works correctly by invoking them manually:
      ```bash
      # Fetch all products from Catalog Service and store them in default-products.json
-     aio rt action invoke fetch-all-products
+     aio rt action invoke aem-commerce-ssg/fetch-all-products
      
      # Check for product changes and generate markup (first run processes all products)
-     aio rt action invoke check-product-changes
+     aio rt action invoke aem-commerce-ssg/check-product-changes
      
      # Clean up and unpublish deleted products
-     aio rt action invoke mark-up-clean-up
+     aio rt action invoke aem-commerce-ssg/mark-up-clean-up
      ```
   1. **Enable Automated Triggers**: Once you've confirmed that all actions work correctly, uncomment the triggers and rules sections in `app.config.yaml`:
      ```yaml
