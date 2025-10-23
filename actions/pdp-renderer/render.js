@@ -1,26 +1,33 @@
 const fs = require('fs');
 const path = require('path');
 const Handlebars = require('handlebars');
-const { findDescription, prepareBaseTemplate, getPrimaryImage, generatePriceString, getImageList } = require('./lib');
+const { findDescription, prepareBaseTemplate, getPrimaryImage, generatePriceString, getImageList, sanitize } = require('./lib');
 const { generateLdJson } = require('./ldJson');
 const { requestSaaS, getProductUrl } = require('../utils');
 const { ProductQuery, ProductByUrlKeyQuery } = require('../queries');
 
 const productTemplateCache = {};
+// according to https://www.aem.live/developer/markup-reference
 
 function toTemplateProductData(baseProduct) {
-  const templateProductData = { ...baseProduct };
   const primaryImage = getPrimaryImage(baseProduct)?.url;
 
-  templateProductData.hasImages = baseProduct.images?.length > 0;
-  templateProductData.imageList = getImageList(primaryImage, baseProduct.images);
-  templateProductData.priceString = generatePriceString(baseProduct);
-  templateProductData.metaDescription = findDescription(baseProduct);
-  templateProductData.metaImage = primaryImage;
-  templateProductData.primaryImage = primaryImage;
-  templateProductData.metaTitle = baseProduct.metaTitle || baseProduct.name || 'Product Details';
-
-  return templateProductData;
+  return {
+    name: sanitize(baseProduct.name, 'inline'),
+    description: sanitize(baseProduct.description, 'all'),
+    externalId: sanitize(baseProduct.externalId, 'no'),
+    sku: sanitize(baseProduct.sku, 'no'),
+    __typename: sanitize(baseProduct.__typename, 'no'),
+    metaDescription: findDescription(baseProduct),
+    metaKeyword: sanitize(baseProduct.metaKeyword, 'no'),
+    metaTitle: sanitize(baseProduct.metaTitle, 'no') || sanitize(baseProduct.name, 'no') || 'Product Details',
+    metaImage: primaryImage,
+    primaryImage: primaryImage,
+    options: baseProduct.options ? [...baseProduct.options] : null,
+    hasImages: baseProduct.images?.length > 0,
+    imageList: getImageList(primaryImage, baseProduct.images),
+    priceString: generatePriceString(baseProduct),
+  };
 }
 
 async function generateProductHtml(sku, urlKey, context) {
@@ -55,12 +62,17 @@ async function generateProductHtml(sku, urlKey, context) {
       const baseUrl = getProductUrl(baseProduct, context);
       if (Array.isArray(option.values)) {
         option.values = option.values.map((value) => ({
-          ...value,
+          title: sanitize(value.title, 'inline'),
           url: baseUrl.toLowerCase() + '?optionsUIDs=' + value.id,
         }));
         option.values.sort((a, b) => a.title.localeCompare(b.title));
       }
-      return option;
+      return {
+        title: sanitize(option.title, 'inline'),
+        id: sanitize(option.id, 'no'),
+        required: sanitize(option.required, 'no'),
+        values: option.values
+      };
     });
   }
 

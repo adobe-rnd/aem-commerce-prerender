@@ -169,4 +169,23 @@ function getImageList(primary, images) {
   return imageList;
 }
 
-module.exports = { extractPathDetails, findDescription, getPrimaryImage, prepareBaseTemplate, generatePriceString, getImageList };
+function sanitize(html, mode = 'all') {
+  if (!html) return html;
+
+  const allowedInlineTags = [ 'a', 'br', 'code', 'del', 'em', 'img', 'strong', 'sub', 'sup', 'u' ];
+  const allowedAllTags = [
+    'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'pre',
+    ...allowedInlineTags,
+    'table', 'tbody', 'td', 'th', 'thead', 'tr',
+  ];
+
+  if (mode === 'all') {
+    return striptags(html, allowedAllTags);
+  } else if (mode === 'inline') {
+    return striptags(html, allowedInlineTags);
+  } else if (mode === 'no') {
+    return striptags(html);
+  }
+}
+
+module.exports = { extractPathDetails, findDescription, getPrimaryImage, prepareBaseTemplate, generatePriceString, getImageList, sanitize };

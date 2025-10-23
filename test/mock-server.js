@@ -19,9 +19,20 @@ const mockVariants = require('./mock-responses/mock-variants.json');
 const mockProduct = require('./mock-responses/mock-product.json');
 const mockProductLs = require('./mock-responses/mock-product-ls.json');
 const mockComplexProduct = require('./mock-responses/mock-complex-product.json');
+const mockProductWithBrokenMarkupJson = require('./mock-responses/mock-product-with-broken-markup.json');
 const mockProductTemplate = fs.readFileSync(path.resolve(__dirname, './mock-responses/product-default.html'), 'utf8');
 
 const handlers = {
+  defaultProductWithBrokenMarkup: (matcher) => graphql.query('ProductQuery', (req) => {
+    matcher?.(req);
+    return HttpResponse.json(mockProductWithBrokenMarkupJson);
+  }),
+  givenProduct: function(product) {
+    return (matcher) => graphql.query('ProductQuery', (req) => {
+      matcher?.(req);
+      return HttpResponse.json(product);
+    });
+  },
   defaultProduct: (matcher) => graphql.query('ProductQuery', (req) => {
     matcher?.(req);
     return HttpResponse.json(mockProduct);
