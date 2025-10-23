@@ -459,7 +459,7 @@ const RULES_MAP = {
       }
 
       const reqBody = await request.json();
-      const { productPageUrlFormat, contentUrl, productsTemplate, storeUrl } = reqBody;
+      const { productPageUrlFormat, contentUrl, productsTemplate, storeUrl, accessTokenId } = reqBody;
       let { locales } = reqBody;
 
       if (locales?.trim() === '') locales = null;
@@ -494,6 +494,17 @@ const RULES_MAP = {
         content: {
           ...currentSiteConfig.content,
           overlay: { url: overlayBaseURL, type: 'markup', suffix: '.html' }
+        },
+        access: {
+          ...(currentSiteConfig.access || {}),
+          admin: {
+            ...(currentSiteConfig.access?.admin || {}),
+            apiKeyId: Array.from(
+              new Set([...(currentSiteConfig.access?.admin?.apiKeyId || []), accessTokenId])
+            ),
+            requireAuth: currentSiteConfig.access?.admin?.requireAuth ?? 'auto',
+            role: { ...(currentSiteConfig.access?.admin?.role || {}) }
+          }
         }
       };
 
