@@ -1105,7 +1105,8 @@ export class SetupWizard extends LitElement {
                     productsTemplate: this.advancedSettings.productsTemplate,
                     productPageUrlFormat: this.advancedSettings.productPageUrlFormat,
                     storeUrl: this.advancedSettings.storeUrl,
-                    locales: this.advancedSettings.locales
+                    locales: this.advancedSettings.locales,
+                    accessTokenId: this.generatedApiKey.id
                 })
             });
 
