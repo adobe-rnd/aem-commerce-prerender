@@ -330,7 +330,7 @@ const RULES_MAP = {
           return RequestHelper.errorResponse('accessToken, org, and site are required');
         }
 
-        const apiKeyEndpoint = `https://admin.hlx.page/config/${org}/profiles/${site}/apiKeys.json`;
+        const apiKeyEndpoint = `https://admin.hlx.page/config/${org}/sites/${site}/apiKeys.json`;
         const body = {
           description: `Key used by PDP Prerender components [${org}/${site}]`,
           roles: [
