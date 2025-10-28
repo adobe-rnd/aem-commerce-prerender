@@ -232,8 +232,8 @@ async function requestPublishedProductsIndex(context) {
 }
 
 async function requestConfigService(context) {
-  const { contentUrl } = context;
-  let publicConfig = `${contentUrl}/config.json`
+  const { contentUrl, configName = 'configs' } = context;
+  let publicConfig = `${contentUrl}/${configName}.json`
   return request('configservice', publicConfig);
 }
 
