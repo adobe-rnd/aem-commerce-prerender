@@ -232,8 +232,8 @@ async function requestPublishedProductsIndex(context) {
 }
 
 async function requestConfigService(context) {
-  const { contentUrl } = context;
-  let publicConfig = `${contentUrl}/config.json`
+  const { contentUrl, configName = 'config' } = context;
+  let publicConfig = `${contentUrl}/${configName}.json`
   return request('configservice', publicConfig);
 }
 
@@ -248,7 +248,7 @@ async function requestConfigService(context) {
  * @returns {Promise<object>} configuration as object.
  */
 async function getConfig(context) {
-  const { configName = 'configs', configSheet, logger, locale } = context;
+  const { configName = 'config', configSheet, logger, locale } = context;
   if (!context.config) {
     // try to fetch the config from the config service first
     logger.debug(`Fetching public config`);

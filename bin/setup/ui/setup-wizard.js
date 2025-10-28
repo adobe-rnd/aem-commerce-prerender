@@ -665,7 +665,8 @@ export class SetupWizard extends LitElement {
 
         this.loadingSites = true;
         try {
-            const sitesEndpoint = `https://admin.hlx.page/config/${this.org}/sites.json`;
+            const orgLower = this.org.toLowerCase();
+            const sitesEndpoint = `https://admin.hlx.page/config/${orgLower}/sites.json`;
             console.log(`Fetching sites from ${sitesEndpoint}`);
 
             const response = await fetch(sitesEndpoint, {
@@ -726,7 +727,8 @@ export class SetupWizard extends LitElement {
 
         this.loading = true;
         try {
-            const apiKeyEndpoint = `https://admin.hlx.page/config/${this.org}/sites/${this.site}/apiKeys.json`;
+            const orgLower = this.org.toLowerCase();
+            const apiKeyEndpoint = `https://admin.hlx.page/config/${orgLower}/sites/${this.site}/apiKeys.json`;
             const body = {
                 description: `Key used by PDP Prerender components [${this.org}/${this.site}]`,
                 roles: [
