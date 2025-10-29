@@ -1,13 +1,13 @@
 class ObservabilityClient {
   constructor(nativeLogger, options = {}) {
-      this.activationId = process.env.__OW_ACTIVATION_ID;
-      this.namespace = process.env.__OW_NAMESPACE;
-      this.instanceStartTime = Date.now();
-      this.options = options;
-      this.org = options.org;
-      this.site = options.site;
-      this.endpoint = options.endpoint;
-      this.nativeLogger = nativeLogger;
+    this.activationId = process.env.__OW_ACTIVATION_ID;
+    this.namespace = process.env.__OW_NAMESPACE;
+    this.instanceStartTime = Date.now();
+    this.options = options;
+    this.org = options.org;
+    this.site = options.site;
+    this.endpoint = options.endpoint;
+    this.nativeLogger = nativeLogger;
   }
 
   getEndpoints(type) {
@@ -19,42 +19,42 @@ class ObservabilityClient {
   }
 
   async #sendRequestToObservability(type, payload) {
-      try {
-        const logEndpoint = this.getEndpoints(type);
-    
-        if (logEndpoint) {
-          await fetch(logEndpoint, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${this.options.token}`,
+    try {
+      const logEndpoint = this.getEndpoints(type);
+
+      if (logEndpoint) {
+        await fetch(logEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.options.token}`,
           },
-            body: JSON.stringify(payload),
-          });
-        }
-      } catch (error) {
-        this.nativeLogger.debug(`[ObservabilityClient] Failed to send to observability endpoint '${type}': ${error.message}`, { error });
+          body: JSON.stringify(payload),
+        });
       }
+    } catch (error) {
+      this.nativeLogger.debug(`[ObservabilityClient] Failed to send to observability endpoint '${type}': ${error.message}`, { error });
     }
+  }
 
-    severityMap = {
-      'DEBUG': 1,
-      'VERBOSE': 2,
-      'INFO': 3,
-      'WARNING': 4,
-      'ERROR': 5,
-      'CRITICAL': 6,
-    }
+  severityMap = {
+    'DEBUG': 1,
+    'VERBOSE': 2,
+    'INFO': 3,
+    'WARNING': 4,
+    'ERROR': 5,
+    'CRITICAL': 6,
+  }
 
-    stateToSeverity(state) {
-      const stateToSeverityMap = {
-        skipped: 'DEBUG',
-        completed: 'INFO',
-        failure: 'ERROR',
-      };
+  stateToSeverity(state) {
+    const stateToSeverityMap = {
+      skipped: 'DEBUG',
+      completed: 'INFO',
+      failure: 'ERROR',
+    };
 
-      return this.severityMap[stateToSeverityMap[state]] || this.severityMap['DEBUG'];
-    }
+    return this.severityMap[stateToSeverityMap[state]] || this.severityMap['DEBUG'];
+  }
 
   /**
    * Sends a single activation log entry to the observability endpoint.
@@ -62,25 +62,41 @@ class ObservabilityClient {
    * @returns {Promise<void>} A promise that resolves when the log is sent, or rejects on error.
    */
   async sendActivationResult(result) {
-      if (!result || typeof result !== 'object') {
-          return;
-      }
+    if (!result || typeof result !== 'object') {
+      return;
+    }
 
-      let severity = this.stateToSeverity(result.state);
+    let severity = this.stateToSeverity(result.state);
 
-      if (result?.status?.failed > 0) {
-        severity = this.severityMap['WARNING'];
-      }
+    if (result?.status?.failed > 0) {
+      severity = this.severityMap['WARNING'];
+    }
 
-      const payload = {
-          environment: `${this.namespace}`,
-          timestamp: this.instanceStartTime,
-          result,
-          severity,
-          activationId: this.activationId,
-      };
+    const payload = {
+      environment: `${this.namespace}`,
+      timestamp: this.instanceStartTime,
+      result,
+      severity,
+      activationId: this.activationId,
+    };
 
-      await this.#sendRequestToObservability('activationResults', payload);
+    await this.#sendRequestToObservability('activationResults', payload);
+  }
+
+  async sendApiKeyAlert(alertData) {
+    const payload = {
+      environment: this.namespace || 'local-test',
+      timestamp: Date.now(),
+      result: {
+        type: 'api_key_expiration_alert',
+        daysUntilExpiration: alertData.daysUntilExpiration,
+        message: alertData.message,
+        recommendedAction: alertData.recommendedAction
+      },
+      activationId: this.activationId || `token-alert-${Date.now()}`
+    };
+
+    await this.#sendRequestToObservability('activationResults', payload);
   }
 }
 
