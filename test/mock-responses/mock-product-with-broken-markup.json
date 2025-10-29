@@ -1,0 +1,183 @@
+{
+    "data": {
+        "products": [
+            {
+                "__typename": "SimpleProductView",
+                "id": "TWpRdFRVSXdNdwBaR1ZtWVhWc2RBAFpqTTRZVEJrWlRBdE56WTBZaTAwTVdaaExXSmtNbU10TldKak1tWXpZemRpTXpsaABiV0ZwYmw5M1pXSnphWFJsWDNOMGIzSmwAWW1GelpRAFRVRkhNREExTXpZeE56STU",
+                "sku": "25-MB03",
+                "name": "Crown Summit Backpack",
+                "url": "http://www.aemshop.net/crown-summit-backpack.html",
+                "description": "<div><p>The Crown Summit Backpack is equally at home in a gym locker, study cube or a pup tent, so be sure yours is packed with books, a bag lunch, water bottles, yoga block, laptop, or whatever else you want in hand. Rugged enough for day hikes and camping trips, it has two large zippered compartments and padded, adjustable shoulder straps.</p>\r\n<ul>\r\n<li>Top handle.</li>\r\n<li>Grommet holes.</li>\r\n<li>Two-way zippers.</li>\r\n<li>H 20\" x W 14\" x D 12\".</li>\r\n<li>Weight: 2 lbs, 8 oz. Volume: 29 L.</li>\r\n<ul></div></div></p>",
+                "shortDescription": "<div><p>The Crown Summit Backpack is equal</p></div></p>",
+                "metaDescription": "",
+                "metaKeyword": "backpack, hiking, camping",
+                "metaTitle": "<h1>Crown Summit Backpack</h1>",
+                "urlKey": "crown-summit-backpack",
+                "inStock": true,
+                "externalId": "7",
+                "lastModifiedAt": "2024-10-03T15:26:48.850Z",
+                "images": [
+                    {
+                        "url": "http://www.aemshop.net/media/catalog/product/m/b/mb03-black-0.jpg",
+                        "label": "Image",
+                        "roles": [
+                            "image",
+                            "small_image",
+                            "thumbnail"
+                        ]
+                    },
+                    {
+                        "url": "http://www.aemshop.net/media/catalog/product/m/b/mb03-black-0_alt1.jpg",
+                        "label": "Image",
+                        "roles": []
+                    }
+                ],
+                "attributes": [
+                    {
+                        "name": "activity",
+                        "label": "Activity",
+                        "value": [
+                            "Gym",
+                            "Hiking",
+                            "Overnight",
+                            "School",
+                            "Trail",
+                            "Travel",
+                            "Urban"
+                        ],
+                        "roles": [
+                            "visible_in_pdp",
+                            "visible_in_compare_list",
+                            "visible_in_search"
+                        ]
+                    },
+                    {
+                        "name": "color",
+                        "label": "Color",
+                        "value": "",
+                        "roles": [
+                            "visible_in_pdp",
+                            "visible_in_compare_list",
+                            "visible_in_plp",
+                            "visible_in_search"
+                        ]
+                    },
+                    {
+                        "name": "cost",
+                        "label": "Cost",
+                        "value": "",
+                        "roles": [
+                            "visible_in_pdp"
+                        ]
+                    },
+                    {
+                        "name": "eco_collection",
+                        "label": "Eco Collection",
+                        "value": "no",
+                        "roles": [
+                            "visible_in_pdp"
+                        ]
+                    },
+                    {
+                        "name": "erin_recommends",
+                        "label": "Erin Recommends",
+                        "value": "no",
+                        "roles": [
+                            "visible_in_pdp"
+                        ]
+                    },
+                    {
+                        "name": "features_bags",
+                        "label": "Features",
+                        "value": [
+                            "Audio Pocket",
+                            "Waterproof",
+                            "Lightweight",
+                            "Reflective",
+                            "Laptop Sleeve"
+                        ],
+                        "roles": [
+                            "visible_in_pdp",
+                            "visible_in_search"
+                        ]
+                    },
+                    {
+                        "name": "material",
+                        "label": "Material",
+                        "value": [
+                            "Nylon",
+                            "Polyester"
+                        ],
+                        "roles": [
+                            "visible_in_pdp",
+                            "visible_in_search"
+                        ]
+                    },
+                    {
+                        "name": "new",
+                        "label": "New",
+                        "value": "no",
+                        "roles": [
+                            "visible_in_pdp"
+                        ]
+                    },
+                    {
+                        "name": "performance_fabric",
+                        "label": "Performance Fabric",
+                        "value": "no",
+                        "roles": [
+                            "visible_in_pdp"
+                        ]
+                    },
+                    {
+                        "name": "sale",
+                        "label": "Sale",
+                        "value": "no",
+                        "roles": [
+                            "visible_in_pdp"
+                        ]
+                    },
+                    {
+                        "name": "strap_bags",
+                        "label": "Strap/Handle",
+                        "value": [
+                            "Adjustable",
+                            "Double",
+                            "Padded"
+                        ],
+                        "roles": [
+                            "visible_in_pdp",
+                            "visible_in_search"
+                        ]
+                    },
+                    {
+                        "name": "style_bags",
+                        "label": "Style",
+                        "value": "Backpack",
+                        "roles": [
+                            "visible_in_pdp",
+                            "visible_in_search"
+                        ]
+                    }
+                ],
+                "price": {
+                    "roles": [
+                        "visible"
+                    ],
+                    "regular": {
+                        "amount": {
+                            "currency": "USD",
+                            "value": 38
+                        }
+                    },
+                    "final": {
+                        "amount": {
+                            "currency": "USD",
+                            "value": 38
+                        }
+                    }
+                }
+            }
+        ]
+    }
+}
