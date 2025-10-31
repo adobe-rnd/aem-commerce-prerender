@@ -119,7 +119,7 @@ function validateAemTokenStructure(token, logger) {
     }
     
     // Check for required admin roles
-    const requiredRoles = ['preview', 'publish'];
+    const requiredRoles = ['publish'];
     const hasRequiredRoles = requiredRoles.every(role => payload.roles.includes(role));
     
     if (!hasRequiredRoles) {
