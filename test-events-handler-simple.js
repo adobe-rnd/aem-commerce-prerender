@@ -26,25 +26,23 @@ async function runTest() {
     SITE: process.env.SITE,
     AEM_ADMIN_API_AUTH_TOKEN: process.env.AEM_ADMIN_API_AUTH_TOKEN,
     
-    // Commerce API configuration
-    COMMERCE_ENDPOINT: process.env.COMMERCE_ENDPOINT,
-    COMMERCE_X_API_KEY: process.env.COMMERCE_X_API_KEY,
-    ENVIRONMENT_ID: process.env.ENVIRONMENT_ID,
-    WEBSITE_CODE: process.env.WEBSITE_CODE,
-    STORE_CODE: process.env.STORE_CODE,
-    STORE_VIEW_CODE: process.env.STORE_VIEW_CODE,
+    // Content URLs
+    CONTENT_URL: process.env.CONTENT_URL,
+    STORE_URL: process.env.STORE_URL,
+    PRODUCTS_TEMPLATE: process.env.PRODUCTS_TEMPLATE,
+    PRODUCT_PAGE_URL_FORMAT: process.env.PRODUCT_PAGE_URL_FORMAT,
     
     // Optional configuration
     LOG_LEVEL: 'info',
     db_event_key: 'test_events_position',
     
-    // Mock libInit for local testing
-    libInit: {
+    // LibInit from environment for Adobe I/O Runtime access
+    libInit: process.env.AIO_runtime_namespace ? {
       ow: {
-        namespace: 'test',
-        auth: 'test'
+        namespace: process.env.AIO_runtime_namespace,
+        auth: process.env.AIO_runtime_auth
       }
-    }
+    } : undefined
   };
   
   // Validate required parameters
@@ -54,9 +52,7 @@ async function runTest() {
     'CLIENT_SECRET',
     'JOURNALLING_URL',
     'ORG',
-    'SITE',
-    'COMMERCE_ENDPOINT',
-    'COMMERCE_X_API_KEY'
+    'SITE'
   ];
   
   const missing = required.filter(key => !params[key]);
