@@ -18,7 +18,7 @@ async function runTest() {
     // Adobe I/O credentials
     IMS_ORG_ID: process.env.IMS_ORG_ID,
     CLIENT_ID: process.env.CLIENT_ID,
-    ACCESS_TOKEN: process.env.ACCESS_TOKEN,
+    CLIENT_SECRET: process.env.CLIENT_SECRET,
     JOURNALLING_URL: process.env.JOURNALLING_URL,
     
     // AEM configuration
@@ -51,7 +51,7 @@ async function runTest() {
   const required = [
     'IMS_ORG_ID',
     'CLIENT_ID', 
-    'ACCESS_TOKEN',
+    'CLIENT_SECRET',
     'JOURNALLING_URL',
     'ORG',
     'SITE',

@@ -7,6 +7,7 @@
 
 const { Core, Events, State, Files } = require('@adobe/aio-sdk');
 const { StateManager } = require('../lib/state');
+const { TokenManager } = require('./token-manager');
 const { getRuntimeConfig } = require('../lib/runtimeConfig');
 const { generateProductHtml } = require('../pdp-renderer/render');
 const { AdminAPI } = require('../lib/aem');
@@ -133,11 +134,13 @@ async function main(params) {
     const filesLib = await Files.init(params.libInit || {});
     const stateManager = new StateManager(stateLib, { logger });
     
-    // Get access token from params
-    const accessToken = params.ACCESS_TOKEN || params.access_token;
-    if (!accessToken) {
-      throw new Error('ACCESS_TOKEN is required');
-    }
+    // Initialize token manager for automatic token refresh
+    const tokenManager = new TokenManager(params, stateManager, logger);
+    
+    // Get access token (will be automatically refreshed if expired)
+    const accessToken = await tokenManager.getAccessToken();
+    
+    logger.info('Access token obtained successfully');
     
     // Initialize Events client
     const eventsClient = await Events.init(

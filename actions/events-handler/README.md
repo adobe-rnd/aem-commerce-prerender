@@ -18,6 +18,7 @@
 - ✅ Интеграция с Adobe I/O Events
 - ✅ Автоматическая публикация в AEM
 - ✅ Сохранение состояния между запусками
+- ✅ Автоматическое обновление токенов (TokenManager)
 
 ## Требования
 
@@ -27,7 +28,7 @@
 # Adobe I/O Events
 IMS_ORG_ID=your_org_id
 CLIENT_ID=your_client_id
-ACCESS_TOKEN=your_access_token
+CLIENT_SECRET=your_client_secret
 JOURNALLING_URL=your_journalling_url
 
 # AEM Configuration
@@ -73,21 +74,24 @@ aio runtime action invoke events-handler --result
 ## Процесс обработки
 
 ```
-1. Получить события из журнала (limit: 50)
+1. Получить токен доступа
+   └─> TokenManager автоматически обновляет если истек
+   
+2. Получить события из журнала (limit: 50)
    └─> Использовать сохраненную позицию
    
-2. Извлечь уникальные SKU
+3. Извлечь уникальные SKU
    └─> Удалить дубликаты
    
-3. Для каждого SKU:
+4. Для каждого SKU:
    └─> Сгенерировать HTML
    └─> Сохранить в Files storage
    
-4. Публикация:
+5. Публикация:
    └─> adminApi.previewAndPublish(records)
    └─> Ожидать завершения
    
-5. Сохранить новую позицию
+6. Сохранить новую позицию
 ```
 
 ## Ответ action
@@ -121,8 +125,8 @@ aio runtime action invoke events-handler --result
 
 | Характеристика | Старая версия | Новая версия |
 |----------------|---------------|--------------|
-| Размер кода | ~930 строк | ~310 строк |
-| Управление токенами | TokenManager | Простой ACCESS_TOKEN |
+| Размер кода | ~930 строк | ~310 строк (index.js + token-manager.js) |
+| Управление токенами | Сложный TokenManager | Упрощенный TokenManager с автообновлением |
 | Batch processing | Сложная логика | Простая последовательная |
 | Публикация | Прямые API вызовы | adminApi.previewAndPublish |
 | Observability | Интегрирована | Убрана |
@@ -131,12 +135,21 @@ aio runtime action invoke events-handler --result
 
 ## Структура кода
 
+### index.js
 ```javascript
 // Основные функции:
 extractUniqueSKUs(events)      // Извлечение уникальных SKU
 fetchEvents(...)               // Получение событий из журнала
 generateSKUHtml(sku, ...)      // Генерация HTML для SKU
 main(params)                   // Главная функция action
+```
+
+### token-manager.js
+```javascript
+// TokenManager класс:
+getAccessToken()               // Получить токен (авто-обновление)
+isTokenValid(tokenData)        // Проверить валидность токена
+fetchNewToken()                // Получить новый токен от Adobe IMS
 ```
 
 ## Логирование
