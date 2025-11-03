@@ -53,13 +53,25 @@ class TokenManager {
 
       // Try to get token from persistent storage
       if (this.stateManager) {
-        const storedTokenString = await this.stateManager.get(this.stateKey);
+        const storedData = await this.stateManager.get(this.stateKey);
         
-        if (storedTokenString) {
+        if (storedData) {
           try {
-            const storedToken = JSON.parse(storedTokenString);
+            // Handle both string and object responses from State
+            let storedToken;
+            if (typeof storedData === 'string') {
+              storedToken = JSON.parse(storedData);
+            } else if (typeof storedData === 'object' && storedData.value) {
+              // State sometimes returns { value: 'data' } object
+              storedToken = typeof storedData.value === 'string' 
+                ? JSON.parse(storedData.value) 
+                : storedData.value;
+            } else if (typeof storedData === 'object') {
+              // Already an object
+              storedToken = storedData;
+            }
             
-            if (this.isTokenValid(storedToken)) {
+            if (storedToken && this.isTokenValid(storedToken)) {
               this.logger.debug('Using stored access token');
               this.tokenCache = storedToken;
               return storedToken.access_token;
