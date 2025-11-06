@@ -195,6 +195,14 @@ async function request(name, url, req, timeout = 60000) {
  */
 async function requestSpreadsheet(name, sheet, context, offset = 0) {
   const { contentUrl } = context;
+  const { siteToken } = context;
+
+  let options = undefined;
+  // Site Token Validation: needs to be a non empty string
+  if (typeof siteToken === 'string' && siteToken.trim()) {
+   options = {headers:{'authorization': `token ${siteToken}`}}
+  }
+
   let sheetUrl = `${contentUrl}/${name}.json`
   const requestURL = new URL(sheetUrl);
 
@@ -206,7 +214,7 @@ async function requestSpreadsheet(name, sheet, context, offset = 0) {
     requestURL.searchParams.set('offset', offset);
   }
 
-  return request('spreadsheet', requestURL.toString());
+  return request('spreadsheet', requestURL.toString(), options);
 }
 
 /**
@@ -232,9 +240,16 @@ async function requestPublishedProductsIndex(context) {
 }
 
 async function requestConfigService(context) {
-  const { contentUrl, configName = 'config' } = context;
+  const { contentUrl, configName = 'config', siteToken = undefined } = context;
+
+  let options = undefined;
+  // Site Token Validation: needs to be a non empty string
+  if (typeof siteToken === 'string' && siteToken.trim()) {
+   options = {headers:{'authorization': `token ${siteToken}`}}
+  }
+
   let publicConfig = `${contentUrl}/${configName}.json`
-  return request('configservice', publicConfig);
+  return request('configservice', publicConfig, options);
 }
 
 /**
@@ -249,6 +264,7 @@ async function requestConfigService(context) {
  */
 async function getConfig(context) {
   const { configName = 'config', configSheet, logger, locale } = context;
+
   if (!context.config) {
     // try to fetch the config from the config service first
     logger.debug(`Fetching public config`);

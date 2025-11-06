@@ -543,7 +543,8 @@ export class SetupWizard extends LitElement {
             productsTemplate: '',
             storeUrl: '',
             configName: 'config',
-            locales: null
+            locales: null,
+            siteToken: ''
         };
         this.previewData = null;
         this.healthChecks = [];
@@ -1240,6 +1241,7 @@ export class SetupWizard extends LitElement {
                 id: `${this.org}/${this.site}`,
                 org: this.org,
                 site: this.site,
+                ...(this.advancedSettings.siteToken && {siteToken: this.advancedSettings.siteToken}),
                 appbuilderProjectJSON: {
                     project: {
                         name: this.aioConfigFile?.name?.replace('.json', '') || 'aem-commerce-prerender',
@@ -1310,6 +1312,7 @@ export class SetupWizard extends LitElement {
         }
     }
 
+    // Step 1: Org and site configuration, and Helix Token 
     renderStep1AccessToken() {
         return html`<div class="step-content">
             <h3>Step 1: Get Access Token</h3>
@@ -1411,6 +1414,7 @@ export class SetupWizard extends LitElement {
         </div>`;
     }
 
+    // Step 2: Appbuilder workspace configuration/upload
     renderStep2Token() {
         return html`<div class="step-content">
             <h3>Step 2: AIO Configuration</h3>
@@ -1473,6 +1477,7 @@ export class SetupWizard extends LitElement {
         </div>`;
     }
 
+    // Step 3: Site COnfiguration 
     renderStep3AdvancedSettings() {
         return html`
             <div class="step-content">
@@ -1549,6 +1554,13 @@ export class SetupWizard extends LitElement {
                                     .value=${this.advancedSettings.storeUrl}
                                     @input=${e => this.handleAdvancedSettingInput('storeUrl', e.target.value)}
                                 ></sp-textfield>
+
+                                <sp-field-label for="store-url" required>Site Token (Optional)</sp-field-label>
+                                <sp-textfield
+                                    id="site-token"
+                                    .value=${this.advancedSettings.siteToken}
+                                    @input=${e => this.handleAdvancedSettingInput('siteToken', e.target.value)}
+                                ></sp-textfield>
                             </div>
                         </sp-accordion-item>
                     </sp-accordion>
@@ -1556,6 +1568,7 @@ export class SetupWizard extends LitElement {
             </div>`;
     }
 
+    // Step 4: Preview and apply configuration
     renderStep4Review() {
         return html`
             <div class="step-content">
