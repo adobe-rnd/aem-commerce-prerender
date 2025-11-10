@@ -404,6 +404,7 @@ const RULES_MAP = {
                     id: parsedData.id,
                     org: parsedData.org,
                     site: parsedData.site,
+                    siteToken: parsedData.siteToken,
                     namespace: parsedData.appbuilderProjectJSON?.project?.workspace?.details?.runtime?.namespaces?.[0]?.name
                 }
             });
@@ -672,10 +673,11 @@ const RULES_MAP = {
         envObject['STORE_URL'] = appConfigParams.storeUrl;
         envObject['PRODUCTS_TEMPLATE'] = appConfigParams.productsTemplate;
         envObject['LOCALES'] = appConfigParams.locales;
+        envObject['SITE_TOKEN'] = appConfigParams.siteToken;
         
         const newEnvContent = dotenvStringify(envObject);
         fs.writeFileSync(envPath, newEnvContent);
-        console.log('Successfully updated .env file with AEM_ADMIN_API_AUTH_TOKEN.');
+        console.log('Successfully updated .env file with provided parameters.');
 
       } catch (error) {
         console.error('Failed to write configuration files:', error);
