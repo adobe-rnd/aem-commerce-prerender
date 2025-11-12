@@ -178,11 +178,18 @@ function getImageList(primary, images) {
   return imageList;
 }
 
-function sanitize(html, mode = 'all') {
-  if (!html || typeof html !== 'string') {
-    return html;
-  }
-
+ /**
+* Sanitizes HTML content by removing disallowed or unbalanced tags. 
+* Suppoorts three modes: 'all', 'inline', 'no'.
+* 'all': allows all block and inline tags supported by edge delivery.
+* 'inline': allows all inline tags supported by edge delivery.
+* 'no': allows no tags
+*
+* @param {string} html - HTML string to sanitize
+* @param {string} [mode='all'] - Sanitization mode
+* @returns {string} Sanitized HTML string
+*/
+function sanitize(html, mode = 'all') {  
   const allowedInlineTags = [ 'a', 'br', 'code', 'del', 'em', 'img', 'strong', 'sub', 'sup', 'u' ];
   const allowedAllTags = [
     'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'pre',
