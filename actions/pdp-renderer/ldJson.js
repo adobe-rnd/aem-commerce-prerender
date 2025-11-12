@@ -2,6 +2,13 @@ const { requestSaaS, getProductUrl } = require('../utils');
 const { findDescription, getPrimaryImage } = require('./lib');
 const { VariantsQuery } = require('../queries');
 
+function lowercaseUrlPath(url) {
+  if (!url) return url;
+  const urlObj = new URL(url);
+  urlObj.pathname = urlObj.pathname.toLowerCase();
+  return urlObj.toString();
+}
+
 function getOffer(product, url) {
   const { sku, inStock, price } = product;
   const finalPriceCurrency = (price?.final?.amount?.currency || 'NONE') === 'NONE' ? 'USD' : price?.final?.amount?.currency;
@@ -10,7 +17,7 @@ function getOffer(product, url) {
   const offer = {
     '@type': 'Offer',
     sku,
-    url,
+    url: lowercaseUrlPath(url),
     availability: inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
     price: price?.final?.amount?.value,
     priceCurrency: finalPriceCurrency,
@@ -164,7 +171,7 @@ async function generateLdJson(product, context) {
       name,
       gtin,
       description: findDescription(product, ['shortDescription', 'metaDescription', 'description']),
-      '@id': url,
+      '@id': lowercaseUrlPath(url),
       offers: [getOffer(product, url)],
     };
   } else if (__typename === 'ComplexProductView') {
@@ -181,7 +188,7 @@ async function generateLdJson(product, context) {
       gtin,
       variesBy: axes.map(axis => schemaOrgProperties.includes(axis) ? `https://schema.org/${axis}` : axis),
       description: findDescription(product, ['shortDescription', 'metaDescription', 'description']),
-      '@id': url,
+      '@id': lowercaseUrlPath(url),
       hasVariant: await getVariants(product, url, axes, context),
     };
   } else {

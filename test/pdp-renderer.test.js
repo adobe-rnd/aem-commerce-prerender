@@ -195,7 +195,7 @@ describe('pdp-renderer', () => {
 
       // Validate product url in structured data
       const ldJson = JSON.parse($('head > script[type="application/ld+json"]').html());
-      expect(ldJson.offers[0].url).toEqual('https://store.com/en/products/24-MB03');
+      expect(ldJson.offers[0].url).toEqual('https://store.com/en/products/24-mb03');
     });
   })
 
@@ -375,7 +375,7 @@ describe('pdp-renderer', () => {
       const ldJson = JSON.parse($('head > script[type="application/ld+json"]').html());
       expect(ldJson).toEqual({
         "@context": "http://schema.org",
-        "@id": "https://store.com/products/crown-summit-backpack/24-MB03",
+        "@id": "https://store.com/products/crown-summit-backpack/24-mb03",
         "@type": "Product",
         "description": 'The Crown Summit Backpack is equally at home in a gym locker, study cube or a pup tent, so be sure yours is packed with books, a bag lunch, water bottles, yoga block, laptop, or whatever else you want in hand. Rugged enough for day hikes and camping trips, it has two large zippered compartments and padded, adjustable shoulder straps.Top handle.Grommet holes.Two-way zippers.H 20" x W 14" x D 12".Weight: 2 lbs, 8 oz. Volume: 29 L.',
         "gtin": "",
@@ -389,7 +389,7 @@ describe('pdp-renderer', () => {
             "price": 38,
             "priceCurrency": "USD",
             "sku": "24-MB03",
-            "url": "https://store.com/products/crown-summit-backpack/24-MB03",
+            "url": "https://store.com/products/crown-summit-backpack/24-mb03",
           },
         ],
         "sku": "24-MB03",
