@@ -10,7 +10,7 @@ function getOffer(product, url) {
   const offer = {
     '@type': 'Offer',
     sku,
-    url,
+    url: url ? url.toLowerCase() : url,
     availability: inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
     price: price?.final?.amount?.value,
     priceCurrency: finalPriceCurrency,
@@ -164,7 +164,7 @@ async function generateLdJson(product, context) {
       name,
       gtin,
       description: findDescription(product, ['shortDescription', 'metaDescription', 'description']),
-      '@id': url,
+      '@id': url ? url.toLowerCase() : url,
       offers: [getOffer(product, url)],
     };
   } else if (__typename === 'ComplexProductView') {
@@ -181,7 +181,7 @@ async function generateLdJson(product, context) {
       gtin,
       variesBy: axes.map(axis => schemaOrgProperties.includes(axis) ? `https://schema.org/${axis}` : axis),
       description: findDescription(product, ['shortDescription', 'metaDescription', 'description']),
-      '@id': url,
+      '@id': url ? url.toLowerCase() : url,
       hasVariant: await getVariants(product, url, axes, context),
     };
   } else {

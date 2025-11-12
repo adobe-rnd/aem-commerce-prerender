@@ -125,7 +125,7 @@ describe('ldJson', () => {
                     offers: [{
                         '@type': 'Offer',
                         sku: 'complex-sku-L-Green',
-                        url: 'https://example.com/products/complex-product/complex-sku?optionsUIDs=color-green%2Csize-l',
+                        url: 'https://example.com/products/complex-product/complex-sku?optionsUIDs=color-green%2csize-l',
                         availability: 'https://schema.org/OutOfStock',
                         price: 30,
                         priceCurrency: 'USD',
@@ -149,7 +149,7 @@ describe('ldJson', () => {
                     offers: [{
                         '@type': 'Offer',
                         sku: 'complex-sku-M-Red',
-                        url: 'https://example.com/products/complex-product/complex-sku?optionsUIDs=color-red%2Csize-m',
+                        url: 'https://example.com/products/complex-product/complex-sku?optionsUIDs=color-red%2csize-m',
                         availability: 'https://schema.org/InStock',
                         price: 52,
                         priceCurrency: 'USD',
