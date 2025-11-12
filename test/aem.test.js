@@ -66,8 +66,10 @@ describe('AdminAPI Optimized Tests', () => {
     test('should stop processing queues', async () => {
         await adminAPI.startProcessing();
         jest.runOnlyPendingTimers();
+
         const stopPromise = adminAPI.stopProcessing();
         jest.runOnlyPendingTimers();
+
         await stopPromise;
         expect(global.clearInterval).toHaveBeenCalled();
     });

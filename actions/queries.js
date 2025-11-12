@@ -58,6 +58,42 @@ const ProductViewFragment = `fragment productViewFields on ProductView {
           type
           value
         }
+        ... on ProductViewOptionValueProduct {
+          product {
+            sku
+            name
+            inStock
+            images(roles: []) {
+              url
+              roles
+            }
+            attributes(roles: ["visible_in_pdp"]) {
+              name
+              label
+              value
+              roles
+            }
+            ... on SimpleProductView {
+              price {
+                roles
+                regular {
+                  amount {
+                    value
+                    currency
+                  }
+                }
+                final {
+                  amount {
+                    value
+                    currency
+                  }
+                }
+              }
+            }
+          }
+          quantity
+          isDefault
+        }
       }
     }
     priceRange {
@@ -144,6 +180,13 @@ const GetLastModifiedQuery = `query getLastModified($skus: [String]!) {
   }
 }`;
 
+const GetUrlKeyQuery = `query getUrlKey($skus: [String]!) {
+  products(skus: $skus) {
+    sku
+    urlKey
+  }
+}`;
+
 const GetAllSkusPaginatedQuery = `query getAllSkusPaginated($currentPage: Int!) {
 	productSearch(phrase: "", page_size: 500, current_page: $currentPage) {
 		items {
@@ -213,5 +256,6 @@ module.exports = {
     GetLastModifiedQuery,
     CategoriesQuery,
     ProductCountQuery,
-    ProductsQuery
+    ProductsQuery,
+    GetUrlKeyQuery
 };

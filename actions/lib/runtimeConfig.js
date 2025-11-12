@@ -1,6 +1,6 @@
 /* Centralized runtime config resolver for AppBuilder actions (CommonJS) */
-/* eslint-disable no-console */
 const { isValidUrl } = require('../utils');
+const { validateAemAdminToken, validateConfigTokenWithApi } = require('./tokenValidator');
 
 const DEFAULTS = {
     LOG_LEVEL: 'error',
@@ -19,8 +19,8 @@ const DEFAULTS = {
     CONTENT_URL: undefined,
     STORE_URL: undefined,
     PRODUCTS_TEMPLATE: undefined,
-
-    LOCALES: undefined
+    LOCALES: undefined,
+    SITE_TOKEN: undefined
 };
 
 /**
@@ -28,8 +28,14 @@ const DEFAULTS = {
  * Rules:
  *  - Require either explicit CONTENT_URL or both ORG & SITE (to derive URLs).
  *  - Admin token is not enforced here; enforce it in actions that need it.
+ * @param {Object} params - Configuration parameters
+ * @param {{validateToken: boolean}} options - Options for validation
+ * @param {boolean} options.validateToken - Whether to validate the admin token
+ * @param {boolean} options.validateTokenWithApi - Whether to validate token against AEM API (makes function async)
+ * @param {Object} options.logger - Logger instance for validation errors
+ * @returns {Object|Promise<Object>} Configuration object, or Promise if API validation is requested
  */
-function getRuntimeConfig(params = {}) {
+function getRuntimeConfig(params = {}, options = {}) {
     const env = process.env || {};
     const merged = sanitizeStrings({
         ...DEFAULTS,
@@ -48,6 +54,19 @@ function getRuntimeConfig(params = {}) {
     }
 
     const adminToken = merged.AEM_ADMIN_API_AUTH_TOKEN;
+    const siteToken = merged.SITE_TOKEN;
+
+
+    // Validate admin token if requested
+    if (options.validateToken) {
+        try {
+            validateAemAdminToken(adminToken, options.logger);
+        } catch (error) {
+            // Re-throw with additional context
+            error.message = `Runtime config validation failed: ${error.message}`;
+            throw error;
+        }
+    }
 
     // Expand CONTENT_URL / STORE_URL / PRODUCTS_TEMPLATE
     if (!merged.CONTENT_URL && ORG && SITE) {
@@ -81,6 +100,7 @@ function getRuntimeConfig(params = {}) {
         logLevel: merged.LOG_LEVEL,
         logIngestorEndpoint: merged.LOG_INGESTOR_ENDPOINT,
         adminAuthToken: adminToken,
+        siteToken: siteToken,
         contentUrl: merged.CONTENT_URL,
         storeUrl: merged.STORE_URL,
         productsTemplate: merged.PRODUCTS_TEMPLATE,
@@ -92,6 +112,20 @@ function getRuntimeConfig(params = {}) {
 
     // URL sanity checks
     validateUrls(cfg);
+
+    // API token validation if requested (makes function async)
+    if (options.validateTokenWithApi && options.logger) {
+        return (async () => {
+            try {
+                await validateConfigTokenWithApi(cfg, options.logger);
+                return cfg;
+            } catch (error) {
+                // Re-throw with additional context
+                error.message = `Runtime config API validation failed: ${error.message}`;
+                throw error;
+            }
+        })();
+    }
 
     return cfg;
 }

@@ -543,7 +543,8 @@ export class SetupWizard extends LitElement {
             productsTemplate: '',
             storeUrl: '',
             configName: 'config',
-            locales: null
+            locales: null,
+            siteToken: ''
         };
         this.previewData = null;
         this.healthChecks = [];
@@ -665,7 +666,8 @@ export class SetupWizard extends LitElement {
 
         this.loadingSites = true;
         try {
-            const sitesEndpoint = `https://admin.hlx.page/config/${this.org}/sites.json`;
+            const orgLower = this.org.toLowerCase();
+            const sitesEndpoint = `https://admin.hlx.page/config/${orgLower}/sites.json`;
             console.log(`Fetching sites from ${sitesEndpoint}`);
 
             const response = await fetch(sitesEndpoint, {
@@ -726,7 +728,8 @@ export class SetupWizard extends LitElement {
 
         this.loading = true;
         try {
-            const apiKeyEndpoint = `https://admin.hlx.page/config/${this.org}/sites/${this.site}/apiKeys.json`;
+            const orgLower = this.org.toLowerCase();
+            const apiKeyEndpoint = `https://admin.hlx.page/config/${orgLower}/sites/${this.site}/apiKeys.json`;
             const body = {
                 description: `Key used by PDP Prerender components [${this.org}/${this.site}]`,
                 roles: [
@@ -1105,7 +1108,8 @@ export class SetupWizard extends LitElement {
                     productsTemplate: this.advancedSettings.productsTemplate,
                     productPageUrlFormat: this.advancedSettings.productPageUrlFormat,
                     storeUrl: this.advancedSettings.storeUrl,
-                    locales: this.advancedSettings.locales
+                    locales: this.advancedSettings.locales,
+                    accessTokenId: this.generatedApiKey.id
                 })
             });
 
@@ -1197,31 +1201,6 @@ export class SetupWizard extends LitElement {
     async performHealthChecks() {
         this.loading = true;
         this.healthChecks = [];
-
-        // Health check for local files endpoint
-        try {
-            const filesUrl = `${window.location.origin}/api/files`;
-            const filesResponse = await fetch(filesUrl, {
-                headers: {
-                    'x-aio-auth': this.aioAuth,
-                    'x-aio-namespace': this.aioNamespace
-                }
-            });
-
-            // We expect a 2xx status code for success
-            this.healthChecks.push({
-                name: 'Files Endpoint',
-                status: filesResponse.status >= 200 && filesResponse.status < 300,
-                message: filesResponse.status >= 200 && filesResponse.status < 300 ? 'Files endpoint accessible' : 'Files endpoint not accessible'
-            });
-        } catch (error) {
-            this.healthChecks.push({
-                name: 'Files Endpoint',
-                status: false,
-                message: 'Failed to check files endpoint'
-            });
-        }
-
         // Health check for rules endpoint
         try {
             const rulesUrl = `${window.location.origin}/api/rules`;
@@ -1262,6 +1241,7 @@ export class SetupWizard extends LitElement {
                 id: `${this.org}/${this.site}`,
                 org: this.org,
                 site: this.site,
+                ...(this.advancedSettings.siteToken && {siteToken: this.advancedSettings.siteToken}),
                 appbuilderProjectJSON: {
                     project: {
                         name: this.aioConfigFile?.name?.replace('.json', '') || 'aem-commerce-prerender',
@@ -1332,6 +1312,7 @@ export class SetupWizard extends LitElement {
         }
     }
 
+    // Step 1: Org and site configuration, and Helix Token 
     renderStep1AccessToken() {
         return html`<div class="step-content">
             <h3>Step 1: Get Access Token</h3>
@@ -1433,6 +1414,7 @@ export class SetupWizard extends LitElement {
         </div>`;
     }
 
+    // Step 2: Appbuilder workspace configuration/upload
     renderStep2Token() {
         return html`<div class="step-content">
             <h3>Step 2: AIO Configuration</h3>
@@ -1495,6 +1477,7 @@ export class SetupWizard extends LitElement {
         </div>`;
     }
 
+    // Step 3: Site COnfiguration 
     renderStep3AdvancedSettings() {
         return html`
             <div class="step-content">
@@ -1571,6 +1554,13 @@ export class SetupWizard extends LitElement {
                                     .value=${this.advancedSettings.storeUrl}
                                     @input=${e => this.handleAdvancedSettingInput('storeUrl', e.target.value)}
                                 ></sp-textfield>
+
+                                <sp-field-label for="store-url" required>Site Token (Optional)</sp-field-label>
+                                <sp-textfield
+                                    id="site-token"
+                                    .value=${this.advancedSettings.siteToken}
+                                    @input=${e => this.handleAdvancedSettingInput('siteToken', e.target.value)}
+                                ></sp-textfield>
                             </div>
                         </sp-accordion-item>
                     </sp-accordion>
@@ -1578,6 +1568,7 @@ export class SetupWizard extends LitElement {
             </div>`;
     }
 
+    // Step 4: Preview and apply configuration
     renderStep4Review() {
         return html`
             <div class="step-content">

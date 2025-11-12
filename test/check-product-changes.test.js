@@ -14,7 +14,7 @@ const assert = require('node:assert/strict');
 const { loadState, saveState, getFileLocation, poll } = require('../actions/check-product-changes/poller');
 const Files = require('./__mocks__/files');
 const { AdminAPI } = require('../actions/lib/aem');
-const { requestSaaS, requestSpreadsheet, isValidUrl } = require('../actions/utils');
+const { requestSaaS, isValidUrl, requestPublishedProductsIndex } = require('../actions/utils');
 const { MockState } = require('./__mocks__/state');
 
 const EXAMPLE_STATE = 'sku1,1,\nsku2,2,\nsku3,3,';
@@ -45,7 +45,7 @@ const mockLogger = {
 
 jest.mock('../actions/utils', () => ({
   requestSaaS: jest.fn(),
-  requestSpreadsheet: jest.fn(),
+  requestPublishedProductsIndex: jest.fn(),
   isValidUrl: jest.fn(() => true),
   getProductUrl: jest.fn(({ urlKey }) => `/p/${urlKey}`),
   getDefaultStoreURL: jest.fn(() => 'https://content.com'),
@@ -122,7 +122,7 @@ describe('Poller', () => {
     productsTemplate: 'https://store.com/products/default',
     productPageUrlFormat: 'products/{urlKey}/{sku}',
     configName: 'configName',
-    adminAuthToken: 'token',
+    adminAuthToken: 'valid-token-123456789',
     pathFormat: '/products/{urlKey}/{sku}',
   };
 
@@ -460,6 +460,7 @@ describe('Poller', () => {
     });
   });
 
+  // Test: Poller › Product unpublishing › should unpublish products that are not in the catalog
   describe('Product unpublishing', () => {
     it.each([
         [[{ sku: 'sku-456', path: '/p/url-sku-456' }, { sku: 'sku-failed', path: '/p/url-sku-failed' }], 1, 1],
@@ -496,7 +497,7 @@ describe('Poller', () => {
       });
 
       // Mock spreadsheet response for products to be removed
-      requestSpreadsheet.mockImplementation(() => {
+      requestPublishedProductsIndex.mockImplementation(() => {
         return Promise.resolve({
           data: spreadsheetResponse,
         });
@@ -561,7 +562,7 @@ describe('Poller', () => {
       });
 
       // Mock spreadsheet response for products to be removed
-      requestSpreadsheet.mockImplementation(() => {
+      requestPublishedProductsIndex.mockImplementation(() => {
         return Promise.resolve({
           data: [
             { sku: 'sku-123', path: '/p/url-sku-123' },

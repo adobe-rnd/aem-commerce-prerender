@@ -330,7 +330,7 @@ const RULES_MAP = {
           return RequestHelper.errorResponse('accessToken, org, and site are required');
         }
 
-        const apiKeyEndpoint = `https://admin.hlx.page/config/${org}/profiles/${site}/apiKeys.json`;
+        const apiKeyEndpoint = `https://admin.hlx.page/config/${org}/sites/${site}/apiKeys.json`;
         const body = {
           description: `Key used by PDP Prerender components [${org}/${site}]`,
           roles: [
@@ -404,6 +404,7 @@ const RULES_MAP = {
                     id: parsedData.id,
                     org: parsedData.org,
                     site: parsedData.site,
+                    siteToken: parsedData.siteToken,
                     namespace: parsedData.appbuilderProjectJSON?.project?.workspace?.details?.runtime?.namespaces?.[0]?.name
                 }
             });
@@ -459,7 +460,7 @@ const RULES_MAP = {
       }
 
       const reqBody = await request.json();
-      const { productPageUrlFormat, contentUrl, productsTemplate, storeUrl } = reqBody;
+      const { productPageUrlFormat, contentUrl, productsTemplate, storeUrl, accessTokenId } = reqBody;
       let { locales } = reqBody;
 
       if (locales?.trim() === '') locales = null;
@@ -494,6 +495,17 @@ const RULES_MAP = {
         content: {
           ...currentSiteConfig.content,
           overlay: { url: overlayBaseURL, type: 'markup', suffix: '.html' }
+        },
+        access: {
+          ...(currentSiteConfig.access || {}),
+          admin: {
+            ...(currentSiteConfig.access?.admin || {}),
+            apiKeyId: Array.from(
+              new Set([...(currentSiteConfig.access?.admin?.apiKeyId || []), accessTokenId])
+            ),
+            requireAuth: currentSiteConfig.access?.admin?.requireAuth ?? 'auto',
+            role: { ...(currentSiteConfig.access?.admin?.role || {}) }
+          }
         }
       };
 
@@ -661,10 +673,11 @@ const RULES_MAP = {
         envObject['STORE_URL'] = appConfigParams.storeUrl;
         envObject['PRODUCTS_TEMPLATE'] = appConfigParams.productsTemplate;
         envObject['LOCALES'] = appConfigParams.locales;
+        envObject['SITE_TOKEN'] = appConfigParams.siteToken;
         
         const newEnvContent = dotenvStringify(envObject);
         fs.writeFileSync(envPath, newEnvContent);
-        console.log('Successfully updated .env file with AEM_ADMIN_API_AUTH_TOKEN.');
+        console.log('Successfully updated .env file with provided parameters.');
 
       } catch (error) {
         console.error('Failed to write configuration files:', error);

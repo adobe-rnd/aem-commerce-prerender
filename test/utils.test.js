@@ -129,7 +129,7 @@ describe('request', () => {
   const server = useMockServer();
 
   test('getConfig (legacy)', async () => {
-    server.use(http.get('https://content.com/configs.json', async () => {
+    server.use(http.get('https://content.com/config.json', async () => {
       return HttpResponse.json({ data: [{ key: 'testKey', value: 'testValue' }] });
     }));
 
@@ -139,11 +139,11 @@ describe('request', () => {
   });
 
   test('getConfig (legacy) with subpath', async () => {
-    server.use(http.get('https://content.com/en/configs.json', async () => {
+    server.use(http.get('https://content.com/en/config.json', async () => {
       return HttpResponse.json({ data: [{ key: 'testKey', value: 'testValue' }] });
     }));
 
-    const context = { configName: 'en/configs', contentUrl: 'https://content.com', logger: { debug: jest.fn() } };
+    const context = { configName: 'en/config', contentUrl: 'https://content.com', logger: { debug: jest.fn() } };
     const config = await getConfig(context);
     expect(config).toEqual({ testKey: 'testValue', __hasLegacyFormat: true });
   });

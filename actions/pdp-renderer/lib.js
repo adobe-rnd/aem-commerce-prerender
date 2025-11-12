@@ -73,7 +73,16 @@ async function prepareBaseTemplate(url, blocks, context) {
     url = url.replace(/\s+/g, '').replace(/\/$/, '').replace('{locale}', context.locale);
   }
 
-  const baseTemplateHtml = await fetch(`${url}.plain.html`).then(resp => resp.text());
+  const { siteToken } = context;
+
+  let options = undefined;
+
+  // Site Validation: needs to be a non empty string
+  if (typeof siteToken === 'string' && siteToken.trim()) {
+   options = {headers:{'authorization': `token ${siteToken}`}}
+  }
+
+  const baseTemplateHtml = await fetch(`${url}.plain.html`, {...options}).then(resp => resp.text());
 
   const $ = cheerio.load(`<main>${baseTemplateHtml}</main>`);
 

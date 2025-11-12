@@ -108,6 +108,7 @@ describe('lib', () => {
             jest.clearAllMocks();
         });
 
+        // test 1: should replace {locale} token when locale is provided and not default
         test('should replace {locale} token when locale is provided and not default', async () => {
             global.fetch.mockResolvedValueOnce({
                 text: () => Promise.resolve(mockTemplateHtml)
@@ -119,9 +120,10 @@ describe('lib', () => {
 
             await prepareBaseTemplate(url, blocks, context);
 
-            expect(global.fetch).toHaveBeenCalledWith('https://content.com/en/products/default.plain.html');
+            expect(global.fetch).toHaveBeenCalledWith('https://content.com/en/products/default.plain.html', {});
         });
 
+        // test 2: should replace {locale} token with complex locale codes
         test('should replace {locale} token with complex locale codes', async () => {
             global.fetch.mockResolvedValueOnce({
                 text: () => Promise.resolve(mockTemplateHtml)
@@ -133,7 +135,7 @@ describe('lib', () => {
 
             await prepareBaseTemplate(url, blocks, context);
 
-            expect(global.fetch).toHaveBeenCalledWith('https://content.com/en/uk/products/default.plain.html');
+            expect(global.fetch).toHaveBeenCalledWith('https://content.com/en/uk/products/default.plain.html', {});
         });
 
         test('should handle URL with multiple {locale} tokens (only replaces first occurrence)', async () => {
@@ -148,7 +150,7 @@ describe('lib', () => {
             await prepareBaseTemplate(url, blocks, context);
 
             // Current implementation only replaces the first {locale} occurrence
-            expect(global.fetch).toHaveBeenCalledWith('https://content.com/fr/category/{locale}/products/default.plain.html');
+            expect(global.fetch).toHaveBeenCalledWith('https://content.com/fr/category/{locale}/products/default.plain.html', {});
         });
 
         test('should trim whitespace and trailing slash before locale replacement', async () => {
@@ -162,7 +164,7 @@ describe('lib', () => {
 
             await prepareBaseTemplate(url, blocks, context);
 
-            expect(global.fetch).toHaveBeenCalledWith('https://content.com/de/products/default.plain.html');
+            expect(global.fetch).toHaveBeenCalledWith('https://content.com/de/products/default.plain.html', {});
         });
 
         test('should not replace {locale} token when locale is "default"', async () => {
@@ -176,7 +178,7 @@ describe('lib', () => {
 
             await prepareBaseTemplate(url, blocks, context);
 
-            expect(global.fetch).toHaveBeenCalledWith('https://content.com/{locale}/products/default.plain.html');
+            expect(global.fetch).toHaveBeenCalledWith('https://content.com/{locale}/products/default.plain.html', {});
         });
 
         test('should not replace {locale} token when locale is not provided', async () => {
@@ -190,7 +192,7 @@ describe('lib', () => {
 
             await prepareBaseTemplate(url, blocks, context);
 
-            expect(global.fetch).toHaveBeenCalledWith('https://content.com/{locale}/products/default.plain.html');
+            expect(global.fetch).toHaveBeenCalledWith('https://content.com/{locale}/products/default.plain.html', {});
         });
 
         test('should not replace {locale} token when locale is null', async () => {
@@ -204,7 +206,7 @@ describe('lib', () => {
 
             await prepareBaseTemplate(url, blocks, context);
 
-            expect(global.fetch).toHaveBeenCalledWith('https://content.com/{locale}/products/default.plain.html');
+            expect(global.fetch).toHaveBeenCalledWith('https://content.com/{locale}/products/default.plain.html', {});
         });
 
         test('should not replace {locale} token when locale is undefined', async () => {
@@ -218,7 +220,7 @@ describe('lib', () => {
 
             await prepareBaseTemplate(url, blocks, context);
 
-            expect(global.fetch).toHaveBeenCalledWith('https://content.com/{locale}/products/default.plain.html');
+            expect(global.fetch).toHaveBeenCalledWith('https://content.com/{locale}/products/default.plain.html', {});
         });
 
         test('should replace blocks with handlebars partials after locale replacement', async () => {
@@ -232,7 +234,7 @@ describe('lib', () => {
 
             const result = await prepareBaseTemplate(url, blocks, context);
 
-            expect(global.fetch).toHaveBeenCalledWith('https://content.com/es/products/default.plain.html');
+            expect(global.fetch).toHaveBeenCalledWith('https://content.com/es/products/default.plain.html', {});
             expect(result).toContain('{{> hero }}');
             expect(result).toContain('{{> product-recommendations }}');
         });
@@ -248,7 +250,7 @@ describe('lib', () => {
 
             await prepareBaseTemplate(url, blocks, context);
 
-            expect(global.fetch).toHaveBeenCalledWith('https://content.com/products/default.plain.html');
+            expect(global.fetch).toHaveBeenCalledWith('https://content.com/products/default.plain.html', {});
         });
 
         test('should handle empty blocks array', async () => {
@@ -262,7 +264,7 @@ describe('lib', () => {
 
             const result = await prepareBaseTemplate(url, blocks, context);
 
-            expect(global.fetch).toHaveBeenCalledWith('https://content.com/it/products/default.plain.html');
+            expect(global.fetch).toHaveBeenCalledWith('https://content.com/it/products/default.plain.html', {});
             expect(result).toBe('<div class="hero">Hero content</div><div class="product-recommendations">Recommendations</div>\n');
         });
 
