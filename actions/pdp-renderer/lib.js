@@ -179,7 +179,9 @@ function getImageList(primary, images) {
 }
 
 function sanitize(html, mode = 'all') {
-  if (!html) return html;
+  if (!html || typeof html !== 'string') {
+    return html;
+  }
 
   const allowedInlineTags = [ 'a', 'br', 'code', 'del', 'em', 'img', 'strong', 'sub', 'sup', 'u' ];
   const allowedAllTags = [
