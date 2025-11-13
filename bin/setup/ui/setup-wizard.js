@@ -1165,7 +1165,6 @@ export class SetupWizard extends LitElement {
     async applyConfig() {
         this.loading = true;
         try {
-            console.log(this.accessToken);
             const response = await fetch(`/api/helix-config?org=${encodeURIComponent(this.org)}&site=${encodeURIComponent(this.site)}`, {
                 method: 'POST',
                 headers: {
