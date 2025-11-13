@@ -45,6 +45,10 @@ const fakeParams = {
 describe('pdp-renderer', () => {
   const server = useMockServer();
 
+  beforeEach(() => {
+    server.use(handlers.defaultProductTemplate);
+  });
+
   describe('basic functionality', () => {
     test('main should be defined', () => {
       expect(action.main).toBeInstanceOf(Function)
@@ -70,7 +74,6 @@ describe('pdp-renderer', () => {
 
   describe('product rendering', () => {
     test('render with product template', async () => {
-      server.use(handlers.defaultProductTemplate);
       server.use(handlers.defaultProduct());
 
       const response = await action.main({
@@ -98,6 +101,7 @@ describe('pdp-renderer', () => {
         CONTENT_URL: 'https://content.com',
         CONFIG_NAME: 'config',
         PRODUCT_PAGE_URL_FORMAT: '/products/{urlKey}/{sku}',
+        PRODUCTS_TEMPLATE: undefined,
         __ow_path: `/products/crown-summit-backpack/24-MB03`,
       });
 
@@ -133,6 +137,79 @@ describe('pdp-renderer', () => {
       expect($('.product-recommendations')).toHaveLength(1);
       expect($('body > main > div')).toHaveLength(2);
       expect(configRequestUrl).toBe('https://content.com/en/config.json');
+    });
+
+    test('sanitize and cleanup product data', async () => {
+      server.use(handlers.defaultProductWithBrokenMarkup());
+
+      const response = await action.main({
+        STORE_URL: 'https://store.com',
+        CONTENT_URL: 'https://content.com',
+        CONFIG_NAME: 'config',
+        PRODUCT_PAGE_URL_FORMAT: '/products/{urlKey}/{sku}',
+        __ow_path: `/products/crown-summit-backpack/25-MB03`,
+      });
+
+      expect(response.body).toBeDefined();
+      expect(typeof response.body).toBe('string');
+
+      expect(response.body).toEqual(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Crown Summit Backpack</title>
+
+  <meta name="description" content="The Crown Summit Backpack is equal"><meta name="keywords" content="backpack, hiking, camping"><meta name="image" content="http://www.aemshop.net/media/catalog/product/m/b/mb03-black-0.jpg"><meta name="id" content="7"><meta name="sku" content="25-MB03"><meta name="__typename" content="SimpleProductView"><meta property="og:type" content="og:product">
+
+  <script type="application/ld+json">{"@context":"http://schema.org","@type":"Product","sku":"25-MB03","name":"Crown Summit Backpack","gtin":"","description":"The Crown Summit Backpack is equal","@id":"https://store.com/products/crown-summit-backpack/25-MB03","offers":[{"@type":"Offer","sku":"25-MB03","url":"https://store.com/products/crown-summit-backpack/25-MB03","availability":"https://schema.org/InStock","price":38,"priceCurrency":"USD","itemCondition":"https://schema.org/NewCondition"}],"image":"http://www.aemshop.net/media/catalog/product/m/b/mb03-black-0.jpg"}</script>
+</head>
+
+<body>
+  <header></header>
+  <main>
+    <div>
+      <div class="product-details">
+        <div>
+          <div>
+            <h1>Crown Summit Backpack</h1>
+          </div>
+        </div>
+        <div>
+          <div><h2>Images</h2></div>
+          <div>
+            <ul>
+              <li><img src="http://www.aemshop.net/media/catalog/product/m/b/mb03-black-0.jpg"></li>
+              <li><img src="http://www.aemshop.net/media/catalog/product/m/b/mb03-black-0_alt1.jpg"></li>
+            </ul>
+          </div>
+        </div>
+        <div>
+          <div><h2>Description</h2></div>
+          <div><p>The Crown Summit Backpack is equally at home in a gym locker, study cube or a pup tent, so be sure yours is packed with books, a bag lunch, water bottles, yoga block, laptop, or whatever else you want in hand. Rugged enough for day hikes and camping trips, it has two large zippered compartments and padded, adjustable shoulder straps.</p>\r
+      <ul>\r
+      <li>Top handle.</li>\r
+      <li>Grommet holes.</li>\r
+      <li>Two-way zippers.</li>\r
+      <li>H 20" x W 14" x D 12".</li>\r
+      <li>Weight: 2 lbs, 8 oz. Volume: 29 L.</li>\r
+      <ul></p></div>
+        </div>
+        <div>
+          <div><h2>Price</h2></div>
+          <div>$38.00</div>
+        </div>
+      </div></div>
+    <div>
+      <div class="product-recommendations">
+        <div>
+          <div></div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <footer></footer>
+</body>
+</html>`)
     });
   })
 
