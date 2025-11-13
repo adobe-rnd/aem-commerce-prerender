@@ -733,9 +733,7 @@ export class SetupWizard extends LitElement {
             const body = {
                 description: `Key used by PDP Prerender components [${this.org}/${this.site}]`,
                 roles: [
-                    "preview",
-                    "publish",
-                    "config_admin"
+                    "publish"
                 ]
             };
 
@@ -1167,6 +1165,7 @@ export class SetupWizard extends LitElement {
     async applyConfig() {
         this.loading = true;
         try {
+            console.log(this.accessToken);
             const response = await fetch(`/api/helix-config?org=${encodeURIComponent(this.org)}&site=${encodeURIComponent(this.site)}`, {
                 method: 'POST',
                 headers: {
