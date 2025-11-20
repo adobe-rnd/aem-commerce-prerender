@@ -92,10 +92,15 @@ async function generateProductHtml(sku, urlKey, context) {
     Handlebars.registerPartial('content', `<div>${productDetailsHbs}</div>`);
   }
 
-  return pageTemplate({
+  const html = pageTemplate({
     ...templateProductData,
     ldJson,
   });
+
+  return {
+    html,
+    productData: baseProduct
+  };
 }
 
 module.exports = {

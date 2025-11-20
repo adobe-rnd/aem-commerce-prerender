@@ -11,7 +11,73 @@ const { TokenManager } = require('./token-manager');
 const { getRuntimeConfig } = require('../lib/runtimeConfig');
 const { generateProductHtml } = require('../pdp-renderer/render');
 const { AdminAPI } = require('../lib/aem');
-const { getProductUrl, PDP_FILE_EXT } = require('../utils');
+const { getProductUrl, PDP_FILE_EXT, FILE_PREFIX, STATE_FILE_EXT } = require('../utils');
+const crypto = require('crypto');
+
+/**
+ * Gets file location for state storage
+ */
+function getFileLocation(stateKey, extension) {
+  return `${FILE_PREFIX}/${stateKey}.${extension}`;
+}
+
+/**
+ * Loads SKU state (hash + timestamp) from filesLib
+ * @param {string} locale - The locale
+ * @param {Object} filesLib - Files library instance
+ * @returns {Promise<Object>} State object with skus
+ */
+async function loadSkuState(locale, filesLib, logger) {
+  const stateObj = { locale, skus: {} };
+  try {
+    const stateKey = locale || 'default';
+    const fileLocation = getFileLocation(stateKey, STATE_FILE_EXT);
+    const buffer = await filesLib.read(fileLocation);
+    const stateData = buffer?.toString();
+    if (stateData) {
+      const lines = stateData.split('\n');
+      stateObj.skus = lines.reduce((acc, line) => {
+        // Format: <sku>,<timestamp>,<hash>
+        const [sku, time, hash] = line.split(',');
+        if (sku && time) {
+          acc[sku] = { lastRenderedAt: new Date(parseInt(time)), hash: hash || null };
+        }
+        return acc;
+      }, {});
+      logger.debug(`Loaded state for ${Object.keys(stateObj.skus).length} SKUs (locale: ${locale || 'default'})`);
+    }
+  } catch (e) {
+    logger.debug(`No previous state found for locale ${locale || 'default'}`);
+  }
+  return stateObj;
+}
+
+/**
+ * Saves SKU state to filesLib
+ * @param {Object} state - State object with skus
+ * @param {Object} filesLib - Files library instance
+ */
+async function saveSkuState(state, filesLib, logger) {
+  const { locale, skus } = state;
+  const stateKey = locale || 'default';
+  const fileLocation = getFileLocation(stateKey, STATE_FILE_EXT);
+  const csvData = [
+    ...Object.entries(skus)
+      .filter(([, { lastRenderedAt }]) => Boolean(lastRenderedAt))
+      .map(([sku, { lastRenderedAt, hash }]) => {
+        return `${sku},${lastRenderedAt.getTime()},${hash || ''}`;
+      }),
+  ].join('\n');
+  await filesLib.write(fileLocation, csvData);
+  logger.debug(`Saved state for ${Object.keys(skus).length} SKUs (locale: ${locale || 'default'})`);
+}
+
+/**
+ * Checks if a product should be previewed & published
+ */
+function shouldPreviewAndPublish({ currentHash, newHash }) {
+  return newHash && currentHash !== newHash;
+}
 
 /**
  * Extracts unique SKUs from events
@@ -22,7 +88,7 @@ function extractUniqueSKUs(events) {
   const skus = new Set();
   
   for (const event of events) {
-    const sku = event.event?.data?.sku;
+    const sku = event.event?.data?.sku; 
     if (sku) {
       skus.add(sku);
     }
@@ -65,52 +131,80 @@ async function fetchEvents(eventsClient, journallingUrl, since) {
 }
 
 /**
- * Generate HTML for a single SKU
+ * Generate HTML for a single SKU and compute hash
  * @param {string} sku - Product SKU
  * @param {Object} context - Processing context
  * @param {Object} filesLib - Files library instance
- * @returns {Object} Processing result
+ * @param {string} currentHash - Current hash from state
+ * @returns {Object} Processing result with hash
  */
-async function generateSKUHtml(sku, context, filesLib) {
+async function generateSKUHtml(sku, context, filesLib, currentHash) {
   const { logger } = context;
   
   try {
     // Generate HTML using pdp-renderer
+    logger.debug(`Generating HTML for SKU ${sku}...`);
     const result = await generateProductHtml(sku, null, context);
     
     if (!result || !result.html) {
+      logger.error(`HTML generation failed for SKU ${sku}: no HTML returned`);
       return {
         success: false,
         sku: sku,
-        error: 'HTML generation failed'
+        error: 'HTML generation failed - no HTML returned'
       };
     }
     
     const { html, productData } = result;
     
-    // Generate path
+    logger.debug(`HTML generated successfully for SKU ${sku}, length: ${html.length} bytes`);
+    
+    // Generate path using productData
     const rawPath = getProductUrl(productData, context, false);
     const productPath = rawPath.toLowerCase();
     const htmlPath = `/public/pdps${productPath}.${PDP_FILE_EXT}`;
     
-    // Save HTML file
-    if (filesLib) {
+    // Compute hash of HTML
+    const newHash = crypto.createHash('sha256').update(html).digest('hex');
+    const changed = shouldPreviewAndPublish({ currentHash, newHash });
+    
+    logger.debug(`Hash computed for SKU ${sku}: ${newHash.substring(0, 8)}... (changed: ${changed})`);
+    
+    // Save HTML file only if changed (optional - may fail in local testing)
+    if (changed && filesLib) {
+      try {
       await filesLib.write(htmlPath, html);
+        logger.debug(`HTML saved successfully to ${htmlPath}`);
+      } catch (error) {
+        logger.warn(`Failed to save HTML to Files storage: ${error.message}`);
+        logger.debug(`This is expected when running locally. HTML will still be published to AEM.`);
+      }
+    } else if (!changed) {
+      logger.debug(`Skipping HTML save for SKU ${sku} - no changes detected`);
     }
     
     return {
       success: true,
       sku: sku,
       path: productPath,
-      htmlPath: htmlPath
+      htmlPath: htmlPath,
+      newHash: newHash,
+      currentHash: currentHash,
+      changed: changed,
+      renderedAt: new Date()
     };
     
   } catch (error) {
     logger.error(`Error generating HTML for SKU ${sku}: ${error.message}`);
+    
+    // Check if product was not found (404)
+    const isNotFound = error.statusCode === 404 || error.message.includes('Product not found');
+    
     return {
       success: false,
       sku: sku,
-      error: error.message
+      error: error.message,
+      notFound: isNotFound
     };
   }
 }
@@ -129,44 +223,164 @@ async function main(params) {
     // Initialize runtime config
     const cfg = getRuntimeConfig(params);
     
+    // Normalize locales: accept array or "en,fr" string; default to [null]
+    const rawLocales = params.locales;
+    const locales = Array.isArray(rawLocales)
+      ? rawLocales
+      : (typeof rawLocales === 'string' && rawLocales.trim()
+        ? rawLocales.split(',').map(s => s.trim()).filter(Boolean)
+        : [null]);
+    
+    logger.info(`Processing for locales: ${locales.join(', ') || 'default'}`);
+    
     // Initialize Adobe I/O SDK components
     const stateLib = await State.init(params.libInit || {});
     const filesLib = await Files.init(params.libInit || {});
     const stateManager = new StateManager(stateLib, { logger });
+      
     
-    // Initialize token manager for automatic token refresh
-    const tokenManager = new TokenManager(params, stateManager, logger);
     
-    // Get access token (will be automatically refreshed if expired)
-    const accessToken = await tokenManager.getAccessToken();
+    await stateManager.put('running', 'false');
     
-    logger.info('Access token obtained successfully');
     
-    // Initialize Events client
-    const eventsClient = await Events.init(
-      params.IMS_ORG_ID || params.ims_org_id,
-      params.CLIENT_ID || params.apiKey,
-      accessToken
-    );
-    
-    const journallingUrl = params.JOURNALLING_URL || params.journalling_url;
-    if (!journallingUrl) {
-      throw new Error('JOURNALLING_URL is required');
+    // Check if previous run is still running (prevent parallel executions)
+    const running = await stateManager.get('running');
+    if (running?.value === 'true' || running === 'true') {
+      logger.warn('Previous run is still marked as running. Skipping this execution.');
+      return {
+        status: 'skipped',
+        message: 'Previous run is still running'
+      };
     }
+    
+    try {
+      // Mark as running with TTL (1 hour) to avoid permanent lock on unexpected failures
+      await stateManager.put('running', 'true', { ttl: 3600 });
+      
+      // Initialize token manager for automatic token refresh
+      const tokenManager = new TokenManager(params, stateManager, logger);
+      
+      // Get access token (will be automatically refreshed if expired)
+      const accessToken = await tokenManager.getAccessToken();
+      
+      logger.info('Access token obtained successfully');
+      
+      // Initialize Events client
+      const eventsClient = await Events.init(
+        params.IMS_ORG_ID || params.ims_org_id,
+        params.CLIENT_ID || params.apiKey,
+        accessToken
+      );
+      
+      const journallingUrl = params.JOURNALLING_URL || params.journalling_url;
+      if (!journallingUrl) {
+        throw new Error('JOURNALLING_URL is required');
+      }
     
     // Get last position from state
     const dbEventKey = params.db_event_key || 'events_position';
-    const lastPosition = await stateManager.get(dbEventKey);
+    const storedPosition = await stateManager.get(dbEventKey);
+    
+    // Handle both string and object responses from State
+    let lastPosition = null;
+    if (storedPosition) {
+      if (typeof storedPosition === 'string') {
+        lastPosition = storedPosition;
+      } else if (typeof storedPosition === 'object' && storedPosition.value) {
+        lastPosition = storedPosition.value;
+      } else if (typeof storedPosition === 'object') {
+        // If it's an object without value property, try to stringify and use
+        lastPosition = null; // Will start from beginning
+      }
+    }
     
     logger.info(`Fetching events from position: ${lastPosition || 'start'}`);
     
     // Fetch events (up to 50)
-    const { events, lastPosition: newPosition } = await fetchEvents(
-      eventsClient,
-      journallingUrl,
-      lastPosition
-    );
+    // const { events, lastPosition: newPosition } = await fetchEvents(
+    //   eventsClient,
+    //   journallingUrl,
+    //   lastPosition
+    // );
     
+    let events = [
+        {
+            "position": "rabbit:4fa3a62b-dab4-4f40-9531-18bde21cacff.camel:33576bee-0f8b-4ca6-af7d-8e9ec00cffce.0044bbbd-8f4a-4c58-b1d6-dc64a46869e8.0.1763487532.172cm-iqvllu5ntio5mx",
+            "event": {
+                "specversion": "1.0",
+                "id": "3b2f9749-b4d6-437b-9073-c93872ec0080",
+                "source": "1f131648-b696-4bd1-af57-2021c7080b56",
+                "type": "com.adobe.commerce.storefront.events.price.update",
+                "datacontenttype": "application/json",
+                "time": "2025-11-18T17:38:49.273Z",
+                "eventid": "0044bbbd-8f4a-4c58-b1d6-dc64a46869e8",
+                "event_id": "0044bbbd-8f4a-4c58-b1d6-dc64a46869e8",
+                "recipient_client_id": "339224a1649b4533bdafcefc62e17b8c",
+                "recipientclientid": "339224a1649b4533bdafcefc62e17b8c",
+                "data": {
+                    "sku": "test-aio-11202023",
+                    "instanceId": "1f131648-b696-4bd1-af57-2021c7080b56",
+                    "scope": [
+                        {
+                            "websiteCode": "base",
+                            "customerGroupCode": "0"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "position": "rabbit:4fa3a62b-dab4-4f40-9531-18bde21cacff.camel:33576bee-0f8b-4ca6-af7d-8e9ec00cffce.0044bbbd-8f4a-4c58-b1d6-dc64a46869e9.0.1763487533.172cm-iqvllu5ntio5my",
+            "event": {
+                "specversion": "1.0",
+                "id": "4c3f9749-b4d6-437b-9073-c93872ec0081",
+                "source": "1f131648-b696-4bd1-af57-2021c7080b56",
+                "type": "com.adobe.commerce.storefront.events.product.update",
+                "datacontenttype": "application/json",
+                "time": "2025-11-18T17:39:15.500Z",
+                "eventid": "0044bbbd-8f4a-4c58-b1d6-dc64a46869e9",
+                "event_id": "0044bbbd-8f4a-4c58-b1d6-dc64a46869e9",
+                "recipient_client_id": "339224a1649b4533bdafcefc62e17b8c",
+                "recipientclientid": "339224a1649b4533bdafcefc62e17b8c",
+                "data": {
+                    "sku": "test-aio-1107",
+                    "instanceId": "1f131648-b696-4bd1-af57-2021c7080b56",
+                    "scope": [
+                        {
+                            "websiteCode": "base",
+                            "customerGroupCode": "0"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "position": "rabbit:4fa3a62b-dab4-4f40-9531-18bde21cacff.camel:33576bee-0f8b-4ca6-af7d-8e9ec00cffce.0044bbbd-8f4a-4c58-b1d6-dc64a46869ea.0.1763487534.172cm-iqvllu5ntio5mz",
+            "event": {
+                "specversion": "1.0",
+                "id": "5d4f9749-b4d6-437b-9073-c93872ec0082",
+                "source": "1f131648-b696-4bd1-af57-2021c7080b56",
+                "type": "com.adobe.commerce.storefront.events.inventory.update",
+                "datacontenttype": "application/json",
+                "time": "2025-11-18T17:39:42.820Z",
+                "eventid": "0044bbbd-8f4a-4c58-b1d6-dc64a46869ea",
+                "event_id": "0044bbbd-8f4a-4c58-b1d6-dc64a46869ea",
+                "recipient_client_id": "339224a1649b4533bdafcefc62e17b8c",
+                "recipientclientid": "339224a1649b4533bdafcefc62e17b8c",
+                "data": {
+                    "sku": "test-aio-1106",
+                    "instanceId": "1f131648-b696-4bd1-af57-2021c7080b56",
+                    "scope": [
+                        {
+                            "websiteCode": "base",
+                            "customerGroupCode": "0"
+                        }
+                    ]
+                }
+            }
+        }
+    ];
+    let newPosition = 'rabbit:4fa3a62b-dab4-4f40-9531-18bde21cacff.camel:33576bee-0f8b-4ca6-af7d-8e9ec00cffce.0044bbbd-8f4a-4c58-b1d6-dc64a46869e8.0.1763487532.172cm-iqvllu5ntio5mx';
     logger.info(`Fetched ${events.length} events`);
     
     if (events.length === 0) {
@@ -199,84 +413,237 @@ async function main(params) {
           published: 0
         }
       };
-    }
-    
-    // Create processing context
-    const processingContext = {
-      ...cfg,
-      logger,
-      aioLibs: { filesLib }
-    };
-    
-    // Generate HTML for all SKUs
-    logger.info('Generating HTML for SKUs...');
-    const htmlResults = [];
-    
-    for (const sku of skus) {
-      const htmlResult = await generateSKUHtml(sku, processingContext, filesLib);
-      htmlResults.push(htmlResult);
-    }
-    
-    // Filter successful results
-    const successfulResults = htmlResults.filter(r => r.success);
-    const failedResults = htmlResults.filter(r => !r.success);
-    
-    logger.info(`HTML generation: ${successfulResults.length} succeeded, ${failedResults.length} failed`);
-    
-    // Publish using AdminAPI
-    let publishedCount = 0;
-    
-    if (successfulResults.length > 0 && cfg.adminAuthToken) {
-      logger.info('Publishing to AEM...');
+      }
       
-      // Initialize AdminAPI
-      const adminApi = new AdminAPI(
+      // Initialize AdminAPI once for all locales
+      const adminApi = cfg.adminAuthToken ? new AdminAPI(
         { org: cfg.org, site: cfg.site },
-        processingContext,
+        { ...cfg, logger, aioLibs: { filesLib } },
         { authToken: cfg.adminAuthToken }
-      );
+      ) : null;
       
-      // Prepare records for publishing
-      const records = successfulResults.map(r => ({
-        sku: r.sku,
-        path: r.path
+      if (adminApi) {
+        await adminApi.startProcessing();
+        logger.debug('AdminAPI processing started');
+      }
+      
+      // Process each locale in parallel
+      const localeResults = await Promise.all(locales.map(async (locale) => {
+        logger.info(`Processing locale: ${locale || 'default'}`);
+        
+        // Load SKU state for this locale
+        const skuState = await loadSkuState(locale, filesLib, logger);
+        
+        // Create processing context with locale
+        const processingContext = {
+          ...cfg,
+          logger,
+          aioLibs: { filesLib }
+        };
+        
+        if (locale) {
+          processingContext.locale = locale;
+        }
+        
+        // Generate HTML for all SKUs with hash checking
+        logger.info(`[${locale || 'default'}] Generating HTML for ${skus.length} SKUs...`);
+        const htmlResults = [];
+        
+        for (const sku of skus) {
+          const currentHash = skuState.skus[sku]?.hash || null;
+          const htmlResult = await generateSKUHtml(sku, processingContext, filesLib, currentHash);
+          htmlResults.push(htmlResult);
+        }
+        
+        // Filter successful results
+        const successfulResults = htmlResults.filter(r => r.success);
+        const failedResults = htmlResults.filter(r => !r.success);
+        const notFoundResults = failedResults.filter(r => r.notFound);
+        
+        // Filter changed results (only publish if hash changed)
+        const changedResults = successfulResults.filter(r => r.changed);
+        const unchangedResults = successfulResults.filter(r => !r.changed);
+        
+        logger.info(`[${locale || 'default'}] HTML generation: ${successfulResults.length} succeeded (${changedResults.length} changed, ${unchangedResults.length} unchanged), ${failedResults.length} failed (${notFoundResults.length} not found)`);
+        
+        // Update state for unchanged products (keep them in state with updated timestamp)
+        for (const result of unchangedResults) {
+          skuState.skus[result.sku] = {
+            lastRenderedAt: result.renderedAt,
+            hash: result.newHash
+          };
+        }
+        
+        // Publish using AdminAPI (only changed products)
+        let previewedCount = 0;
+        let publishedCount = 0;
+        let failedCount = 0;
+        
+        if (changedResults.length > 0 && adminApi) {
+          logger.info(`[${locale || 'default'}] Publishing ${changedResults.length} changed products to AEM...`);
+          
+          // Prepare records for publishing
+          const records = changedResults.map(r => ({
+            sku: r.sku,
+            path: r.path,
+            renderedAt: r.renderedAt
+          }));
+          
+          logger.info(`[${locale || 'default'}] Prepared ${records.length} records for publishing`);
+          records.forEach(r => logger.debug(`  - SKU: ${r.sku}, path: ${r.path}`));
+          
+          // Add to preview and publish queue
+          logger.debug(`[${locale || 'default'}] Calling previewAndPublish...`);
+          await adminApi.previewAndPublish(records, locale, 1);
+          logger.debug(`[${locale || 'default'}] previewAndPublish completed`);
+          
+          // Count results and update state for published products
+          for (const record of records) {
+            if (record.previewedAt) previewedCount++;
+            if (record.publishedAt) publishedCount++;
+            if (record.failed) {
+              failedCount++;
+            } else if (record.previewedAt && record.publishedAt) {
+              // Update state only for successfully published products
+              const result = changedResults.find(r => r.sku === record.sku);
+              if (result) {
+                skuState.skus[record.sku] = {
+                  lastRenderedAt: record.renderedAt,
+                  hash: result.newHash
+                };
+              }
+            }
+          }
+          
+          logger.info(`[${locale || 'default'}] Results: previewed=${previewedCount}, published=${publishedCount}, failed=${failedCount}`);
+          
+          if (failedCount > 0) {
+            logger.warn(`[${locale || 'default'}] Failed records:`);
+            records.filter(r => r.failed).forEach(r => {
+              logger.warn(`  - SKU: ${r.sku}, path: ${r.path}, error: ${r.error || 'unknown'}`);
+            });
+          }
+        } else if (!adminApi) {
+          logger.warn(`[${locale || 'default'}] Skipping publish: no auth token`);
+        } else if (changedResults.length === 0) {
+          logger.info(`[${locale || 'default'}] No changed products to publish`);
+        }
+        
+        // Unpublish products that were not found (deleted from catalog)
+        let unpublishedCount = 0;
+        
+        if (notFoundResults.length > 0 && adminApi) {
+          logger.info(`[${locale || 'default'}] Unpublishing ${notFoundResults.length} not found products...`);
+          
+          // Prepare records for unpublishing - we need to generate paths for them
+          const unpublishRecords = notFoundResults.map(r => {
+            // Generate path from SKU since we don't have productData
+            const productPath = `/products/${r.sku.toLowerCase()}`;
+            return {
+              sku: r.sku,
+              path: productPath
+            };
+          });
+          
+          logger.info(`[${locale || 'default'}] Prepared ${unpublishRecords.length} records for unpublishing`);
+          unpublishRecords.forEach(r => logger.debug(`  - SKU: ${r.sku}, path: ${r.path}`));
+          
+          // Unpublish from live and preview
+          logger.debug(`[${locale || 'default'}] Calling unpublishAndDelete...`);
+          await adminApi.unpublishAndDelete(unpublishRecords, locale, 1);
+          logger.debug(`[${locale || 'default'}] unpublishAndDelete completed`);
+          
+          // Delete HTML files and remove from state for unpublished products
+          for (const record of unpublishRecords) {
+            if (record.liveUnpublishedAt && record.previewUnpublishedAt) {
+              try {
+                const htmlPath = `/public/pdps${record.path}.${PDP_FILE_EXT}`;
+                await filesLib.delete(htmlPath);
+                logger.debug(`[${locale || 'default'}] Deleted HTML file: ${htmlPath}`);
+                
+                // Remove from state
+                delete skuState.skus[record.sku];
+                
+                unpublishedCount++;
+              } catch (error) {
+                logger.warn(`[${locale || 'default'}] Failed to delete HTML file for ${record.sku}: ${error.message}`);
+              }
+            }
+          }
+          
+          logger.info(`[${locale || 'default'}] Unpublished and deleted ${unpublishedCount} products`);
+        } else if (notFoundResults.length > 0) {
+          logger.warn(`[${locale || 'default'}] Found ${notFoundResults.length} deleted products but no AdminAPI to unpublish them`);
+        }
+        
+        // Save updated state
+        try {
+          await saveSkuState(skuState, filesLib, logger);
+        } catch (error) {
+          logger.warn(`[${locale || 'default'}] Failed to save state: ${error.message}`);
+          logger.debug('This is expected when running locally. State will be saved in production.');
+        }
+        
+        return {
+          locale,
+          processed: successfulResults.length,
+          changed: changedResults.length,
+          unchanged: unchangedResults.length,
+          failed: failedResults.length,
+          previewed: previewedCount,
+          published: publishedCount,
+          unpublished: unpublishedCount
+        };
       }));
       
-      // Start processing queues
-      await adminApi.startProcessing();
+      // Stop AdminAPI processing
+      if (adminApi) {
+        logger.debug('Stopping AdminAPI processing...');
+        await adminApi.stopProcessing();
+        logger.debug('AdminAPI processing stopped');
+      }
       
-      // Add to preview and publish queue
-      await adminApi.previewAndPublish(records, null, 1);
+      // Aggregate results from all locales
+      const totalProcessed = localeResults.reduce((sum, r) => sum + r.processed, 0);
+      const totalChanged = localeResults.reduce((sum, r) => sum + (r.changed || 0), 0);
+      const totalUnchanged = localeResults.reduce((sum, r) => sum + (r.unchanged || 0), 0);
+      const totalFailed = localeResults.reduce((sum, r) => sum + r.failed, 0);
+      const publishedCount = localeResults.reduce((sum, r) => sum + r.published, 0);
+      const unpublishedCount = localeResults.reduce((sum, r) => sum + (r.unpublished || 0), 0);
       
-      // Stop and wait for completion
-      await adminApi.stopProcessing();
-      
-      // Count published records
-      publishedCount = records.filter(r => r.publishedAt).length;
-      
-      logger.info(`Published ${publishedCount} products`);
-    } else {
-      logger.warn('Skipping publish: no successful results or no auth token');
-    }
-    
-    // Save new position to state
-    await stateManager.put(dbEventKey, newPosition);
-    logger.info(`Saved new position: ${newPosition}`);
+      // Save new position to state
+      await stateManager.put(dbEventKey, newPosition);
+      logger.info(`Saved new position: ${newPosition}`);
     
     const result = {
       status: 'completed',
       statistics: {
-        events_fetched: events.length,
-        unique_skus: skus.length,
-        processed: successfulResults.length,
-        failed: failedResults.length,
-        published: publishedCount
+          events_fetched: events.length,
+          unique_skus: skus.length,
+          locales: locales.length,
+          processed: totalProcessed,
+          changed: totalChanged,
+          unchanged: totalUnchanged,
+          failed: totalFailed,
+          published: publishedCount,
+          unpublished: unpublishedCount,
+          by_locale: localeResults
+        }
+      };
+      
+      logger.info('Events processing completed', result.statistics);
+      
+      return result;
+      
+    } finally {
+      // Always reset running flag
+      try {
+        await stateManager.put('running', 'false');
+        logger.debug('Reset running flag');
+      } catch (stateErr) {
+        logger.error('Failed to reset running state:', stateErr);
       }
-    };
-    
-    logger.info('Events processing completed', result.statistics);
-    
-    return result;
+    }
     
   } catch (error) {
     logger.error('Events handler error:', error);
