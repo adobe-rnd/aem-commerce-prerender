@@ -24,13 +24,13 @@ function decodeJwtPayload(token) {
         if (parts.length !== 3) {
             return null;
         }
-        
+
         // Decode the payload (second part)
         const payload = parts[1];
         // Add padding if needed for base64 decoding
         const paddedPayload = payload + '='.repeat((4 - payload.length % 4) % 4);
         const decoded = Buffer.from(paddedPayload, 'base64url').toString('utf8');
-        
+
         return JSON.parse(decoded);
     } catch {
         return null;
@@ -45,20 +45,20 @@ function decodeJwtPayload(token) {
  */
 function isTokenExpired(token, logger) {
     const payload = decodeJwtPayload(token);
-    
+
     if (!payload) {
         logger?.warn('Unable to decode token payload for expiration check');
         return false; // If we can't decode, assume not expired to avoid false positives
     }
-    
+
     if (!payload.exp) {
         logger?.debug('Token does not contain expiration claim (exp)');
         return false; // No expiration claim means token doesn't expire
     }
-    
+
     const now = Math.floor(Date.now() / 1000); // Current time in seconds
     const expired = payload.exp < now;
-    
+
     if (expired) {
         const expiredDate = new Date(payload.exp * 1000).toISOString();
         logger?.warn(`Token expired at ${expiredDate}`);
@@ -66,7 +66,7 @@ function isTokenExpired(token, logger) {
         const expirationDate = new Date(payload.exp * 1000).toISOString();
         logger?.debug(`Token expires at ${expirationDate}`);
     }
-    
+
     return expired;
 }
 
@@ -79,7 +79,7 @@ function isTokenExpired(token, logger) {
  */
 function validateAemTokenStructure(token, logger) {
     const payload = decodeJwtPayload(token);
-    
+
     if (!payload) {
         const error = new Error('Invalid JWT token structure - cannot decode payload');
         error.statusCode = 400;
@@ -87,11 +87,11 @@ function validateAemTokenStructure(token, logger) {
         logger?.error('Token validation failed: Cannot decode JWT payload');
         throw error;
     }
-    
+
     // Check required AEM fields
     const requiredFields = ['iss', 'sub', 'aud', 'roles'];
     const missingFields = requiredFields.filter(field => !payload[field]);
-    
+
     if (missingFields.length > 0) {
         const error = new Error(`Invalid AEM token - missing required fields: ${missingFields.join(', ')}`);
         error.statusCode = 400;
@@ -99,7 +99,7 @@ function validateAemTokenStructure(token, logger) {
         logger?.error(`Token validation failed: Missing required fields: ${missingFields.join(', ')}`);
         throw error;
     }
-    
+
     // Validate issuer
     if (payload.iss !== 'https://admin.hlx.page/') {
         const error = new Error(`Invalid token issuer: expected 'https://admin.hlx.page/', got '${payload.iss}'`);
@@ -108,7 +108,7 @@ function validateAemTokenStructure(token, logger) {
         logger?.error(`Token validation failed: Invalid issuer ${payload.iss}`);
         throw error;
     }
-    
+
     // Validate roles array
     if (!Array.isArray(payload.roles)) {
         const error = new Error('Invalid token - roles must be an array');
@@ -117,11 +117,11 @@ function validateAemTokenStructure(token, logger) {
         logger?.error('Token validation failed: roles is not an array');
         throw error;
     }
-    
+
     // Check for required admin roles
     const requiredRoles = ['publish'];
     const hasRequiredRoles = requiredRoles.every(role => payload.roles.includes(role));
-    
+
     if (!hasRequiredRoles) {
         const missingRoles = requiredRoles.filter(role => !payload.roles.includes(role));
         const error = new Error(`Insufficient permissions - missing required roles: ${missingRoles.join(', ')}`);
@@ -130,13 +130,13 @@ function validateAemTokenStructure(token, logger) {
         logger?.error(`Token validation failed: Missing required roles: ${missingRoles.join(', ')}`);
         throw error;
     }
-    
+
     logger?.debug('AEM token structure validation passed', {
         subject: payload.sub,
         roles: payload.roles,
         issuer: payload.iss
     });
-    
+
     return payload;
 }
 
@@ -208,11 +208,11 @@ async function validateAemAdminTokenWithApi(token, org, site, logger) {
         };
 
         logger?.info(`Validating token against AEM API: ${adminUrl}`);
-        
+
         // Make a request to check if the token is valid
         // This endpoint should return 200 if token is valid, 401/403 if invalid
         await request('token-validation', adminUrl, req, 10000); // 10 second timeout
-        
+
         logger?.info('AEM_ADMIN_API_AUTH_TOKEN API validation passed');
         return true;
     } catch (error) {
@@ -225,13 +225,13 @@ async function validateAemAdminTokenWithApi(token, org, site, logger) {
             logger?.error('Token API validation failed: Invalid or expired token');
             throw authError;
         }
-        
+
         // For other errors (network, timeout, etc.), log but don't fail validation
         logger?.warn('Token API validation failed due to network error, falling back to basic validation:', {
             message: error.message,
             code: 'NETWORK_ERROR'
         });
-        
+
         // Return true since basic validation passed
         return true;
     }
@@ -285,9 +285,37 @@ async function validateConfigTokenWithApi(config, logger) {
     return validateAemAdminTokenWithApi(config.adminAuthToken, config.org, config.site, logger);
 }
 
+/**
+ * Checks token expiration and returns detailed expiration information
+ * @param {string} token - JWT token to check
+ * @returns {Object} Expiration information object
+ */
+function checkTokenExpiration(token) {
+    try {
+        const payload = decodeJwtPayload(token);
+        if (!payload || !payload.exp) {
+            return { isValid: false, error: 'Invalid token or no expiration claim' };
+        }
+
+        const expirationDate = new Date(payload.exp * 1000);
+        const now = new Date();
+        const daysUntilExpiration = Math.ceil((expirationDate - now) / (1000 * 60 * 60 * 24));
+
+        return {
+            isValid: true,
+            expirationDate,
+            daysUntilExpiration,
+            isExpired: daysUntilExpiration <= 0
+        };
+    } catch (error) {
+        return { isValid: false, error: error.message };
+    }
+}
+
 module.exports = {
     validateAemAdminToken,
     validateAemAdminTokenWithApi,
     validateConfigToken,
-    validateConfigTokenWithApi
+    validateConfigTokenWithApi,
+    checkTokenExpiration
 };
