@@ -251,11 +251,6 @@ async function main(params) {
     const filesLib = await Files.init(params.libInit || {});
     const stateManager = new StateManager(stateLib, { logger });
     
-    
-    
-    await stateManager.put('running', 'false');
-    
-    
     // Check if previous run is still running (prevent parallel executions)
     const running = await stateManager.get('running');
     if (running?.value === 'true' || running === 'true') {
@@ -316,86 +311,6 @@ async function main(params) {
       lastPosition,
       maxEventsInBatch
     );
-    
-    // let events = [
-    //     {
-    //         "position": "rabbit:4fa3a62b-dab4-4f40-9531-18bde21cacff.camel:33576bee-0f8b-4ca6-af7d-8e9ec00cffce.0044bbbd-8f4a-4c58-b1d6-dc64a46869e8.0.1763487532.172cm-iqvllu5ntio5mx",
-    //         "event": {
-    //             "specversion": "1.0",
-    //             "id": "3b2f9749-b4d6-437b-9073-c93872ec0080",
-    //             "source": "1f131648-b696-4bd1-af57-2021c7080b56",
-    //             "type": "com.adobe.commerce.storefront.events.price.update",
-    //             "datacontenttype": "application/json",
-    //             "time": "2025-11-18T17:38:49.273Z",
-    //             "eventid": "0044bbbd-8f4a-4c58-b1d6-dc64a46869e8",
-    //             "event_id": "0044bbbd-8f4a-4c58-b1d6-dc64a46869e8",
-    //             "recipient_client_id": "339224a1649b4533bdafcefc62e17b8c",
-    //             "recipientclientid": "339224a1649b4533bdafcefc62e17b8c",
-    //             "data": {
-    //                 "sku": "test-aio-1120202       3",
-    //                 "instanceId": "1f131648-b696-4bd1-af57-2021c7080b56",
-    //                 "scope": [
-    //                     {
-    //                         "websiteCode": "base",
-    //                         "customerGroupCode": "0"
-    //                     }
-    //                 ]
-    //             }
-    //         }
-    //     },
-    //     {
-    //         "position": "rabbit:4fa3a62b-dab4-4f40-9531-18bde21cacff.camel:33576bee-0f8b-4ca6-af7d-8e9ec00cffce.0044bbbd-8f4a-4c58-b1d6-dc64a46869e9.0.1763487533.172cm-iqvllu5ntio5my",
-    //         "event": {
-    //             "specversion": "1.0",
-    //             "id": "4c3f9749-b4d6-437b-9073-c93872ec0081",
-    //             "source": "1f131648-b696-4bd1-af57-2021c7080b56",
-    //             "type": "com.adobe.commerce.storefront.events.product.update",
-    //             "datacontenttype": "application/json",
-    //             "time": "2025-11-18T17:39:15.500Z",
-    //             "eventid": "0044bbbd-8f4a-4c58-b1d6-dc64a46869e9",
-    //             "event_id": "0044bbbd-8f4a-4c58-b1d6-dc64a46869e9",
-    //             "recipient_client_id": "339224a1649b4533bdafcefc62e17b8c",
-    //             "recipientclientid": "339224a1649b4533bdafcefc62e17b8c",
-    //             "data": {
-    //                 "sku": "test-aio-1107",
-    //                 "instanceId": "1f131648-b696-4bd1-af57-2021c7080b56",
-    //                 "scope": [
-    //                     {
-    //                         "websiteCode": "base",
-    //                         "customerGroupCode": "0"
-    //                     }
-    //                 ]
-    //             }
-    //         }
-    //     },
-    //     {
-    //         "position": "rabbit:4fa3a62b-dab4-4f40-9531-18bde21cacff.camel:33576bee-0f8b-4ca6-af7d-8e9ec00cffce.0044bbbd-8f4a-4c58-b1d6-dc64a46869ea.0.1763487534.172cm-iqvllu5ntio5mz",
-    //         "event": {
-    //             "specversion": "1.0",
-    //             "id": "5d4f9749-b4d6-437b-9073-c93872ec0082",
-    //             "source": "1f131648-b696-4bd1-af57-2021c7080b56",
-    //             "type": "com.adobe.commerce.storefront.events.inventory.update",
-    //             "datacontenttype": "application/json",
-    //             "time": "2025-11-18T17:39:42.820Z",
-    //             "eventid": "0044bbbd-8f4a-4c58-b1d6-dc64a46869ea",
-    //             "event_id": "0044bbbd-8f4a-4c58-b1d6-dc64a46869ea",
-    //             "recipient_client_id": "339224a1649b4533bdafcefc62e17b8c",
-    //             "recipientclientid": "339224a1649b4533bdafcefc62e17b8c",
-    //             "data": {
-    //                 "sku": "test-aio-1106",
-    //                 "instanceId": "1f131648-b696-4bd1-af57-2021c7080b56",
-    //                 "scope": [
-    //                     {
-    //                         "websiteCode": "base",
-    //                         "customerGroupCode": "0"
-    //                     }
-    //                 ]
-    //             }
-    //         }
-    //     }
-    // ];
-    // let newPosition = 'rabbit:4fa3a62b-dab4-4f40-9531-18bde21cacff.camel:33576bee-0f8b-4ca6-af7d-8e9ec00cffce.0044bbbd-8f4a-4c58-b1d6-dc64a46869e8.0.1763487532.172cm-iqvllu5ntio5mx';
-    // logger.info(`Fetched ${events.length} events`);
     
     if (events.length === 0) {
       return {
