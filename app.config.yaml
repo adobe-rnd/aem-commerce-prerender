@@ -57,7 +57,31 @@ application:
               AEM_ADMIN_API_AUTH_TOKEN: "${AEM_ADMIN_API_AUTH_TOKEN}"
             annotations:
               final: true
-#        triggers:
+          events-handler:
+            function: "actions/events-handler/index.js"
+            web: "no"
+            runtime: "nodejs:22"
+            include:
+              - - "actions/pdp-renderer/templates/*.hbs"
+                - "templates/"
+            limits:
+              memorySize: 256
+              timeout: 600000
+            inputs:
+              CLIENT_ID: "${CLIENT_ID}"
+              CLIENT_SECRET: "${CLIENT_SECRET}"
+              IMS_ORG_ID: "${IMS_ORG_ID}"
+              journalling_url: "${JOURNALLING_URL}"
+              db_event_key: "commerce_events_position"
+              max_events_in_batch: 50
+              AEM_ADMIN_API_AUTH_TOKEN: "${AEM_ADMIN_API_AUTH_TOKEN}"
+            annotations:
+              final: true
+        triggers:
+          eventsHandlerTrigger:
+            feed: "/whisk.system/alarms/interval"
+            inputs:
+              minutes: 1
 #          productPollerTrigger:
 #            feed: "/whisk.system/alarms/interval"
 #            inputs:
@@ -70,7 +94,10 @@ application:
 #            feed: "/whisk.system/alarms/interval"
 #            inputs:
 #              minutes: 60
-#        rules:
+        rules:
+          eventsHandlerRule:
+            trigger: "eventsHandlerTrigger"
+            action: "events-handler"
 #          productPollerRule:
 #            trigger: "productPollerTrigger"
 #            action: "check-product-changes"

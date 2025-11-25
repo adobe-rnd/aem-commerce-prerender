@@ -63,12 +63,20 @@ async function loadState(locale, aioLibs) {
       const lines = stateData.split('\n');
       stateObj.skus = lines.reduce((acc, line) => {
         // the format of the state object is:
-        // <sku1>,<timestamp>,<hash>
-        // <sku2>,<timestamp>,<hash>
+        // <sku1>,<timestamp>,<hash>,<path>
+        // <sku2>,<timestamp>,<hash>,<path>
         // ...
-        // each row is a set of SKUs, last previewed timestamp and hash
-        const [sku, time, hash] = line.split(',');
-        acc[sku] = { lastRenderedAt: new Date(parseInt(time)), hash };
+        // each row is a set of SKUs, last previewed timestamp, hash and path
+        const [sku, time, hash, path] = line.split(',');
+        const timestamp = parseInt(time);
+        // Only load entries with valid SKU and timestamp > 0
+        if (sku && time && timestamp > 0) {
+          acc[sku] = { 
+            lastRenderedAt: new Date(timestamp), 
+            hash: hash || null,
+            path: path || null 
+          };
+        }
         return acc;
       }, {});
     } else {
@@ -99,9 +107,12 @@ async function saveState(state, aioLibs) {
     ...Object.entries(state.skus)
       // if lastRenderedAt is not set, skip the product
       // this can happen i.e. if the product is not found
-      .filter(([, { lastRenderedAt }]) => Boolean(lastRenderedAt))
-      .map(([sku, { lastRenderedAt, hash }]) => {
-        return `${sku},${lastRenderedAt.getTime()},${hash || ''}`;
+      .filter(([, { lastRenderedAt }]) => {
+        // Only save entries with valid timestamp (not null, undefined, or 0)
+        return lastRenderedAt && lastRenderedAt.getTime() > 0;
+      })
+      .map(([sku, { lastRenderedAt, hash, path }]) => {
+        return `${sku},${lastRenderedAt.getTime()},${hash || ''},${path || ''}`;
       }),
   ].join('\n');
   return await filesLib.write(fileLocation, csvData);
@@ -274,7 +285,8 @@ async function processPublishedBatch(publishedBatch, state, counts, products, ai
       const product = products.find(p => p.sku === record.sku);
       state.skus[record.sku] = {
         lastRenderedAt: record.renderedAt,
-        hash: product?.newHash
+        hash: product?.newHash,
+        path: record.path
       };
       counts.published++;
     } else {
@@ -450,7 +462,7 @@ async function poll(params, aioLibs, logger) {
         const productsFileName = getFileLocation(`${locale || 'default'}-products`, 'json');
         JSON.parse((await filesLib.read(productsFileName)).toString()).forEach(({ sku }) => {
           if (!state.skus[sku]) {
-            state.skus[sku] = { lastRenderedAt: new Date(0), hash: null };
+            state.skus[sku] = { lastRenderedAt: new Date(0), hash: null, path: null };
           }
         });
         timings.sample('get-discovered-products');

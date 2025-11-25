@@ -397,12 +397,23 @@ class AdminAPI {
             if (response?.job) {
                 logger.info(`Unpublished ${route} batch number ${batchNumber} for locale ${locale}`);
                 const successPaths = await this.checkJobStatus(response.job);
+                
+                // Mark records as unpublished:
+                // - If path was in successPaths (found and deleted)
+                // - OR if job completed but path wasn't found (already deleted or never existed)
+                // This handles the case where we try to unpublish content that doesn't exist
                 batch.records.forEach(record => {
-                    if (successPaths.includes(record.path)) {
+                    const pathFound = successPaths.includes(record.path);
+                    const pathNotFound = successPaths.length === 0 && paths.includes(record.path);
+                    
+                    if (pathFound || pathNotFound) {
                         if (route === 'live') {
                             record.liveUnpublishedAt = new Date();
                         } else {
                             record.previewUnpublishedAt = new Date();
+                        }
+                        if (pathNotFound) {
+                            logger.debug(`Path ${record.path} not found on ${route}, marking as unpublished anyway`);
                         }
                     }
                 });

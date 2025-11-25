@@ -22,7 +22,7 @@ function getFileLocation(stateKey, extension) {
 }
 
 /**
- * Loads SKU state (hash + timestamp) from filesLib
+ * Loads SKU state (hash + timestamp + path) from filesLib
  * @param {string} locale - The locale
  * @param {Object} filesLib - Files library instance
  * @returns {Promise<Object>} State object with skus
@@ -37,10 +37,16 @@ async function loadSkuState(locale, filesLib, logger) {
     if (stateData) {
       const lines = stateData.split('\n');
       stateObj.skus = lines.reduce((acc, line) => {
-        // Format: <sku>,<timestamp>,<hash>
-        const [sku, time, hash] = line.split(',');
-        if (sku && time) {
-          acc[sku] = { lastRenderedAt: new Date(parseInt(time)), hash: hash || null };
+        // Format: <sku>,<timestamp>,<hash>,<path>
+        const [sku, time, hash, path] = line.split(',');
+        const timestamp = parseInt(time);
+        // Only load entries with valid SKU and timestamp > 0
+        if (sku && time && timestamp > 0) {
+          acc[sku] = { 
+            lastRenderedAt: new Date(timestamp), 
+            hash: hash || null,
+            path: path || null
+          };
         }
         return acc;
       }, {});
@@ -63,9 +69,12 @@ async function saveSkuState(state, filesLib, logger) {
   const fileLocation = getFileLocation(stateKey, STATE_FILE_EXT);
   const csvData = [
     ...Object.entries(skus)
-      .filter(([, { lastRenderedAt }]) => Boolean(lastRenderedAt))
-      .map(([sku, { lastRenderedAt, hash }]) => {
-        return `${sku},${lastRenderedAt.getTime()},${hash || ''}`;
+      .filter(([, { lastRenderedAt }]) => {
+        // Only save entries with valid timestamp (not null, undefined, or 0)
+        return lastRenderedAt && lastRenderedAt.getTime() > 0;
+      })
+      .map(([sku, { lastRenderedAt, hash, path }]) => {
+        return `${sku},${lastRenderedAt.getTime()},${hash || ''},${path || ''}`;
       }),
   ].join('\n');
   await filesLib.write(fileLocation, csvData);
@@ -102,10 +111,11 @@ function extractUniqueSKUs(events) {
  * @param {Object} eventsClient - Events SDK client
  * @param {string} journallingUrl - Journalling URL
  * @param {string} since - Position to start from
+ * @param {number} limit - Maximum number of events to fetch (default: 50)
  * @returns {Promise<Object>} Object with events and last position
  */
-async function fetchEvents(eventsClient, journallingUrl, since) {
-  const options = { limit: 50 };
+async function fetchEvents(eventsClient, journallingUrl, since, limit = 50) {
+  const options = { limit };
   
   if (since && since !== 'END' && since !== 'BEGINNING') {
     options.since = since;
@@ -170,14 +180,13 @@ async function generateSKUHtml(sku, context, filesLib, currentHash) {
     
     logger.debug(`Hash computed for SKU ${sku}: ${newHash.substring(0, 8)}... (changed: ${changed})`);
     
-    // Save HTML file only if changed (optional - may fail in local testing)
+    // Save HTML file only if changed
     if (changed && filesLib) {
       try {
       await filesLib.write(htmlPath, html);
         logger.debug(`HTML saved successfully to ${htmlPath}`);
       } catch (error) {
         logger.warn(`Failed to save HTML to Files storage: ${error.message}`);
-        logger.debug(`This is expected when running locally. HTML will still be published to AEM.`);
       }
     } else if (!changed) {
       logger.debug(`Skipping HTML save for SKU ${sku} - no changes detected`);
@@ -231,13 +240,17 @@ async function main(params) {
         ? rawLocales.split(',').map(s => s.trim()).filter(Boolean)
         : [null]);
     
+    // Get max events limit from params (default: 50)
+    const maxEventsInBatch = parseInt(params.max_events_in_batch) || 50;
+    
     logger.info(`Processing for locales: ${locales.join(', ') || 'default'}`);
+    logger.info(`Max events per batch: ${maxEventsInBatch}`);
     
     // Initialize Adobe I/O SDK components
     const stateLib = await State.init(params.libInit || {});
     const filesLib = await Files.init(params.libInit || {});
     const stateManager = new StateManager(stateLib, { logger });
-      
+    
     
     
     await stateManager.put('running', 'false');
@@ -296,92 +309,93 @@ async function main(params) {
     
     logger.info(`Fetching events from position: ${lastPosition || 'start'}`);
     
-    // Fetch events (up to 50)
-    // const { events, lastPosition: newPosition } = await fetchEvents(
-    //   eventsClient,
-    //   journallingUrl,
-    //   lastPosition
-    // );
+    // Fetch events
+    const { events, lastPosition: newPosition } = await fetchEvents(
+      eventsClient,
+      journallingUrl,
+      lastPosition,
+      maxEventsInBatch
+    );
     
-    let events = [
-        {
-            "position": "rabbit:4fa3a62b-dab4-4f40-9531-18bde21cacff.camel:33576bee-0f8b-4ca6-af7d-8e9ec00cffce.0044bbbd-8f4a-4c58-b1d6-dc64a46869e8.0.1763487532.172cm-iqvllu5ntio5mx",
-            "event": {
-                "specversion": "1.0",
-                "id": "3b2f9749-b4d6-437b-9073-c93872ec0080",
-                "source": "1f131648-b696-4bd1-af57-2021c7080b56",
-                "type": "com.adobe.commerce.storefront.events.price.update",
-                "datacontenttype": "application/json",
-                "time": "2025-11-18T17:38:49.273Z",
-                "eventid": "0044bbbd-8f4a-4c58-b1d6-dc64a46869e8",
-                "event_id": "0044bbbd-8f4a-4c58-b1d6-dc64a46869e8",
-                "recipient_client_id": "339224a1649b4533bdafcefc62e17b8c",
-                "recipientclientid": "339224a1649b4533bdafcefc62e17b8c",
-                "data": {
-                    "sku": "test-aio-11202023",
-                    "instanceId": "1f131648-b696-4bd1-af57-2021c7080b56",
-                    "scope": [
-                        {
-                            "websiteCode": "base",
-                            "customerGroupCode": "0"
-                        }
-                    ]
-                }
-            }
-        },
-        {
-            "position": "rabbit:4fa3a62b-dab4-4f40-9531-18bde21cacff.camel:33576bee-0f8b-4ca6-af7d-8e9ec00cffce.0044bbbd-8f4a-4c58-b1d6-dc64a46869e9.0.1763487533.172cm-iqvllu5ntio5my",
-            "event": {
-                "specversion": "1.0",
-                "id": "4c3f9749-b4d6-437b-9073-c93872ec0081",
-                "source": "1f131648-b696-4bd1-af57-2021c7080b56",
-                "type": "com.adobe.commerce.storefront.events.product.update",
-                "datacontenttype": "application/json",
-                "time": "2025-11-18T17:39:15.500Z",
-                "eventid": "0044bbbd-8f4a-4c58-b1d6-dc64a46869e9",
-                "event_id": "0044bbbd-8f4a-4c58-b1d6-dc64a46869e9",
-                "recipient_client_id": "339224a1649b4533bdafcefc62e17b8c",
-                "recipientclientid": "339224a1649b4533bdafcefc62e17b8c",
-                "data": {
-                    "sku": "test-aio-1107",
-                    "instanceId": "1f131648-b696-4bd1-af57-2021c7080b56",
-                    "scope": [
-                        {
-                            "websiteCode": "base",
-                            "customerGroupCode": "0"
-                        }
-                    ]
-                }
-            }
-        },
-        {
-            "position": "rabbit:4fa3a62b-dab4-4f40-9531-18bde21cacff.camel:33576bee-0f8b-4ca6-af7d-8e9ec00cffce.0044bbbd-8f4a-4c58-b1d6-dc64a46869ea.0.1763487534.172cm-iqvllu5ntio5mz",
-            "event": {
-                "specversion": "1.0",
-                "id": "5d4f9749-b4d6-437b-9073-c93872ec0082",
-                "source": "1f131648-b696-4bd1-af57-2021c7080b56",
-                "type": "com.adobe.commerce.storefront.events.inventory.update",
-                "datacontenttype": "application/json",
-                "time": "2025-11-18T17:39:42.820Z",
-                "eventid": "0044bbbd-8f4a-4c58-b1d6-dc64a46869ea",
-                "event_id": "0044bbbd-8f4a-4c58-b1d6-dc64a46869ea",
-                "recipient_client_id": "339224a1649b4533bdafcefc62e17b8c",
-                "recipientclientid": "339224a1649b4533bdafcefc62e17b8c",
-                "data": {
-                    "sku": "test-aio-1106",
-                    "instanceId": "1f131648-b696-4bd1-af57-2021c7080b56",
-                    "scope": [
-                        {
-                            "websiteCode": "base",
-                            "customerGroupCode": "0"
-                        }
-                    ]
-                }
-            }
-        }
-    ];
-    let newPosition = 'rabbit:4fa3a62b-dab4-4f40-9531-18bde21cacff.camel:33576bee-0f8b-4ca6-af7d-8e9ec00cffce.0044bbbd-8f4a-4c58-b1d6-dc64a46869e8.0.1763487532.172cm-iqvllu5ntio5mx';
-    logger.info(`Fetched ${events.length} events`);
+    // let events = [
+    //     {
+    //         "position": "rabbit:4fa3a62b-dab4-4f40-9531-18bde21cacff.camel:33576bee-0f8b-4ca6-af7d-8e9ec00cffce.0044bbbd-8f4a-4c58-b1d6-dc64a46869e8.0.1763487532.172cm-iqvllu5ntio5mx",
+    //         "event": {
+    //             "specversion": "1.0",
+    //             "id": "3b2f9749-b4d6-437b-9073-c93872ec0080",
+    //             "source": "1f131648-b696-4bd1-af57-2021c7080b56",
+    //             "type": "com.adobe.commerce.storefront.events.price.update",
+    //             "datacontenttype": "application/json",
+    //             "time": "2025-11-18T17:38:49.273Z",
+    //             "eventid": "0044bbbd-8f4a-4c58-b1d6-dc64a46869e8",
+    //             "event_id": "0044bbbd-8f4a-4c58-b1d6-dc64a46869e8",
+    //             "recipient_client_id": "339224a1649b4533bdafcefc62e17b8c",
+    //             "recipientclientid": "339224a1649b4533bdafcefc62e17b8c",
+    //             "data": {
+    //                 "sku": "test-aio-1120202       3",
+    //                 "instanceId": "1f131648-b696-4bd1-af57-2021c7080b56",
+    //                 "scope": [
+    //                     {
+    //                         "websiteCode": "base",
+    //                         "customerGroupCode": "0"
+    //                     }
+    //                 ]
+    //             }
+    //         }
+    //     },
+    //     {
+    //         "position": "rabbit:4fa3a62b-dab4-4f40-9531-18bde21cacff.camel:33576bee-0f8b-4ca6-af7d-8e9ec00cffce.0044bbbd-8f4a-4c58-b1d6-dc64a46869e9.0.1763487533.172cm-iqvllu5ntio5my",
+    //         "event": {
+    //             "specversion": "1.0",
+    //             "id": "4c3f9749-b4d6-437b-9073-c93872ec0081",
+    //             "source": "1f131648-b696-4bd1-af57-2021c7080b56",
+    //             "type": "com.adobe.commerce.storefront.events.product.update",
+    //             "datacontenttype": "application/json",
+    //             "time": "2025-11-18T17:39:15.500Z",
+    //             "eventid": "0044bbbd-8f4a-4c58-b1d6-dc64a46869e9",
+    //             "event_id": "0044bbbd-8f4a-4c58-b1d6-dc64a46869e9",
+    //             "recipient_client_id": "339224a1649b4533bdafcefc62e17b8c",
+    //             "recipientclientid": "339224a1649b4533bdafcefc62e17b8c",
+    //             "data": {
+    //                 "sku": "test-aio-1107",
+    //                 "instanceId": "1f131648-b696-4bd1-af57-2021c7080b56",
+    //                 "scope": [
+    //                     {
+    //                         "websiteCode": "base",
+    //                         "customerGroupCode": "0"
+    //                     }
+    //                 ]
+    //             }
+    //         }
+    //     },
+    //     {
+    //         "position": "rabbit:4fa3a62b-dab4-4f40-9531-18bde21cacff.camel:33576bee-0f8b-4ca6-af7d-8e9ec00cffce.0044bbbd-8f4a-4c58-b1d6-dc64a46869ea.0.1763487534.172cm-iqvllu5ntio5mz",
+    //         "event": {
+    //             "specversion": "1.0",
+    //             "id": "5d4f9749-b4d6-437b-9073-c93872ec0082",
+    //             "source": "1f131648-b696-4bd1-af57-2021c7080b56",
+    //             "type": "com.adobe.commerce.storefront.events.inventory.update",
+    //             "datacontenttype": "application/json",
+    //             "time": "2025-11-18T17:39:42.820Z",
+    //             "eventid": "0044bbbd-8f4a-4c58-b1d6-dc64a46869ea",
+    //             "event_id": "0044bbbd-8f4a-4c58-b1d6-dc64a46869ea",
+    //             "recipient_client_id": "339224a1649b4533bdafcefc62e17b8c",
+    //             "recipientclientid": "339224a1649b4533bdafcefc62e17b8c",
+    //             "data": {
+    //                 "sku": "test-aio-1106",
+    //                 "instanceId": "1f131648-b696-4bd1-af57-2021c7080b56",
+    //                 "scope": [
+    //                     {
+    //                         "websiteCode": "base",
+    //                         "customerGroupCode": "0"
+    //                     }
+    //                 ]
+    //             }
+    //         }
+    //     }
+    // ];
+    // let newPosition = 'rabbit:4fa3a62b-dab4-4f40-9531-18bde21cacff.camel:33576bee-0f8b-4ca6-af7d-8e9ec00cffce.0044bbbd-8f4a-4c58-b1d6-dc64a46869e8.0.1763487532.172cm-iqvllu5ntio5mx';
+    // logger.info(`Fetched ${events.length} events`);
     
     if (events.length === 0) {
       return {
@@ -470,7 +484,8 @@ async function main(params) {
         for (const result of unchangedResults) {
           skuState.skus[result.sku] = {
             lastRenderedAt: result.renderedAt,
-            hash: result.newHash
+            hash: result.newHash,
+            path: result.path
           };
         }
         
@@ -509,7 +524,8 @@ async function main(params) {
               if (result) {
                 skuState.skus[record.sku] = {
                   lastRenderedAt: record.renderedAt,
-                  hash: result.newHash
+                  hash: result.newHash,
+                  path: result.path
                 };
               }
             }
@@ -535,43 +551,58 @@ async function main(params) {
         if (notFoundResults.length > 0 && adminApi) {
           logger.info(`[${locale || 'default'}] Unpublishing ${notFoundResults.length} not found products...`);
           
-          // Prepare records for unpublishing - we need to generate paths for them
-          const unpublishRecords = notFoundResults.map(r => {
-            // Generate path from SKU since we don't have productData
-            const productPath = `/products/${r.sku.toLowerCase()}`;
-            return {
-              sku: r.sku,
-              path: productPath
-            };
-          });
+          // Prepare records for unpublishing - use path from state (only unpublish previously published products)
+          const unpublishRecords = notFoundResults
+            .filter(r => {
+              const hasPath = skuState.skus[r.sku]?.path;
+              if (!hasPath) {
+                logger.debug(`[${locale || 'default'}] Skipping unpublish for ${r.sku} - no path in state (was never published)`);
+              }
+              return hasPath;
+            })
+            .map(r => {
+              const productPath = skuState.skus[r.sku].path;
+              return {
+                sku: r.sku,
+                path: productPath
+              };
+            });
           
-          logger.info(`[${locale || 'default'}] Prepared ${unpublishRecords.length} records for unpublishing`);
-          unpublishRecords.forEach(r => logger.debug(`  - SKU: ${r.sku}, path: ${r.path}`));
-          
-          // Unpublish from live and preview
-          logger.debug(`[${locale || 'default'}] Calling unpublishAndDelete...`);
-          await adminApi.unpublishAndDelete(unpublishRecords, locale, 1);
-          logger.debug(`[${locale || 'default'}] unpublishAndDelete completed`);
-          
-          // Delete HTML files and remove from state for unpublished products
-          for (const record of unpublishRecords) {
-            if (record.liveUnpublishedAt && record.previewUnpublishedAt) {
-              try {
-                const htmlPath = `/public/pdps${record.path}.${PDP_FILE_EXT}`;
-                await filesLib.delete(htmlPath);
-                logger.debug(`[${locale || 'default'}] Deleted HTML file: ${htmlPath}`);
+          if (unpublishRecords.length === 0) {
+            logger.info(`[${locale || 'default'}] No products to unpublish (none were previously published)`);
+            } else {
+            logger.info(`[${locale || 'default'}] Prepared ${unpublishRecords.length} records for unpublishing`);
+            unpublishRecords.forEach(r => logger.debug(`  - SKU: ${r.sku}, path: ${r.path}`));
+            
+            // Unpublish from live and preview
+            logger.debug(`[${locale || 'default'}] Calling unpublishAndDelete...`);
+            await adminApi.unpublishAndDelete(unpublishRecords, locale, 1);
+            logger.debug(`[${locale || 'default'}] unpublishAndDelete completed`);
+            
+            // Delete HTML files and remove from state for unpublished products
+            // Check only liveUnpublishedAt since preview unpublish happens after and may not complete in time
+            for (const record of unpublishRecords) {
+              if (record.liveUnpublishedAt) {
+                try {
+                  const htmlPath = `/public/pdps${record.path}.${PDP_FILE_EXT}`;
+                  await filesLib.delete(htmlPath);
+                  logger.debug(`[${locale || 'default'}] Deleted HTML file: ${htmlPath}`);
+                } catch (error) {
+                  logger.warn(`[${locale || 'default'}] Failed to delete HTML file for ${record.sku}: ${error.message}`);
+                }
                 
-                // Remove from state
+                // Remove from state (whether file delete succeeded or not)
                 delete skuState.skus[record.sku];
-                
                 unpublishedCount++;
-              } catch (error) {
-                logger.warn(`[${locale || 'default'}] Failed to delete HTML file for ${record.sku}: ${error.message}`);
+                
+                logger.debug(`[${locale || 'default'}] Removed ${record.sku} from state (unpublished from live)`);
+              } else {
+                logger.warn(`[${locale || 'default'}] Product ${record.sku} was not unpublished from live, keeping in state`);
               }
             }
+            
+            logger.info(`[${locale || 'default'}] Unpublished and deleted ${unpublishedCount} products`);
           }
-          
-          logger.info(`[${locale || 'default'}] Unpublished and deleted ${unpublishedCount} products`);
         } else if (notFoundResults.length > 0) {
           logger.warn(`[${locale || 'default'}] Found ${notFoundResults.length} deleted products but no AdminAPI to unpublish them`);
         }
@@ -581,7 +612,6 @@ async function main(params) {
           await saveSkuState(skuState, filesLib, logger);
         } catch (error) {
           logger.warn(`[${locale || 'default'}] Failed to save state: ${error.message}`);
-          logger.debug('This is expected when running locally. State will be saved in production.');
         }
         
         return {
@@ -628,11 +658,11 @@ async function main(params) {
           published: publishedCount,
           unpublished: unpublishedCount,
           by_locale: localeResults
-        }
-      };
-      
-      logger.info('Events processing completed', result.statistics);
-      
+      }
+    };
+    
+    logger.info('Events processing completed', result.statistics);
+    
       return result;
       
     } finally {
