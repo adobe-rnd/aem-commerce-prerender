@@ -19,8 +19,8 @@ const DEFAULTS = {
     CONTENT_URL: undefined,
     STORE_URL: undefined,
     PRODUCTS_TEMPLATE: undefined,
-
-    LOCALES: undefined
+    LOCALES: undefined,
+    SITE_TOKEN: undefined
 };
 
 /**
@@ -54,6 +54,8 @@ function getRuntimeConfig(params = {}, options = {}) {
     }
 
     const adminToken = merged.AEM_ADMIN_API_AUTH_TOKEN;
+    const siteToken = merged.SITE_TOKEN;
+
 
     // Validate admin token if requested
     if (options.validateToken) {
@@ -98,6 +100,7 @@ function getRuntimeConfig(params = {}, options = {}) {
         logLevel: merged.LOG_LEVEL,
         logIngestorEndpoint: merged.LOG_INGESTOR_ENDPOINT,
         adminAuthToken: adminToken,
+        siteToken: siteToken,
         contentUrl: merged.CONTENT_URL,
         storeUrl: merged.STORE_URL,
         productsTemplate: merged.PRODUCTS_TEMPLATE,

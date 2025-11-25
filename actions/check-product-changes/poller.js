@@ -405,7 +405,7 @@ async function poll(params, aioLibs, logger) {
     const counts = { published: 0, unpublished: 0, ignored: 0, failed: 0 };
     const {
       org, site, pathFormat,
-      configName, configSheet,
+      siteToken, configName, configSheet,
       adminAuthToken,
       productsTemplate, storeUrl, contentUrl,
       logLevel, logIngestorEndpoint,
@@ -420,6 +420,7 @@ async function poll(params, aioLibs, logger) {
             : [null]);
 
     const sharedContext = {
+      siteToken,
       storeUrl,
       contentUrl,
       configName,
