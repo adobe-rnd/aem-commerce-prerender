@@ -20,7 +20,14 @@ const DEFAULTS = {
     STORE_URL: undefined,
     PRODUCTS_TEMPLATE: undefined,
     LOCALES: undefined,
-    SITE_TOKEN: undefined
+    SITE_TOKEN: undefined,
+    MAX_EVENTS_IN_BATCH: 50,
+    // Adobe I/O Events configuration
+    IMS_ORG_ID: undefined,
+    CLIENT_ID: undefined,
+    CLIENT_SECRET: undefined,
+    JOURNALLING_URL: undefined,
+    DB_EVENT_KEY: 'events_position'
 };
 
 /**
@@ -107,7 +114,14 @@ function getRuntimeConfig(params = {}, options = {}) {
         configName: merged.CONFIG_NAME,
         configSheet: merged.CONFIG_SHEET,
         pathFormat: merged.PRODUCT_PAGE_URL_FORMAT,
-        locales: localesArr
+        locales: localesArr,
+        maxEventsInBatch: parseInt(merged.MAX_EVENTS_IN_BATCH) || 200,
+        // Adobe I/O Events configuration
+        imsOrgId: merged.IMS_ORG_ID || merged.ims_org_id,
+        clientId: merged.CLIENT_ID || merged.apiKey,
+        clientSecret: merged.CLIENT_SECRET,
+        journallingUrl: merged.JOURNALLING_URL || merged.journalling_url,
+        dbEventKey: merged.DB_EVENT_KEY || 'events_position'
     };
 
     // URL sanity checks

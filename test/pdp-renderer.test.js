@@ -466,10 +466,10 @@ describe('generateProductHtml', () => {
         config: mockConfig.data.reduce((acc, { key, value }) => ({ ...acc, [key]: value }), {})
       };
 
-      const html = await generateProductHtml('24-MB03', null, contextWithConfig);
+      const result = await generateProductHtml('24-MB03', null, contextWithConfig);
 
-      expect(html).toContain('Crown Summit Backpack');
-      expect(html).toContain('product-recommendations');
+      expect(result.html).toContain('Crown Summit Backpack');
+      expect(result.html).toContain('product-recommendations');
     });
 
     test('generates HTML without product template', async () => {
@@ -481,10 +481,10 @@ describe('generateProductHtml', () => {
         config: mockConfig.data.reduce((acc, { key, value }) => ({ ...acc, [key]: value }), {})
       };
 
-      const html = await generateProductHtml('24-MB03', null, contextWithConfig);
+      const result = await generateProductHtml('24-MB03', null, contextWithConfig);
 
-      expect(html).toContain('Crown Summit Backpack');
-      expect(html).not.toContain('product-recommendations');
+      expect(result.html).toContain('Crown Summit Backpack');
+      expect(result.html).not.toContain('product-recommendations');
     });
 
     test('generates HTML using urlKey', async () => {
@@ -496,9 +496,9 @@ describe('generateProductHtml', () => {
         config: mockConfig.data.reduce((acc, { key, value }) => ({ ...acc, [key]: value }), {})
       };
 
-      const html = await generateProductHtml(null, 'crown-summit-backpack', contextWithConfig);
+      const result = await generateProductHtml(null, 'crown-summit-backpack', contextWithConfig);
 
-      expect(html).toContain('Crown Summit Backpack');
+      expect(result.html).toContain('Crown Summit Backpack');
     });
   });
 });

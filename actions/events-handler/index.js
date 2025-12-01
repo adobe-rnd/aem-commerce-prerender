@@ -11,6 +11,7 @@ const { TokenManager } = require('./token-manager');
 const { getRuntimeConfig } = require('../lib/runtimeConfig');
 const { generateProductHtml } = require('../pdp-renderer/render');
 const { AdminAPI } = require('../lib/aem');
+const { ObservabilityClient } = require('../lib/observability');
 const { getProductUrl, PDP_FILE_EXT, FILE_PREFIX, STATE_FILE_EXT } = require('../utils');
 const crypto = require('crypto');
 
@@ -97,9 +98,30 @@ function extractUniqueSKUs(events) {
   const skus = new Set();
   
   for (const event of events) {
-    const sku = event.event?.data?.sku; 
-    if (sku) {
-      skus.add(sku);
+    try {
+      // Try event.event.data.sku first (direct data)
+      let sku = event.event?.data?.sku;
+      
+      // If not found, try parsing event-data JSON string
+      if (!sku && event.event?.['event-data']) {
+        try {
+          const eventData = typeof event.event['event-data'] === 'string'
+            ? JSON.parse(event.event['event-data'])
+            : event.event['event-data'];
+          sku = eventData.sku;
+        } catch (parseError) {
+          // Invalid JSON in event-data, skip this event
+          console.error(`Invalid event data for event ${event.event?.['event-id']}: ${parseError.message}`);
+          continue;
+        }
+      }
+      
+      if (sku) {
+        skus.add(sku);
+      }
+    } catch (error) {
+      // Skip malformed events
+      console.error(`Error extracting SKU from event: ${error.message}`);
     }
   }
   
@@ -224,49 +246,63 @@ async function generateSKUHtml(sku, context, filesLib, currentHash) {
  * @returns {Object} Action result
  */
 async function main(params) {
-  const logger = Core.Logger('events-handler', { level: params.LOG_LEVEL || 'info' });
+  // Initialize runtime config and validate token
+  const cfg = getRuntimeConfig(params, { validateToken: true });
+  const logger = Core.Logger('events-handler', { level: cfg.logLevel });
   
   logger.info('Starting Adobe I/O Events Handler (Simplified)');
   
   try {
-    // Initialize runtime config
-    const cfg = getRuntimeConfig(params);
+  // Initialize observability (best-effort usage later)
+  const observabilityClient = new ObservabilityClient(logger, {
+      token: cfg.adminAuthToken,
+    endpoint: cfg.logIngestorEndpoint,
+      org: cfg.org,
+      site: cfg.site
+    });
     
-    // Normalize locales: accept array or "en,fr" string; default to [null]
-    const rawLocales = params.locales;
-    const locales = Array.isArray(rawLocales)
-      ? rawLocales
-      : (typeof rawLocales === 'string' && rawLocales.trim()
-        ? rawLocales.split(',').map(s => s.trim()).filter(Boolean)
-        : [null]);
-    
-    // Get max events limit from params (default: 50)
-    const maxEventsInBatch = parseInt(params.max_events_in_batch) || 50;
+    // Use locales from cfg (already normalized)
+    const locales = cfg.locales;
     
     logger.info(`Processing for locales: ${locales.join(', ') || 'default'}`);
-    logger.info(`Max events per batch: ${maxEventsInBatch}`);
+    logger.info(`Max events per batch: ${cfg.maxEventsInBatch}`);
     
     // Initialize Adobe I/O SDK components
     const stateLib = await State.init(params.libInit || {});
     const filesLib = await Files.init(params.libInit || {});
     const stateManager = new StateManager(stateLib, { logger });
     
+    let activationResult;
+    
     // Check if previous run is still running (prevent parallel executions)
     const running = await stateManager.get('running');
     if (running?.value === 'true' || running === 'true') {
       logger.warn('Previous run is still marked as running. Skipping this execution.');
-      return {
+      activationResult = { 
         status: 'skipped',
         message: 'Previous run is still running'
       };
+      
+      try {
+        await observabilityClient.sendActivationResult(activationResult);
+      } catch (obsErr) {
+        logger.warn('Failed to send activation result (skipped).', obsErr);
+      }
+      
+      return activationResult;
     }
     
     try {
       // Mark as running with TTL (1 hour) to avoid permanent lock on unexpected failures
-      await stateManager.put('running', 'true', { ttl: 3600 });
+      await stateManager.put('running', 'true', { ttl: 900 });
       
       // Initialize token manager for automatic token refresh
-      const tokenManager = new TokenManager(params, stateManager, logger);
+      const tokenManagerParams = {
+        CLIENT_ID: cfg.clientId,
+        CLIENT_SECRET: cfg.clientSecret,
+        IMS_ORG_ID: cfg.imsOrgId
+      };
+      const tokenManager = new TokenManager(tokenManagerParams, stateManager, logger);
       
       // Get access token (will be automatically refreshed if expired)
       const accessToken = await tokenManager.getAccessToken();
@@ -274,19 +310,24 @@ async function main(params) {
       logger.info('Access token obtained successfully');
       
       // Initialize Events client
-      const eventsClient = await Events.init(
-        params.IMS_ORG_ID || params.ims_org_id,
-        params.CLIENT_ID || params.apiKey,
-        accessToken
-      );
-      
-      const journallingUrl = params.JOURNALLING_URL || params.journalling_url;
-      if (!journallingUrl) {
+      if (!cfg.imsOrgId) {
+        throw new Error('IMS_ORG_ID is required');
+      }
+      if (!cfg.clientId) {
+        throw new Error('CLIENT_ID is required');
+      }
+      if (!cfg.journallingUrl) {
         throw new Error('JOURNALLING_URL is required');
       }
+      
+      const eventsClient = await Events.init(
+        cfg.imsOrgId,
+        cfg.clientId,
+        accessToken
+      );
     
     // Get last position from state
-    const dbEventKey = params.db_event_key || 'events_position';
+    const dbEventKey = cfg.dbEventKey;
     const storedPosition = await stateManager.get(dbEventKey);
     
     // Handle both string and object responses from State
@@ -307,9 +348,9 @@ async function main(params) {
     // Fetch events
     const { events, lastPosition: newPosition } = await fetchEvents(
       eventsClient,
-      journallingUrl,
+      cfg.journallingUrl,
       lastPosition,
-      maxEventsInBatch
+      cfg.maxEventsInBatch
     );
     
     if (events.length === 0) {
@@ -345,16 +386,14 @@ async function main(params) {
       }
       
       // Initialize AdminAPI once for all locales
-      const adminApi = cfg.adminAuthToken ? new AdminAPI(
+      const adminApi = new AdminAPI(
         { org: cfg.org, site: cfg.site },
         { ...cfg, logger, aioLibs: { filesLib } },
         { authToken: cfg.adminAuthToken }
-      ) : null;
+      );
       
-      if (adminApi) {
-        await adminApi.startProcessing();
-        logger.debug('AdminAPI processing started');
-      }
+      await adminApi.startProcessing();
+      logger.debug('AdminAPI processing started');
       
       // Process each locale in parallel
       const localeResults = await Promise.all(locales.map(async (locale) => {
@@ -409,7 +448,7 @@ async function main(params) {
         let publishedCount = 0;
         let failedCount = 0;
         
-        if (changedResults.length > 0 && adminApi) {
+        if (changedResults.length > 0) {
           logger.info(`[${locale || 'default'}] Publishing ${changedResults.length} changed products to AEM...`);
           
           // Prepare records for publishing
@@ -454,16 +493,14 @@ async function main(params) {
               logger.warn(`  - SKU: ${r.sku}, path: ${r.path}, error: ${r.error || 'unknown'}`);
             });
           }
-        } else if (!adminApi) {
-          logger.warn(`[${locale || 'default'}] Skipping publish: no auth token`);
-        } else if (changedResults.length === 0) {
+        } else {
           logger.info(`[${locale || 'default'}] No changed products to publish`);
         }
         
         // Unpublish products that were not found (deleted from catalog)
         let unpublishedCount = 0;
         
-        if (notFoundResults.length > 0 && adminApi) {
+        if (notFoundResults.length > 0) {
           logger.info(`[${locale || 'default'}] Unpublishing ${notFoundResults.length} not found products...`);
           
           // Prepare records for unpublishing - use path from state (only unpublish previously published products)
@@ -518,8 +555,6 @@ async function main(params) {
             
             logger.info(`[${locale || 'default'}] Unpublished and deleted ${unpublishedCount} products`);
           }
-        } else if (notFoundResults.length > 0) {
-          logger.warn(`[${locale || 'default'}] Found ${notFoundResults.length} deleted products but no AdminAPI to unpublish them`);
         }
         
         // Save updated state
@@ -542,11 +577,9 @@ async function main(params) {
       }));
       
       // Stop AdminAPI processing
-      if (adminApi) {
-        logger.debug('Stopping AdminAPI processing...');
-        await adminApi.stopProcessing();
-        logger.debug('AdminAPI processing stopped');
-      }
+      logger.debug('Stopping AdminAPI processing...');
+      await adminApi.stopProcessing();
+      logger.debug('AdminAPI processing stopped');
       
       // Aggregate results from all locales
       const totalProcessed = localeResults.reduce((sum, r) => sum + r.processed, 0);
@@ -560,7 +593,7 @@ async function main(params) {
       await stateManager.put(dbEventKey, newPosition);
       logger.info(`Saved new position: ${newPosition}`);
     
-    const result = {
+    activationResult = {
       status: 'completed',
       statistics: {
           events_fetched: events.length,
@@ -576,9 +609,7 @@ async function main(params) {
       }
     };
     
-    logger.info('Events processing completed', result.statistics);
-    
-      return result;
+    logger.info('Events processing completed', activationResult.statistics);
       
     } finally {
       // Always reset running flag
@@ -589,6 +620,14 @@ async function main(params) {
         logger.error('Failed to reset running state:', stateErr);
       }
     }
+    
+    try {
+      await observabilityClient.sendActivationResult(activationResult);
+    } catch (obsErr) {
+      logger.warn('Failed to send activation result.', obsErr);
+    }
+    
+    return activationResult;
     
   } catch (error) {
     logger.error('Events handler error:', error);

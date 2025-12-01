@@ -88,8 +88,8 @@ function validateAemTokenStructure(token, logger) {
         throw error;
     }
     
-    // Check required AEM fields
-    const requiredFields = ['iss', 'sub', 'aud', 'roles'];
+    // Check required AEM fields (roles is optional for some token types)
+    const requiredFields = ['iss', 'sub', 'aud'];
     const missingFields = requiredFields.filter(field => !payload[field]);
     
     if (missingFields.length > 0) {
@@ -98,6 +98,11 @@ function validateAemTokenStructure(token, logger) {
         error.code = 'INVALID_TOKEN_FORMAT';
         logger?.error(`Token validation failed: Missing required fields: ${missingFields.join(', ')}`);
         throw error;
+    }
+    
+    // Warn if roles field is missing but don't fail
+    if (!payload.roles) {
+        logger?.warn('Token does not contain "roles" field - this may limit functionality');
     }
     
     // Validate issuer
@@ -109,8 +114,8 @@ function validateAemTokenStructure(token, logger) {
         throw error;
     }
     
-    // Validate roles array
-    if (!Array.isArray(payload.roles)) {
+    // Validate roles array (only if roles field exists)
+    if (payload.roles && !Array.isArray(payload.roles)) {
         const error = new Error('Invalid token - roles must be an array');
         error.statusCode = 400;
         error.code = 'INVALID_TOKEN_FORMAT';
@@ -118,17 +123,21 @@ function validateAemTokenStructure(token, logger) {
         throw error;
     }
     
-    // Check for required admin roles
-    const requiredRoles = ['publish'];
-    const hasRequiredRoles = requiredRoles.every(role => payload.roles.includes(role));
-    
-    if (!hasRequiredRoles) {
-        const missingRoles = requiredRoles.filter(role => !payload.roles.includes(role));
-        const error = new Error(`Insufficient permissions - missing required roles: ${missingRoles.join(', ')}`);
-        error.statusCode = 403;
-        error.code = 'INSUFFICIENT_PERMISSIONS';
-        logger?.error(`Token validation failed: Missing required roles: ${missingRoles.join(', ')}`);
-        throw error;
+    // Check for required admin roles (only if roles exists)
+    if (payload.roles && Array.isArray(payload.roles)) {
+        const requiredRoles = ['publish'];
+        const hasRequiredRoles = requiredRoles.every(role => payload.roles.includes(role));
+        
+        if (!hasRequiredRoles) {
+            const missingRoles = requiredRoles.filter(role => !payload.roles.includes(role));
+            const error = new Error(`Insufficient permissions - missing required roles: ${missingRoles.join(', ')}`);
+            error.statusCode = 403;
+            error.code = 'INSUFFICIENT_PERMISSIONS';
+            logger?.error(`Token validation failed: Missing required roles: ${missingRoles.join(', ')}`);
+            throw error;
+        }
+    } else {
+        logger?.warn('Token does not have roles array - skipping role validation');
     }
     
     logger?.debug('AEM token structure validation passed', {

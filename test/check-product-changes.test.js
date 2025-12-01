@@ -17,22 +17,25 @@ const { AdminAPI } = require('../actions/lib/aem');
 const { requestSaaS, isValidUrl, requestPublishedProductsIndex } = require('../actions/utils');
 const { MockState } = require('./__mocks__/state');
 
-const EXAMPLE_STATE = 'sku1,1,\nsku2,2,\nsku3,3,';
+const EXAMPLE_STATE = 'sku1,1,,\nsku2,2,,\nsku3,3,,';
 
 const EXAMPLE_EXPECTED_STATE = {
   locale: 'uk',
   skus: {
     sku1: {
       lastRenderedAt: new Date(1),
-      hash: '',
+      hash: null,
+      path: null,
     },
     sku2: {
       lastRenderedAt: new Date(2),
-      hash: '',
+      hash: null,
+      path: null,
     },
     sku3: {
       lastRenderedAt: new Date(3),
-      hash: '',
+      hash: null,
+      path: null,
     },
   },
 };
@@ -70,12 +73,18 @@ jest.spyOn(AdminAPI.prototype, 'previewAndPublish').mockImplementation((batch) =
 
 jest.mock('../actions/pdp-renderer/render', () => ({
   generateProductHtml: jest.fn().mockImplementation((sku) => {
-    if (sku === 'sku-123') return '<html>Product 123</html>';
-    if (sku === 'sku-456') return '<html>Product 456</html>';
-    if (sku === 'sku-789') return '<html>Product 789</html>';
-    if (sku === 'sku-failed-due-preview') return '<html>Failed Preview</html>';
-    if (sku === 'sku-failed-due-publishing') return '<html>Failed Publishing</html>';
-    return `<html>Product ${sku}</html>`;
+    let html;
+    if (sku === 'sku-123') html = '<html>Product 123</html>';
+    else if (sku === 'sku-456') html = '<html>Product 456</html>';
+    else if (sku === 'sku-789') html = '<html>Product 789</html>';
+    else if (sku === 'sku-failed-due-preview') html = '<html>Failed Preview</html>';
+    else if (sku === 'sku-failed-due-publishing') html = '<html>Failed Publishing</html>';
+    else html = `<html>Product ${sku}</html>`;
+    
+    return Promise.resolve({
+      html,
+      productData: { sku, name: `Product ${sku}` }
+    });
   }),
 }));
 
@@ -204,15 +213,17 @@ describe('Poller', () => {
     state.skus['sku1'] = {
       lastRenderedAt: new Date(4),
       hash: 'hash1',
+      path: '/p/sku1',
     };
     state.skus['sku2'] = {
       lastRenderedAt: new Date(5),
       hash: 'hash2',
+      path: '/p/sku2',
     };
     await saveState(state, { filesLib, stateLib });
 
     const serializedState = await filesLib.read(getFileLocation('uk', 'csv'));
-    assert.equal(serializedState, 'sku1,4,hash1\nsku2,5,hash2\nsku3,3,');
+    assert.equal(serializedState, 'sku1,4,hash1,/p/sku1\nsku2,5,hash2,/p/sku2\nsku3,3,,');
 
     const newState = await loadState('uk', { filesLib, stateLib });
     assert.deepEqual(newState, state);
@@ -231,15 +242,17 @@ describe('Poller', () => {
     state.skus['sku1'] = {
       lastRenderedAt: new Date(4),
       hash: 'hash1',
+      path: '/p/sku1',
     };
     state.skus['sku2'] = {
       lastRenderedAt: new Date(5),
       hash: 'hash2',
+      path: '/p/sku2',
     };
     await saveState(state, { filesLib, stateLib });
 
     const serializedState = await filesLib.read(getFileLocation('default', 'csv'));
-    assert.equal(serializedState, 'sku1,4,hash1\nsku2,5,hash2\nsku3,3,');
+    assert.equal(serializedState, 'sku1,4,hash1,/p/sku1\nsku2,5,hash2,/p/sku2\nsku3,3,,');
   });
 
   describe('Parameter validation', () => {
