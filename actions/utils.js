@@ -401,8 +401,12 @@ function getProductUrl(product, context, addStore = true) {
   const availableParams = {
     sku: product.sku,
     urlKey: product.urlKey,
+    path: product.path,
   };
-  
+
+  if (product.path) {
+    return product.path;
+  }
   // Only add locale if it has a valid value
   if (context.locale) {
     availableParams.locale = context.locale;
