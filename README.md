@@ -75,7 +75,7 @@ For detailed setup instructions, see the [Step-by-Step Configuration](#step-by-s
      
      * **Site Context**: A Site Context will be created and stored in your localStorage. This serves as the authentication medium required to operate the [Storefront Prerender Management UI](https://prerender.aem-storefront.com) (you will be redirected to this address).
      
-     * **AEM Site Configuration**: Your AEM site configuration will be automatically updated via the Admin API to include the `overlay` section. This configuration enables the prerendered markup delivery by pointing to the Azure Blob Storage URL where generated HTML files are stored. The overlay configuration is added to your site's config with the following structure:
+     * **AEM Site Configuration**: Your AEM site configuration will be automatically updated via the Admin API to include the `overlay` section. This configuration enables the prerendered markup delivery by pointing to the App Builder storage URL where generated HTML files are stored. The overlay configuration is added to your site's config with the following structure:
        ```json
        {
          "content": {
