@@ -32,7 +32,7 @@ Before you begin, make sure you have:
 * **Adobe I/O App Builder CLI** (`aio`) - [Installation guide](https://developer.adobe.com/app-builder/docs/getting_started/first_app/#1-install-aio-cli)
 * **Developer or System Administrator role** in your Adobe IMS organization to manage Developer Console projects and App Builder access - [See documentation](https://helpx.adobe.com/enterprise/using/manage-developers.html)
 * **Access to Adobe Commerce** with Catalog Service enabled
-* **AEM Edge Delivery Services site** configured
+* **AEM Edge Delivery Services site** configured with **Helix 5** enabled
 
 ## Quick Start
 
@@ -71,7 +71,22 @@ For detailed setup instructions, see the [Step-by-Step Configuration](#step-by-s
      * `AEM_ADMIN_API_AUTH_TOKEN`: Long-lived authentication token for AEM Admin API (valid for 1 year). During setup, the wizard will exchange your temporary 24-hour token from [admin.hlx.page](https://admin.hlx.page/) for this long-lived token automatically.
      
      You can modify the environment-specific variables by editing the `.env` file directly or by re-running the setup wizard with `npm run setup`.
-  1. At the end of the process a Site Context will be created and stored in your localStorage: this will be the authentication medium required to operate the <https://prerender.aem-storefront.com> management interface (you will be redirected to this address).
+  1. **After Setup Completion**: Once the setup process is complete, the following configurations will be automatically applied:
+     
+     * **Site Context**: A Site Context will be created and stored in your localStorage. This serves as the authentication medium required to operate the [Storefront Prerender Management UI](https://prerender.aem-storefront.com) (you will be redirected to this address).
+     
+     * **AEM Site Configuration**: Your AEM site configuration will be automatically updated via the Admin API to include the `overlay` section. This configuration enables the prerendered markup delivery by pointing to the Azure Blob Storage URL where generated HTML files are stored. The overlay configuration is added to your site's config with the following structure:
+       ```json
+       {
+         "content": {
+           "overlay": {
+             "url": "https://firefly.azureedge.net/[your-namespace]-public/public/pdps",
+             "type": "markup",
+             "suffix": ".html"
+           }
+         }
+       }
+       ```
   1. [Customize the code](/docs/CUSTOMIZE.md) that contains the rendering logic according to your requirements, for [structured data](/actions/pdp-renderer/ldJson.js), [markup](/actions/pdp-renderer/render.js) and [templates](https://github.com/adobe-rnd/aem-commerce-prerender/tree/main/actions/pdp-renderer/templates)
   1. Deploy the solution with `npm run deploy`
   1. **Testing Actions Manually**: Before enabling automated triggers, verify that each action works correctly by invoking them manually:
