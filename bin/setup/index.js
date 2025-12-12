@@ -334,7 +334,9 @@ const RULES_MAP = {
         const body = {
           description: `Key used by PDP Prerender components [${org}/${site}]`,
           roles: [
-            "publish"
+            "preview",
+            "publish", 
+            "config_admin"
           ]
         };
 
