@@ -733,7 +733,9 @@ export class SetupWizard extends LitElement {
             const body = {
                 description: `Key used by PDP Prerender components [${this.org}/${this.site}]`,
                 roles: [
-                    "publish"
+                    "preview",
+                    "publish",
+                    "config_admin"
                 ]
             };
 
