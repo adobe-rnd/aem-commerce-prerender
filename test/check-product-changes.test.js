@@ -587,8 +587,8 @@ describe('Poller', () => {
 
       // Verify HTML files were deleted
       expect(filesLib.delete).toHaveBeenCalledTimes(2);
-      expect(filesLib.delete).toHaveBeenCalledWith('/public/pdps/p/url-sku-123');
-      expect(filesLib.delete).toHaveBeenCalledWith('/public/pdps/p/url-sku-456');
+      expect(filesLib.delete).toHaveBeenCalledWith('/public/pdps/p/url-sku-123.html');
+      expect(filesLib.delete).toHaveBeenCalledWith('/public/pdps/p/url-sku-456.html');
     });
   });
 });

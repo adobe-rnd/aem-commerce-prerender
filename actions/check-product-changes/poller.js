@@ -309,7 +309,7 @@ async function processDeletedProducts(remainingSkus, state, context, adminApi) {
               if (record.liveUnpublishedAt && record.previewUnpublishedAt) {
                 // Delete the HTML file from public storage
                 try {
-                  const htmlPath = `/public/pdps${record.path}`;
+                  const htmlPath = `/public/pdps${record.path}.${PDP_FILE_EXT}`;
                   filesLib.delete(htmlPath);
                   logger.debug(`Deleted HTML file for product ${record.sku} from ${htmlPath}`);
                 } catch (e) {
