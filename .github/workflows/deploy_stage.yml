@@ -30,7 +30,7 @@ jobs:
       - name: Build
         env:
           AIO_RUNTIME_NAMESPACE: ${{ secrets.AIO_RUNTIME_NAMESPACE_STAGE }}
-        uses: adobe/aio-apps-action@3.4.0
+        uses: adobe/aio-apps-action@4.0.0
         with:
           os: ${{ matrix.os }}
           command: build
@@ -41,7 +41,7 @@ jobs:
           ORG: ${{ secrets.PROJECT_ORG_STAGE }}
           SITE: ${{ secrets.PROJECT_SITE_STAGE }}
           PRODUCT_PAGE_URL_FORMAT: ${{ secrets.PRODUCT_PAGE_URL_FORMAT_STAGE }}
-        uses: adobe/aio-apps-action@3.4.0
+        uses: adobe/aio-apps-action@4.0.0
         with:
           os: ${{ matrix.os }}
           command: deploy
