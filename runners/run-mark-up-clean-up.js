@@ -11,7 +11,7 @@ const { main } = require('../actions/mark-up-clean-up/index');
                     auth: process.env.AIO_runtime_auth,
                 }
             },
-            AEM_ADMIN_AUTH_TOKEN: process.env.AEM_ADMIN_API_AUTH_TOKEN,
+            AEM_ADMIN_API_AUTH_TOKEN: process.env.AEM_ADMIN_API_AUTH_TOKEN,
             SITE: process.env.SITE,
             ORG: process.env.ORG,
             STORE_URL: process.env.STORE_URL,

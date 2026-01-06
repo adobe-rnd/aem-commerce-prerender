@@ -29,11 +29,27 @@ const {
  * @param {*} checkedProducts 
  * @returns 
  */
-function urlkeymatch(publishedProduct, queriedProducts){
+function urlkeymatch(publishedProduct, queriedProducts, context){ 
+  const locale = context.locale;
   let path = publishedProduct.path.split('/');
+  const sku = publishedProduct.sku;
+
+  //special case for products/default, IE the template page
+  if (!sku) {    
+    return true;
+  }
+
+  // if locale is provided and not in the path, return true (do not delete markup)
+  if ( locale?.trim() && !path.includes(locale)){
+    return true;
+  }
+
+  const pdpUrlFormat = context.pathFormat.split('/');
+  const urlKeyIndex = pdpUrlFormat.indexOf('{urlKey}');
   
   const result = queriedProducts.some((product) => { 
-    if (path.includes(product.urlKey)) {
+    const urlKey = product.urlKey.split('/').pop();
+    if (path[urlKeyIndex]?.toLowerCase() === urlKey?.toLowerCase()) {
       return true;
     }    
   });  
@@ -53,7 +69,7 @@ async function markUpCleanUP(context, filesLib, logger, adminApi) {
     let queryResult = await requestSaaS(GetUrlKeyQuery, 'getUrlKey', { skus: publishedSkus }, context);
     queryResult = queryResult.data.products;
 
-    const redundantpublishedProducts = publishedProducts.data.filter((product) => !urlkeymatch(product, queryResult))
+    const redundantpublishedProducts = publishedProducts.data.filter((product) => !urlkeymatch(product, queryResult, context))
     context.counts.detected = redundantpublishedProducts.length;
 
     for (const product of redundantpublishedProducts) {
@@ -113,6 +129,7 @@ async function main(params) {
     contentUrl,
     logLevel,
     logIngestorEndpoint,
+    adminAuthToken
   } = cfg;
 
   const counts = { detected: 0, deleted: 0, unpublished: 0 };
@@ -129,7 +146,7 @@ async function main(params) {
     logLevel,
     logIngestorEndpoint,
   }
-  const adminApi = new AdminAPI({ org: params.ORG, site: params.SITE }, sharedContext, { authToken: params.AEM_ADMIN_AUTH_TOKEN });
+  const adminApi = new AdminAPI({ org: params.ORG, site: params.SITE }, sharedContext, { authToken: adminAuthToken});
 
   let activationResult = {status: {}};
 
@@ -143,7 +160,7 @@ async function main(params) {
         context.locale = locale;
         tempLocale = locale;
       } 
-      activationResult.status[tempLocale] = await markUpCleanUP(context, filesLib, logger);
+      activationResult.status[tempLocale] = await markUpCleanUP(context, filesLib, logger, adminApi);
    }
 
     await observabilityClient.sendActivationResult(activationResult);
