@@ -19,7 +19,7 @@ jest.mock('../actions/utils', () => ({
 
 describe('AdminAPI Optimized Tests', () => {
     let adminAPI;
-    const context = { logger: { info: jest.fn(), error: jest.fn() } };
+    const context = { logger: { info: jest.fn(), error: jest.fn(), debug: jest.fn() } };
 
     beforeEach(() => {
         adminAPI = new AdminAPI(
@@ -44,17 +44,20 @@ describe('AdminAPI Optimized Tests', () => {
     });
 
     test('should add record to previewQueue on previewAndPublish', async () => {
-        const record = { path: '/test' };
-        adminAPI.previewAndPublish(record);
-        expect(adminAPI.previewQueue).toHaveLength(1);
+        const records = [{ path: '/test' }];
+        adminAPI.previewAndPublish(records, null, 1);
+        // Backpressure resolves immediately when pending < 500; then the batch is pushed. Allow microtasks to run.
         await Promise.resolve();
+        await Promise.resolve();
+        expect(adminAPI.previewQueue).toHaveLength(1);
     });
 
     test('should add record to unpublishQueue on unpublishAndDelete', async () => {
-        const record = { path: '/test' };
-        adminAPI.unpublishAndDelete(record);
-        expect(adminAPI.unpublishQueue).toHaveLength(1);
+        const records = [{ path: '/test' }];
+        adminAPI.unpublishAndDelete(records, null, 1);
         await Promise.resolve();
+        await Promise.resolve();
+        expect(adminAPI.unpublishQueue).toHaveLength(1);
     });
 
     test('should start processing queues', async () => {
@@ -113,5 +116,53 @@ describe('AdminAPI Optimized Tests', () => {
         adminAPI.unpublishPreviewQueue.push({ records: batch, resolve: jest.fn() });
         adminAPI.processQueues();
         expect(context.logger.info).toHaveBeenCalledWith('Queues: preview=0, publish=0, unpublish live=0, unpublish preview=1, inflight=0, in queue=0');
+    });
+
+    describe('Qatar / bulk job serialization and rate limiting (409/429 fix)', () => {
+        test('getPendingCount returns queues + inflight', () => {
+            adminAPI.previewQueue.push({ records: [], locale: null, batchNumber: 1, resolve: jest.fn() });
+            adminAPI.publishQueue.push({ records: [], locale: null, batchNumber: 2, resolve: jest.fn() });
+            expect(adminAPI.getPendingCount()).toBe(2);
+        });
+
+        test('MAX_PENDING_JOBS is 500', () => {
+            expect(adminAPI.MAX_PENDING_JOBS).toBe(500);
+        });
+
+        test('JOB_STATUS_POLL_INTERVAL_MS is 5000', () => {
+            expect(adminAPI.JOB_STATUS_POLL_INTERVAL_MS).toBe(5000);
+        });
+
+        test('previewAndPublish waits when pending >= MAX_PENDING_JOBS (backpressure)', async () => {
+            // Fill up to 500 pending (all in queues; no inflight so we never resolve backpressure from completion)
+            for (let i = 0; i < adminAPI.MAX_PENDING_JOBS; i++) {
+                adminAPI.previewQueue.push({
+                    records: [{ path: `/p/${i}` }],
+                    locale: null,
+                    batchNumber: i + 1,
+                    resolve: jest.fn(),
+                });
+            }
+            expect(adminAPI.getPendingCount()).toBe(adminAPI.MAX_PENDING_JOBS);
+
+            const promise = adminAPI.previewAndPublish([{ path: '/extra' }], null, 999);
+            await Promise.resolve();
+            await Promise.resolve();
+            // Should not have added the extra batch yet (still waiting for backpressure)
+            expect(adminAPI.previewQueue.length).toBe(adminAPI.MAX_PENDING_JOBS);
+            expect(adminAPI.previewQueue.every((b) => b.batchNumber !== 999)).toBe(true);
+
+            // Simulate one item leaving the queue so pending drops below 500
+            adminAPI.previewQueue.pop();
+            adminAPI._resolveBackpressure();
+
+            await Promise.resolve();
+            await Promise.resolve();
+            // Now the waiting batch should have been pushed
+            expect(adminAPI.getPendingCount()).toBeLessThanOrEqual(adminAPI.MAX_PENDING_JOBS);
+            expect(adminAPI.previewQueue).toContainEqual(
+                expect.objectContaining({ batchNumber: 999 }),
+            );
+        });
     });
 });

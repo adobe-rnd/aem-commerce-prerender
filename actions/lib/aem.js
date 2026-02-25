@@ -31,6 +31,12 @@ class AdminAPI {
     inflight = [];
     MAX_RETRIES = 3;
     RETRY_DELAY = 5000;
+    /** Max number of pending jobs (queues + inflight). Keep below 500 to avoid 409 queue size limit. */
+    MAX_PENDING_JOBS = 500;
+    /** Poll interval for job status (ms). Avoid polling too frequently (e.g. once every 5 seconds). */
+    JOB_STATUS_POLL_INTERVAL_MS = 5000;
+    /** Resolvers for backpressure: call when pending drops below MAX_PENDING_JOBS */
+    _backpressureResolvers = [];
 
     constructor(
         { org, site },
@@ -50,15 +56,47 @@ class AdminAPI {
     }
 
     previewAndPublish(records, locale, batchNumber) {
-        return new Promise((resolve) => {
+        const pushAndReturnPromise = (resolve) => {
             this.previewQueue.push({ records, locale, batchNumber, resolve });
-        });
+        };
+        return this._waitPendingBelowLimit()
+            .then(() => new Promise(pushAndReturnPromise));
     }
 
     unpublishAndDelete(records, locale, batchNumber) {
-        return new Promise((resolve) => {
+        const pushAndReturnPromise = (resolve) => {
             this.unpublishQueue.push({ records, locale, batchNumber, resolve });
-        });
+        };
+        return this._waitPendingBelowLimit()
+            .then(() => new Promise(pushAndReturnPromise));
+    }
+
+    /**
+     * Returns current count of pending work (queues + inflight).
+     * Used to keep pending jobs below MAX_PENDING_JOBS and avoid 409/429.
+     */
+    getPendingCount() {
+        return this.previewQueue.length + this.publishQueue.length
+            + this.unpublishQueue.length + this.unpublishPreviewQueue.length
+            + this.inflight.length;
+    }
+
+    /**
+     * Resolves when pending count is below MAX_PENDING_JOBS (backpressure).
+     */
+    async _waitPendingBelowLimit() {
+        while (this.getPendingCount() >= this.MAX_PENDING_JOBS) {
+            await new Promise((resolve) => {
+                this._backpressureResolvers.push(resolve);
+            });
+        }
+    }
+
+    _resolveBackpressure() {
+        if (this.getPendingCount() >= this.MAX_PENDING_JOBS) return;
+        const resolvers = this._backpressureResolvers;
+        this._backpressureResolvers = [];
+        resolvers.forEach((r) => r());
     }
 
     async startProcessing() {
@@ -103,6 +141,7 @@ class AdminAPI {
             this.inflight.push(promise);
             promise.then(() => {
                 this.inflight.splice(this.inflight.indexOf(promise), 1);
+                this._resolveBackpressure();
 
                 if (this.queue.length > 0) {
                     const publishes = [];
@@ -123,7 +162,7 @@ class AdminAPI {
             });
         };
 
-        if (this.inflight.length < 2) {
+        if (this.inflight.length < 1) {
             executeTask();
         } else {
             const task = {
@@ -245,8 +284,8 @@ class AdminAPI {
                 }
             }
 
-            // Wait for 2 seconds before the next status check
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // Wait for 5 seconds before the next status check (avoid high request rate)
+            await new Promise(resolve => setTimeout(resolve, this.JOB_STATUS_POLL_INTERVAL_MS));
         }
     }
 
@@ -466,6 +505,7 @@ class AdminAPI {
         if (this.onQueuesProcessed) {
             this.onQueuesProcessed();
         }
+        this._resolveBackpressure();
     }
 }
 
