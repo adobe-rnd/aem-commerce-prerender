@@ -410,7 +410,7 @@ describe('pdp-renderer', () => {
       expect(optionsHeader).toHaveLength(1);
 
       const optionsContainer = optionsHeader.parent().next();
-      expect(optionsContainer.find('li').length).toBeGreaterThan(0);
+      expect(optionsContainer.find('li')).not.toHaveLength(0);
     });
   })
 

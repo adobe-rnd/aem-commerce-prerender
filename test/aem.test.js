@@ -145,11 +145,11 @@ describe('AdminAPI Optimized Tests', () => {
             }
             expect(adminAPI.getPendingCount()).toBe(adminAPI.MAX_PENDING_JOBS);
 
-            const promise = adminAPI.previewAndPublish([{ path: '/extra' }], null, 999);
+            adminAPI.previewAndPublish([{ path: '/extra' }], null, 999);
             await Promise.resolve();
             await Promise.resolve();
             // Should not have added the extra batch yet (still waiting for backpressure)
-            expect(adminAPI.previewQueue.length).toBe(adminAPI.MAX_PENDING_JOBS);
+            expect(adminAPI.previewQueue).toHaveLength(adminAPI.MAX_PENDING_JOBS);
             expect(adminAPI.previewQueue.every((b) => b.batchNumber !== 999)).toBe(true);
 
             // Simulate one item leaving the queue so pending drops below 500
