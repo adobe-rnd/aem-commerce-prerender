@@ -161,7 +161,7 @@ describe('pdp-renderer', () => {
 
   <meta name="description" content="The Crown Summit Backpack is equal"><meta name="keywords" content="backpack, hiking, camping"><meta name="image" content="http://www.aemshop.net/media/catalog/product/m/b/mb03-black-0.jpg"><meta name="id" content="7"><meta name="sku" content="25-MB03"><meta name="__typename" content="SimpleProductView"><meta property="og:type" content="og:product">
 
-  <script type="application/ld+json">{"@context":"http://schema.org","@type":"Product","sku":"25-MB03","name":"Crown Summit Backpack","gtin":"","description":"The Crown Summit Backpack is equal","@id":"https://store.com/products/crown-summit-backpack/25-MB03","offers":[{"@type":"Offer","sku":"25-MB03","url":"https://store.com/products/crown-summit-backpack/25-MB03","availability":"https://schema.org/InStock","price":38,"priceCurrency":"USD","itemCondition":"https://schema.org/NewCondition"}],"image":"http://www.aemshop.net/media/catalog/product/m/b/mb03-black-0.jpg"}</script>
+  <script type="application/ld+json">{"@context":"http://schema.org","@type":"Product","sku":"25-MB03","name":"Crown Summit Backpack","gtin":"","description":"The Crown Summit Backpack is equal","@id":"https://store.com/products/crown-summit-backpack/25-mb03","offers":[{"@type":"Offer","sku":"25-MB03","url":"https://store.com/products/crown-summit-backpack/25-mb03","availability":"https://schema.org/InStock","price":38,"priceCurrency":"USD","itemCondition":"https://schema.org/NewCondition"}],"image":"http://www.aemshop.net/media/catalog/product/m/b/mb03-black-0.jpg"}</script>
 </head>
 
 <body>
