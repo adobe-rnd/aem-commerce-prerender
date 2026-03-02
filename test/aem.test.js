@@ -46,7 +46,7 @@ describe('AdminAPI Optimized Tests', () => {
     test('should add record to previewQueue on previewAndPublish', async () => {
         const records = [{ path: '/test' }];
         adminAPI.previewAndPublish(records, null, 1);
-        // Backpressure resolves immediately when pending < 500; then the batch is pushed. Allow microtasks to run.
+        // Backpressure resolves immediately when pending < MAX_PENDING_JOBS; then the batch is pushed. Allow microtasks to run.
         await Promise.resolve();
         await Promise.resolve();
         expect(adminAPI.previewQueue).toHaveLength(1);
@@ -125,8 +125,8 @@ describe('AdminAPI Optimized Tests', () => {
             expect(adminAPI.getPendingCount()).toBe(2);
         });
 
-        test('MAX_PENDING_JOBS is 500', () => {
-            expect(adminAPI.MAX_PENDING_JOBS).toBe(500);
+        test('MAX_PENDING_JOBS is 20', () => {
+            expect(adminAPI.MAX_PENDING_JOBS).toBe(20);
         });
 
         test('JOB_STATUS_POLL_INTERVAL_MS is 5000', () => {
@@ -134,7 +134,7 @@ describe('AdminAPI Optimized Tests', () => {
         });
 
         test('previewAndPublish waits when pending >= MAX_PENDING_JOBS (backpressure)', async () => {
-            // Fill up to 500 pending (all in queues; no inflight so we never resolve backpressure from completion)
+            // Fill up to MAX_PENDING_JOBS pending (all in queues; no inflight so we never resolve backpressure from completion)
             for (let i = 0; i < adminAPI.MAX_PENDING_JOBS; i++) {
                 adminAPI.previewQueue.push({
                     records: [{ path: `/p/${i}` }],
@@ -152,7 +152,7 @@ describe('AdminAPI Optimized Tests', () => {
             expect(adminAPI.previewQueue).toHaveLength(adminAPI.MAX_PENDING_JOBS);
             expect(adminAPI.previewQueue.every((b) => b.batchNumber !== 999)).toBe(true);
 
-            // Simulate one item leaving the queue so pending drops below 500
+            // Simulate one item leaving the queue so pending drops below MAX_PENDING_JOBS
             adminAPI.previewQueue.pop();
             adminAPI._resolveBackpressure();
 

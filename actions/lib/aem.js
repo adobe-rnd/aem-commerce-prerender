@@ -31,8 +31,8 @@ class AdminAPI {
     inflight = [];
     MAX_RETRIES = 3;
     RETRY_DELAY = 5000;
-    /** Max number of pending jobs (queues + inflight). Keep below 500 to avoid 409 queue size limit. */
-    MAX_PENDING_JOBS = 500;
+    /** Max number of pending jobs (queues + inflight). Keep low to avoid "noisy neighbor" effect. */
+    MAX_PENDING_JOBS = 20;
     /** Poll interval for job status (ms). Avoid polling too frequently (e.g. once every 5 seconds). */
     JOB_STATUS_POLL_INTERVAL_MS = 5000;
     /** Resolvers for backpressure: call when pending drops below MAX_PENDING_JOBS */
@@ -162,7 +162,7 @@ class AdminAPI {
             });
         };
 
-        if (this.inflight.length < 1) {
+        if (this.inflight.length < 2) {
             executeTask();
         } else {
             const task = {
