@@ -237,7 +237,10 @@ const ProductsQuery = `
       items {
         productView {
           urlKey
-          sku          
+          sku
+          categories {
+            slug
+          }
         }
       }
       page_info {

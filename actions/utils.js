@@ -1,5 +1,5 @@
 /*
-Copyright 2025 Adobe. All rights reserved.
+Copyright 2026 Adobe. All rights reserved.
 This file is licensed to you under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License. You may obtain a copy
 of the License at http://www.apache.org/licenses/LICENSE-2.0
@@ -12,6 +12,11 @@ governing permissions and limitations under the License.
 const deepmerge = require('@fastify/deepmerge')();
 const helixSharedStringLib = require('@adobe/helix-shared-string');
 const BATCH_SIZE = 50;
+
+const SITE_TYPES = Object.freeze({
+  ACO: 'aco',
+  ACCS: 'accs',
+});
 
 /* This file exposes some common utilities for your actions */
 
@@ -309,6 +314,46 @@ async function getConfig(context) {
 }
 
 /**
+ * Returns the Commerce Catalog Service headers based on the site type and configuration.
+ * 
+ * @param {Object} config - The site configuration object returned by getConfig().
+ * @returns {Object} The Commerce Catalog Service headers.
+ */
+function getCsHeaders(config) {
+  const siteType = getSiteType(config);
+  let csHeaders = {};
+
+  if (siteType === SITE_TYPES.ACO) {
+    csHeaders = {
+      'ac-view-id': config.headers?.cs?.['AC-View-ID'],
+      'ac-price-book-id': config.headers?.cs?.['AC-Price-Book-ID'],
+    };
+  } else {
+    if (config.__hasLegacyFormat) {
+      csHeaders = {
+        'magento-customer-group': config['commerce.headers.cs.Magento-Customer-Group'] || config['commerce-customer-group'],
+        'magento-environment-id': config['commerce.headers.cs.Magento-Environment-Id'] || config['commerce-environment-id'],
+        'magento-store-code': config['commerce.headers.cs.Magento-Store-Code'] || config['commerce-store-code'],
+        'magento-store-view-code': config['commerce.headers.cs.Magento-Store-View-Code'] || config['commerce-store-view-code'],
+        'magento-website-code': config['commerce.headers.cs.Magento-Website-Code'] || config['commerce-website-code'],
+        'x-api-key': config['commerce.headers.cs.x-api-key'] || config['commerce-x-api-key'],
+      };
+    } else {
+      csHeaders = {
+        'magento-customer-group': config.headers?.cs?.['Magento-Customer-Group'],
+        'magento-environment-id': config.headers?.cs?.['Magento-Environment-Id'],
+        'magento-store-code': config.headers?.cs?.['Magento-Store-Code'],
+        'magento-store-view-code': config.headers?.cs?.['Magento-Store-View-Code'],
+        'magento-website-code': config.headers?.cs?.['Magento-Website-Code'],
+        'x-api-key': config.headers?.cs?.['x-api-key'],
+      };
+    }
+  }
+
+  return csHeaders;
+}
+
+/**
  * Requests data from Commerce Catalog Service API.
  *
  * @param {string} query GraphQL query.
@@ -324,26 +369,12 @@ async function requestSaaS(query, operationName, variables, context) {
     ... (await getConfig(context)),
     ...configOverrides
   };
+
   const headers = {
     'Content-Type': 'application/json',
     'origin': storeUrl,
-    ...(config.__hasLegacyFormat ? {
-      'magento-customer-group': config['commerce.headers.cs.Magento-Customer-Group'] || config['commerce-customer-group'],
-      'magento-environment-id': config['commerce.headers.cs.Magento-Environment-Id'] || config['commerce-environment-id'],
-      'magento-store-code': config['commerce.headers.cs.Magento-Store-Code'] || config['commerce-store-code'],
-      'magento-store-view-code': config['commerce.headers.cs.Magento-Store-View-Code'] || config['commerce-store-view-code'],
-      'magento-website-code': config['commerce.headers.cs.Magento-Website-Code'] || config['commerce-website-code'],
-      'x-api-key': config['commerce.headers.cs.x-api-key'] || config['commerce-x-api-key'],
-    } : {
-      'magento-customer-group': config.headers?.cs?.['Magento-Customer-Group'],
-      'magento-environment-id': config.headers?.cs?.['Magento-Environment-Id'],
-      'magento-store-code': config.headers?.cs?.['Magento-Store-Code'],
-      'magento-store-view-code': config.headers?.cs?.['Magento-Store-View-Code'],
-      'magento-website-code': config.headers?.cs?.['Magento-Website-Code'],
-      'x-api-key': config.headers?.cs?.['x-api-key'],
-    }),
-    // bypass LiveSearch cache
-    'Magento-Is-Preview': true,
+    ...getCsHeaders(config),
+    'Magento-Is-Preview': true, // bypass LiveSearch cache
   };
   const method = 'POST';
 
@@ -369,6 +400,24 @@ async function requestSaaS(query, operationName, variables, context) {
   }
 
   return response;
+}
+
+/**
+ * Determines whether a site is ACO or ACCS based on its config.
+ * @param {Object} config - The site configuration object returned by getConfig().
+ * @returns {string} One of SITE_TYPES.ACO or SITE_TYPES.ACCS.
+ */
+function getSiteType(config) {
+  if (config['adobe-commerce-optimizer'] === true) {
+    return SITE_TYPES.ACO;
+  }
+  const csHeaders = config.headers?.cs;
+  if (csHeaders && Object.keys(csHeaders).some(
+    (key) => key.toLowerCase().startsWith('ac-')
+  )) {
+    return SITE_TYPES.ACO;
+  }
+  return SITE_TYPES.ACCS;
 }
 
 /**
@@ -466,6 +515,8 @@ module.exports = {
   getDefaultStoreURL,
   formatMemoryUsage,
   requestPublishedProductsIndex,
+  getSiteType,
+  SITE_TYPES,
   FILE_PREFIX,
   PDP_FILE_EXT,
   STATE_FILE_EXT,

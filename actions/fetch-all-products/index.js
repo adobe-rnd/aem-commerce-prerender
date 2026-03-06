@@ -1,6 +1,6 @@
 /*
 
-Copyright 2025 Adobe. All rights reserved.
+Copyright 2026 Adobe. All rights reserved.
 This file is licensed to you under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License. You may obtain a copy
 of the License at http://www.apache.org/licenses/LICENSE-2.0
@@ -12,129 +12,60 @@ governing permissions and limitations under the License.
 
 */
 
-const { CategoriesQuery, ProductCountQuery, ProductsQuery } = require('../queries');
-const { Core, Files } = require('@adobe/aio-sdk')
-const { requestSaaS, FILE_PREFIX } = require('../utils');
-const { Timings } = require('../lib/benchmark');
-const { getRuntimeConfig } = require('../lib/runtimeConfig');
-const { handleActionError } = require('../lib/errorHandler');
-
-async function getSkus(categoryPath, context) {
-  let productsResp = await requestSaaS(ProductsQuery, 'getProducts', { currentPage: 1, categoryPath }, context);
-  const products = [...productsResp.data.productSearch.items.map(({ productView }) => (
-    {
-      urlKey: productView.urlKey,
-      sku: productView.sku
-    }
-  ))];  
-  let maxPage = productsResp.data.productSearch.page_info.total_pages;
-
-  if (maxPage > 20) {
-    console.warn(`Category ${categoryPath} has more than 10000 products.`);
-    maxPage = 20;
-  }
-
-  for (let currentPage = 2; currentPage <= maxPage; currentPage++) {
-    productsResp = await requestSaaS(ProductsQuery, 'getProducts', { currentPage, categoryPath }, context);
-     products.push(...productsResp.data.productSearch.items.map(({ productView }) => (
-      {
-        urlKey: productView.urlKey,
-        sku: productView.sku
-      }
-    )));
-  }
-
-  return products;
-}
-
-async function getAllCategories(context) {
-  const categories = [];
-  const categoriesResp = await requestSaaS(CategoriesQuery, 'getCategories', {}, context);
-  const items = categoriesResp.data.categories;
-  for (const {urlPath, level, name} of items) {
-    const index = parseInt(level);
-    categories[index] = categories[index] || [];
-    categories[index].push({urlPath, name, level});
-  }
-  return categories;
-}
-
-async function getAllSkus(context) {
-  const productCountResp = await requestSaaS(ProductCountQuery, 'getProductCount', { categoryPath: '' }, context);
-  const productCount = productCountResp.data.productSearch?.page_info?.total_pages;
-
-  if (!productCount) {
-    throw new Error('Unknown product count.');
-  }
-
-  if (productCount <= 10000) {
-    // we can get everything from the default category
-    return getSkus('', context);
-  }
-
-  const products = new Set();
-  // we have to traverse the category tree
-  const categories = await getAllCategories(context);
-
-  outer: for (const category of categories) {
-    if (!category) continue;
-    while (category.length) {
-      const slice = category.splice(0, 50);
-      const fetchedProducts = await Promise.all(slice.map((category) => getSkus(category.urlPath, context)));
-      fetchedProducts.flatMap((skus) => skus).forEach((sku) => products.add(sku));
-      if (products.size >= productCount) {
-        // break if we got all products already
-        break outer;
-      }
-    }
-  }
-
-  if (products.size !== productCount) {
-    console.warn(`Expected ${productCount} products, but got ${products.size}.`);
-  }
-
-  return [...products];
-}
+const { Core, Files } = require("@adobe/aio-sdk");
+const { getConfig, getSiteType, SITE_TYPES, FILE_PREFIX } = require("../utils");
+const { Timings } = require("../lib/benchmark");
+const { getRuntimeConfig } = require("../lib/runtimeConfig");
+const { handleActionError } = require("../lib/errorHandler");
+const { getAllSkus: getAllSkusAccs } = require("./accs");
+const { getAllSkus: getAllSkusAco } = require("./aco");
 
 async function main(params) {
   try {
     // Resolve runtime config
     const cfg = getRuntimeConfig(params);
-    const logger = Core.Logger('main', { level: cfg.logLevel });
+    const logger = Core.Logger("main", { level: cfg.logLevel });
 
-    const sharedContext = { ...cfg, logger }
+    const sharedContext = { ...cfg, logger };
 
     const results = await Promise.all(
-        cfg.locales.map(async (locale) => {
-          const context = { ...sharedContext };
-          if (locale) {
-              context.locale = locale;
-          }
-          const timings = new Timings();
-          const stateFilePrefix = locale || 'default';
-          const allSkus = await getAllSkus(context);
-          timings.sample('getAllSkus');
-          const filesLib = await Files.init(params.libInit || {});
-          timings.sample('saveFile');
-          const productsFileName = `${FILE_PREFIX}/${stateFilePrefix}-products.json`;
-          await filesLib.write(productsFileName, JSON.stringify(allSkus));
-          return timings.measures;
-        })
+      cfg.locales.map(async (locale) => {
+        const context = { ...sharedContext };
+        if (locale) {
+          context.locale = locale;
+        }
+        const timings = new Timings();
+        const stateFilePrefix = locale || "default";
+
+        const siteConfig = await getConfig(context);
+        const siteType = getSiteType(siteConfig);
+        const allSkus =
+          siteType === SITE_TYPES.ACO
+            ? await getAllSkusAco(context)
+            : await getAllSkusAccs(context);
+
+        timings.sample("getAllSkus");
+        const filesLib = await Files.init(params.libInit || {});
+        timings.sample("saveFile");
+        const productsFileName = `${FILE_PREFIX}/${stateFilePrefix}-products.json`;
+        await filesLib.write(productsFileName, JSON.stringify(allSkus));
+        return timings.measures;
+      }),
     );
 
     return {
       statusCode: 200,
-      body: { status: 'completed', timings: results }
+      body: { status: "completed", timings: results },
     };
   } catch (error) {
     // Handle errors and determine if job should fail
-    const logger = Core.Logger('main', { level: 'error' });
-    
-    return handleActionError(error, { 
-      logger, 
-      actionName: 'Fetch all products' 
+    const logger = Core.Logger("main", { level: "error" });
+
+    return handleActionError(error, {
+      logger,
+      actionName: "Fetch all products",
     });
   }
 }
 
-exports.main = main
+exports.main = main;
