@@ -12,9 +12,15 @@ governing permissions and limitations under the License.
 
 */
 
-const pLimit = require("p-limit");
 const { requestSaaS } = require("../utils");
 const { ProductsQuery } = require("../queries");
+
+// Limiting at 10,000 products per category
+const MAX_PAGES_FETCHED = 20;
+const CONCURRENCY = 5;
+const pLimitPromise = import("p-limit").then(({ default: pLimit }) =>
+  pLimit(CONCURRENCY),
+);
 
 const acoMapper = ({ productView }) => ({
   urlKey: productView.urlKey,
@@ -22,66 +28,41 @@ const acoMapper = ({ productView }) => ({
   categories: (productView.categories || []).map((c) => c.slug),
 });
 
-async function getSkus(
-  categoryPath,
-  context,
-  { mapItem, pageLimit = 20, concurrency = 1 } = {},
-) {
-  let productsResp = await requestSaaS(
+async function getAllSkus(context) {
+  const categoryPath = ""; // we are fetching all products from the catalog for ACO
+  const productsResp = await requestSaaS(
     ProductsQuery,
     "getProducts",
     { currentPage: 1, categoryPath },
     context,
   );
-  const products = productsResp.data.productSearch.items.map(mapItem);
+  const products = productsResp.data.productSearch.items.map(acoMapper);
   let maxPage = productsResp.data.productSearch.page_info.total_pages;
 
-  if (pageLimit !== Infinity && maxPage > pageLimit) {
-    console.warn(
-      `Category ${categoryPath} has more than ${pageLimit * 500} products.`,
-    );
-    maxPage = pageLimit;
+  if (maxPage > MAX_PAGES_FETCHED) {
+    console.warn(`Catalog has more than 10000 products.`);
+    maxPage = MAX_PAGES_FETCHED;
   }
 
-  if (concurrency > 1 && maxPage > 1) {
-    const limit = pLimit(concurrency);
-    const pages = Array.from({ length: maxPage - 1 }, (_, i) => i + 2);
-    const results = await Promise.all(
-      pages.map((page) =>
-        limit(() =>
-          requestSaaS(
-            ProductsQuery,
-            "getProducts",
-            { currentPage: page, categoryPath },
-            context,
-          ),
+  const limit = await pLimitPromise;
+  const pages = Array.from({ length: maxPage - 1 }, (_, i) => i + 2);
+  const results = await Promise.all(
+    pages.map((page) =>
+      limit(() =>
+        requestSaaS(
+          ProductsQuery,
+          "getProducts",
+          { currentPage: page, categoryPath },
+          context,
         ),
       ),
-    );
-    for (const resp of results) {
-      products.push(...resp.data.productSearch.items.map(mapItem));
-    }
-  } else {
-    for (let currentPage = 2; currentPage <= maxPage; currentPage++) {
-      productsResp = await requestSaaS(
-        ProductsQuery,
-        "getProducts",
-        { currentPage, categoryPath },
-        context,
-      );
-      products.push(...productsResp.data.productSearch.items.map(mapItem));
-    }
+    ),
+  );
+  for (const resp of results) {
+    products.push(...resp.data.productSearch.items.map(acoMapper));
   }
 
   return products;
-}
-
-async function getAllSkus(context) {
-  return getSkus("", context, {
-    mapItem: acoMapper,
-    pageLimit: Infinity,
-    concurrency: 5,
-  });
 }
 
 module.exports = { getAllSkus };
