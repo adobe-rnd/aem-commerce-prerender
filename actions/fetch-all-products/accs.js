@@ -19,6 +19,9 @@ const {
 } = require("../queries");
 const { requestSaaS } = require("../utils");
 
+// Limiting at 10,000 products per category
+const MAX_PAGES_FETCHED = 20;
+
 const accsMapper = ({ productView }) => ({
   urlKey: productView.urlKey,
   sku: productView.sku,
@@ -51,9 +54,9 @@ async function getSkus(categoryPath, context) {
   const products = [...productsResp.data.productSearch.items.map(accsMapper)];
   let maxPage = productsResp.data.productSearch.page_info.total_pages;
 
-  if (maxPage > 20) {
+  if (maxPage > MAX_PAGES_FETCHED) {
     console.warn(`Category ${categoryPath} has more than 10000 products.`);
-    maxPage = 20;
+    maxPage = MAX_PAGES_FETCHED;
   }
 
   for (let currentPage = 2; currentPage <= maxPage; currentPage++) {
