@@ -93,6 +93,14 @@ function getRuntimeConfig(params = {}, options = {}) {
         if (!localesArr.length) localesArr = [null];
     }
 
+    // Normalize ACO_CATEGORY_FAMILIES
+    let categoryFamiliesArr = [null];
+    if (Array.isArray(merged.ACO_CATEGORY_FAMILIES)) {
+        categoryFamiliesArr = merged.ACO_CATEGORY_FAMILIES.map(String).map(s => s.trim()).filter(Boolean);
+    } else if (typeof merged.ACO_CATEGORY_FAMILIES === 'string' && merged.ACO_CATEGORY_FAMILIES.trim()) {
+        categoryFamiliesArr = merged.ACO_CATEGORY_FAMILIES.split(',').map(s => s.trim()).filter(Boolean);
+    }
+
     const cfg = {
         raw: { ...merged, LOCALES_ARRAY: localesArr },
         org: ORG,
@@ -107,7 +115,8 @@ function getRuntimeConfig(params = {}, options = {}) {
         configName: merged.CONFIG_NAME,
         configSheet: merged.CONFIG_SHEET,
         pathFormat: merged.PRODUCT_PAGE_URL_FORMAT,
-        locales: localesArr
+        locales: localesArr,
+        categoryFamilies: categoryFamiliesArr
     };
 
     // URL sanity checks

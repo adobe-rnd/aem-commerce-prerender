@@ -11,6 +11,7 @@ governing permissions and limitations under the License.
 */
 const deepmerge = require('@fastify/deepmerge')();
 const helixSharedStringLib = require('@adobe/helix-shared-string');
+const { ERROR_CODES } = require('./lib/errorHandler');
 const BATCH_SIZE = 50;
 
 const SITE_TYPES = Object.freeze({
@@ -314,6 +315,19 @@ async function getConfig(context) {
 }
 
 /**
+ * Converts the keys of an object to lowercase.
+ * 
+ * @param {Object} obj - The object to convert the keys of.
+ * @returns {Object} The object with the keys converted to lowercase.
+ */
+function lowercaseKeys(obj) {
+  if (!obj || typeof obj !== 'object') return {};
+  return Object.fromEntries(
+    Object.entries(obj).map(([k, v]) => [k.toLowerCase(), v]),
+  );
+}
+
+/**
  * Returns the Commerce Catalog Service headers based on the site type and configuration.
  * 
  * @param {Object} config - The site configuration object returned by getConfig().
@@ -324,9 +338,15 @@ function getCsHeaders(config) {
   let csHeaders = {};
 
   if (siteType === SITE_TYPES.ACO) {
+    const configHeaders = lowercaseKeys(config.headers?.cs);
+    const policyHeaders = Object.fromEntries(
+      Object.entries(configHeaders)
+        .filter(([key]) => key.startsWith('ac-policy-')),
+    );
     csHeaders = {
-      'ac-view-id': config.headers?.cs?.['AC-View-ID'],
-      'ac-price-book-id': config.headers?.cs?.['AC-Price-Book-ID'],
+      'ac-view-id': configHeaders['ac-view-id'],
+      'ac-price-book-id': configHeaders['ac-price-book-id'],
+      ...policyHeaders,
     };
   } else {
     if (config.__hasLegacyFormat) {
@@ -339,13 +359,14 @@ function getCsHeaders(config) {
         'x-api-key': config['commerce.headers.cs.x-api-key'] || config['commerce-x-api-key'],
       };
     } else {
+      const configHeaders = lowercaseKeys(config.headers?.cs);
       csHeaders = {
-        'magento-customer-group': config.headers?.cs?.['Magento-Customer-Group'],
-        'magento-environment-id': config.headers?.cs?.['Magento-Environment-Id'],
-        'magento-store-code': config.headers?.cs?.['Magento-Store-Code'],
-        'magento-store-view-code': config.headers?.cs?.['Magento-Store-View-Code'],
-        'magento-website-code': config.headers?.cs?.['Magento-Website-Code'],
-        'x-api-key': config.headers?.cs?.['x-api-key'],
+        'magento-customer-group': configHeaders['magento-customer-group'],
+        'magento-environment-id': configHeaders['magento-environment-id'],
+        'magento-store-code': configHeaders['magento-store-code'],
+        'magento-store-view-code': configHeaders['magento-store-view-code'],
+        'magento-website-code': configHeaders['magento-website-code'],
+        'x-api-key': configHeaders['x-api-key'],
       };
     }
   }
@@ -397,6 +418,9 @@ async function requestSaaS(query, operationName, variables, context) {
     for (const error of response.errors) {
       logger.error(`Request '${operationName}' returned GraphQL error`, error);
     }
+    const err = new Error(`GraphQL request '${operationName}' failed`);
+    err.code = ERROR_CODES.PROCESSING_ERROR;
+    throw err;
   }
 
   return response;

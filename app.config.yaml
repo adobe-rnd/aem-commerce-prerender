@@ -16,6 +16,7 @@ application:
           CONFIG_NAME: "config"
           LOCALES: "${LOCALES}"
           SITE_TOKEN: "${SITE_TOKEN}"
+          ACO_CATEGORY_FAMILIES: "${ACO_CATEGORY_FAMILIES}"
         actions:
           pdp-renderer:
             function: "actions/pdp-renderer/index.js"

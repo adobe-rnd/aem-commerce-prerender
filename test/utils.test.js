@@ -271,8 +271,8 @@ describe('request', () => {
     const operationName = 'TestOperation';
     const variables = { var1: 'value1' };
 
-    const response = await requestSaaS(query, operationName, variables, context);
-    expect(response).toEqual({ data: { result: 'success' }, errors: [graphqlError] });
+    await expect(requestSaaS(query, operationName, variables, context))
+      .rejects.toThrow("GraphQL request 'TestOperation' failed");
     expect(context.logger.error).toHaveBeenCalledWith(`Request 'TestOperation' returned GraphQL error`, graphqlError);
   });
 

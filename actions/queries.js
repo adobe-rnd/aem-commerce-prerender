@@ -238,27 +238,61 @@ const ProductsQuery = `
         productView {
           urlKey
           sku
-          categories {
-            slug
-          }
         }
       }
       page_info {
         current_page
         total_pages
       }
+      total_count
+    }
+  }
+`;
+
+const CategoryTreeQuery = `
+  query getCategoryTree($family: String!) {
+    categoryTree(family: $family) {
+      slug
+      name
+      level
+      metaTags {
+        title
+        description
+        keywords
+      }
+      images {
+        url
+        label
+        roles
+        customRoles
+      }
+      childrenSlugs
+    }
+  }
+`;
+
+const CategoryTreeBySlugsQuery = `
+  query getCategoryTreeBySlugs($family: String!, $slugs: [String!], $depth: Int!) {
+    categoryTree(family: $family, slugs: $slugs, depth: $depth) {
+      slug
+      name
+      level
+      parentSlug
+      childrenSlugs
     }
   }
 `;
 
 module.exports = {
-    ProductQuery,
-    ProductByUrlKeyQuery,
-    VariantsQuery,
-    GetAllSkusPaginatedQuery,
-    GetLastModifiedQuery,
-    CategoriesQuery,
-    ProductCountQuery,
-    ProductsQuery,
-    GetUrlKeyQuery
+  ProductQuery,
+  ProductByUrlKeyQuery,
+  VariantsQuery,
+  GetAllSkusPaginatedQuery,
+  GetLastModifiedQuery,
+  CategoriesQuery,
+  ProductCountQuery,
+  ProductsQuery,
+  GetUrlKeyQuery,
+  CategoryTreeQuery,
+  CategoryTreeBySlugsQuery,
 };
