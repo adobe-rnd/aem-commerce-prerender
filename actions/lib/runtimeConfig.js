@@ -94,12 +94,12 @@ function getRuntimeConfig(params = {}, options = {}) {
     }
 
     // Normalize ACO_CATEGORY_FAMILIES
-    let categoryFamiliesArr = [null];
-    if (Array.isArray(merged.ACO_CATEGORY_FAMILIES)) {
-        categoryFamiliesArr = merged.ACO_CATEGORY_FAMILIES.map(String).map(s => s.trim()).filter(Boolean);
-    } else if (typeof merged.ACO_CATEGORY_FAMILIES === 'string' && merged.ACO_CATEGORY_FAMILIES.trim()) {
-        categoryFamiliesArr = merged.ACO_CATEGORY_FAMILIES.split(',').map(s => s.trim()).filter(Boolean);
-    }
+    const categoryFamiliesRaw = merged.ACO_CATEGORY_FAMILIES;
+    const categoryFamiliesArr = (
+        Array.isArray(categoryFamiliesRaw) ? categoryFamiliesRaw
+            : typeof categoryFamiliesRaw === 'string' ? categoryFamiliesRaw.split(',')
+            : []
+    ).map(s => String(s).trim()).filter(Boolean);
 
     const cfg = {
         raw: { ...merged, LOCALES_ARRAY: localesArr },

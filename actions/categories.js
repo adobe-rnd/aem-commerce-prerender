@@ -28,7 +28,7 @@ const MAX_TREE_DEPTH = 3;
  * @returns {boolean}
  */
 function hasFamilies(families) {
-  return Array.isArray(families) && families.length > 0 && families[0] !== null;
+  return Array.isArray(families) && families.length > 0;
 }
 
 /**

@@ -253,19 +253,19 @@ const CategoryTreeQuery = `
   query getCategoryTree($family: String!) {
     categoryTree(family: $family) {
       slug
-      name
-      level
-      metaTags {
-        title
-        description
-        keywords
-      }
-      images {
-        url
-        label
-        roles
-        customRoles
-      }
+      # name
+      # level
+      # metaTags {
+      #   title
+      #   description
+      #   keywords
+      # }
+      # images {
+      #   url
+      #   label
+      #   roles
+      #   customRoles
+      # }
       childrenSlugs
     }
   }
@@ -275,9 +275,9 @@ const CategoryTreeBySlugsQuery = `
   query getCategoryTreeBySlugs($family: String!, $slugs: [String!], $depth: Int!) {
     categoryTree(family: $family, slugs: $slugs, depth: $depth) {
       slug
-      name
-      level
-      parentSlug
+      # name
+      # level
+      # parentSlug
       childrenSlugs
     }
   }
