@@ -345,7 +345,7 @@ function getCsHeaders(config) {
     );
     csHeaders = {
       'ac-view-id': configHeaders['ac-view-id'],
-      'ac-price-book-id': configHeaders['ac-price-book-id'],
+      ...(configHeaders['ac-price-book-id'] ? { 'ac-price-book-id': configHeaders['ac-price-book-id'] } : {}),
       ...policyHeaders,
     };
   } else {
