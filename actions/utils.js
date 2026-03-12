@@ -1,5 +1,5 @@
 /*
-Copyright 2025 Adobe. All rights reserved.
+Copyright 2026 Adobe. All rights reserved.
 This file is licensed to you under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License. You may obtain a copy
 of the License at http://www.apache.org/licenses/LICENSE-2.0
@@ -11,7 +11,13 @@ governing permissions and limitations under the License.
 */
 const deepmerge = require('@fastify/deepmerge')();
 const helixSharedStringLib = require('@adobe/helix-shared-string');
+const { ERROR_CODES } = require('./lib/errorHandler');
 const BATCH_SIZE = 50;
+
+const SITE_TYPES = Object.freeze({
+  ACO: 'aco',
+  ACCS: 'accs',
+});
 
 /* This file exposes some common utilities for your actions */
 
@@ -309,6 +315,66 @@ async function getConfig(context) {
 }
 
 /**
+ * Converts the keys of an object to lowercase.
+ * 
+ * @param {Object} obj - The object to convert the keys of.
+ * @returns {Object} The object with the keys converted to lowercase.
+ */
+function lowercaseKeys(obj) {
+  if (!obj || typeof obj !== 'object') return {};
+  return Object.fromEntries(
+    Object.entries(obj).map(([k, v]) => [k.toLowerCase(), v]),
+  );
+}
+
+/**
+ * Returns the Commerce Catalog Service headers based on the site type and configuration.
+ * 
+ * @param {Object} config - The site configuration object returned by getConfig().
+ * @returns {Object} The Commerce Catalog Service headers.
+ */
+function getCsHeaders(config) {
+  const siteType = getSiteType(config);
+  let csHeaders = {};
+
+  if (siteType === SITE_TYPES.ACO) {
+    const configHeaders = lowercaseKeys(config.headers?.cs);
+    const policyHeaders = Object.fromEntries(
+      Object.entries(configHeaders)
+        .filter(([key]) => key.startsWith('ac-policy-')),
+    );
+    csHeaders = {
+      'ac-view-id': configHeaders['ac-view-id'],
+      ...(configHeaders['ac-price-book-id'] ? { 'ac-price-book-id': configHeaders['ac-price-book-id'] } : {}),
+      ...policyHeaders,
+    };
+  } else {
+    if (config.__hasLegacyFormat) {
+      csHeaders = {
+        'magento-customer-group': config['commerce.headers.cs.Magento-Customer-Group'] || config['commerce-customer-group'],
+        'magento-environment-id': config['commerce.headers.cs.Magento-Environment-Id'] || config['commerce-environment-id'],
+        'magento-store-code': config['commerce.headers.cs.Magento-Store-Code'] || config['commerce-store-code'],
+        'magento-store-view-code': config['commerce.headers.cs.Magento-Store-View-Code'] || config['commerce-store-view-code'],
+        'magento-website-code': config['commerce.headers.cs.Magento-Website-Code'] || config['commerce-website-code'],
+        'x-api-key': config['commerce.headers.cs.x-api-key'] || config['commerce-x-api-key'],
+      };
+    } else {
+      const configHeaders = lowercaseKeys(config.headers?.cs);
+      csHeaders = {
+        'magento-customer-group': configHeaders['magento-customer-group'],
+        'magento-environment-id': configHeaders['magento-environment-id'],
+        'magento-store-code': configHeaders['magento-store-code'],
+        'magento-store-view-code': configHeaders['magento-store-view-code'],
+        'magento-website-code': configHeaders['magento-website-code'],
+        'x-api-key': configHeaders['x-api-key'],
+      };
+    }
+  }
+
+  return csHeaders;
+}
+
+/**
  * Requests data from Commerce Catalog Service API.
  *
  * @param {string} query GraphQL query.
@@ -324,26 +390,12 @@ async function requestSaaS(query, operationName, variables, context) {
     ... (await getConfig(context)),
     ...configOverrides
   };
+
   const headers = {
     'Content-Type': 'application/json',
     'origin': storeUrl,
-    ...(config.__hasLegacyFormat ? {
-      'magento-customer-group': config['commerce.headers.cs.Magento-Customer-Group'] || config['commerce-customer-group'],
-      'magento-environment-id': config['commerce.headers.cs.Magento-Environment-Id'] || config['commerce-environment-id'],
-      'magento-store-code': config['commerce.headers.cs.Magento-Store-Code'] || config['commerce-store-code'],
-      'magento-store-view-code': config['commerce.headers.cs.Magento-Store-View-Code'] || config['commerce-store-view-code'],
-      'magento-website-code': config['commerce.headers.cs.Magento-Website-Code'] || config['commerce-website-code'],
-      'x-api-key': config['commerce.headers.cs.x-api-key'] || config['commerce-x-api-key'],
-    } : {
-      'magento-customer-group': config.headers?.cs?.['Magento-Customer-Group'],
-      'magento-environment-id': config.headers?.cs?.['Magento-Environment-Id'],
-      'magento-store-code': config.headers?.cs?.['Magento-Store-Code'],
-      'magento-store-view-code': config.headers?.cs?.['Magento-Store-View-Code'],
-      'magento-website-code': config.headers?.cs?.['Magento-Website-Code'],
-      'x-api-key': config.headers?.cs?.['x-api-key'],
-    }),
-    // bypass LiveSearch cache
-    'Magento-Is-Preview': true,
+    ...getCsHeaders(config),
+    'Magento-Is-Preview': true, // bypass LiveSearch cache
   };
   const method = 'POST';
 
@@ -366,9 +418,30 @@ async function requestSaaS(query, operationName, variables, context) {
     for (const error of response.errors) {
       logger.error(`Request '${operationName}' returned GraphQL error`, error);
     }
+    const err = new Error(`GraphQL request '${operationName}' failed`);
+    err.code = ERROR_CODES.PROCESSING_ERROR;
+    throw err;
   }
 
   return response;
+}
+
+/**
+ * Determines whether a site is ACO or ACCS based on its config.
+ * @param {Object} config - The site configuration object returned by getConfig().
+ * @returns {string} One of SITE_TYPES.ACO or SITE_TYPES.ACCS.
+ */
+function getSiteType(config) {
+  if (config['adobe-commerce-optimizer'] === true) {
+    return SITE_TYPES.ACO;
+  }
+  const csHeaders = config.headers?.cs;
+  if (csHeaders && Object.keys(csHeaders).some(
+    (key) => key.toLowerCase().startsWith('ac-')
+  )) {
+    return SITE_TYPES.ACO;
+  }
+  return SITE_TYPES.ACCS;
 }
 
 /**
@@ -466,6 +539,8 @@ module.exports = {
   getDefaultStoreURL,
   formatMemoryUsage,
   requestPublishedProductsIndex,
+  getSiteType,
+  SITE_TYPES,
   FILE_PREFIX,
   PDP_FILE_EXT,
   STATE_FILE_EXT,

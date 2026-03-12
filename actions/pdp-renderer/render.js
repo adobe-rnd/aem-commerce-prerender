@@ -70,7 +70,7 @@ async function generateProductHtml(sku, urlKey, context) {
       return {
         title: sanitize(option.title, 'inline'),
         id: sanitize(option.id, 'no'),
-        required: sanitize(option.required, 'no'),
+        required: sanitize(String(option.required), 'no'),
         values: option.values
       };
     });
