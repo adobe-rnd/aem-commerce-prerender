@@ -109,7 +109,7 @@ const RULES_MAP = {
 
   class ConfigService {
     static async buildAppConfig(params) {
-      const { org, site, locales, contentUrl, productsTemplate, productPageUrlFormat, storeUrl } = params;
+      const { org, site, locales, contentUrl, productsTemplate, categoriesTemplate, productPageUrlFormat, storeUrl } = params;
 
       try {
         const sampleConfigContent = fs.readFileSync('app.config.yaml', 'utf8');
@@ -121,6 +121,7 @@ const RULES_MAP = {
           SITE: site,
           CONTENT_URL: contentUrl,
           PRODUCTS_TEMPLATE: productsTemplate,
+          CATEGORIES_TEMPLATE: categoriesTemplate,
           PRODUCT_PAGE_URL_FORMAT: productPageUrlFormat,
           STORE_URL: storeUrl,
           LOCALES: locales
@@ -458,7 +459,7 @@ const RULES_MAP = {
       }
 
       const reqBody = await request.json();
-      const { productPageUrlFormat, contentUrl, productsTemplate, storeUrl, accessTokenId } = reqBody;
+      const { productPageUrlFormat, contentUrl, productsTemplate, categoriesTemplate, storeUrl, accessTokenId } = reqBody;
       let { locales } = reqBody;
 
       if (locales?.trim() === '') locales = null;
@@ -670,6 +671,7 @@ const RULES_MAP = {
         envObject['CONTENT_URL'] = appConfigParams.contentUrl;
         envObject['STORE_URL'] = appConfigParams.storeUrl;
         envObject['PRODUCTS_TEMPLATE'] = appConfigParams.productsTemplate;
+        envObject['CATEGORIES_TEMPLATE'] = appConfigParams.categoriesTemplate;
         envObject['LOCALES'] = appConfigParams.locales;
         envObject['SITE_TOKEN'] = appConfigParams.siteToken;
         

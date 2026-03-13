@@ -52,7 +52,7 @@ For detailed setup instructions, see the [Step-by-Step Configuration](#step-by-s
   1. **Download Configuration**: Download your App Builder project JSON file from the Developer Console (click "Download All" in the top-right)
   1. Run `npm run setup` to onboard and configure your environment. The wizard will guide you through the configuration process:
      * **Step 1-2**: Provide your App Builder credentials and site information
-     * **Step 3 - Advanced Settings**: The wizard will automatically detect and populate default values for `CONTENT_URL`, `STORE_URL`, `PRODUCTS_TEMPLATE`, and `PRODUCT_PAGE_URL_FORMAT` based on your site configuration. You can review and customize these settings in the advanced settings section. A `.env` file will be created with all necessary environment variables.
+     * **Step 3 - Advanced Settings**: The wizard will automatically detect and populate default values for `CONTENT_URL`, `STORE_URL`, `PRODUCTS_TEMPLATE`, `CATEGORIES_TEMPLATE`, and `PRODUCT_PAGE_URL_FORMAT` based on your site configuration. You can review and customize these settings in the advanced settings section. A `.env` file will be created with all necessary environment variables.
   1. **Configuration Variables**: After completing the setup wizard, the solution will use two types of configuration:
      
      **Static Configuration** (defined in `app.config.yaml`):
@@ -66,6 +66,7 @@ For detailed setup instructions, see the [Step-by-Step Configuration](#step-by-s
      * `CONTENT_URL`: Your AEM content URL (auto-populated by wizard)
      * `STORE_URL`: Your Commerce store URL (auto-populated by wizard)
      * `PRODUCTS_TEMPLATE`: The URL for the product template page (auto-populated by wizard). For localized sites with URLs like `https://main--site--org.aem.page/en-us/products/default`, you can use the `{locale}` token: `https://main--site--org.aem.page/{locale}/products/default`
+     * `CATEGORIES_TEMPLATE`: The URL for the category template page (auto-populated by wizard). Works the same way as `PRODUCTS_TEMPLATE` but for PLP pages. Default: `https://main--site--org.aem.live/categories/default`. Supports the `{locale}` token for localized sites.
      * `PRODUCT_PAGE_URL_FORMAT`: The URL pattern for product pages (auto-populated by wizard). Supports tokens: `{locale}`, `{urlKey}`, `{sku}`. Default pattern: `/{locale}/products/{urlKey}`. For live environments, consider using a different prefix like `/{locale}/products-prerendered/{urlKey}` for logical separation
      * `LOCALES`: Comma-separated list of locales (e.g., `en-us,en-gb,fr-fr`) or empty for non-localized sites
      * `ACO_CATEGORY_FAMILIES`: *(Commerce Optimizer only)* Comma-separated list of category family identifiers (e.g., `electronics,apparel`). Determines which categories are included for PLP pre-rendering. For PDP pre-rendering, catalogs with 10,000 or fewer products are fetched in full regardless of this setting. For larger catalogs, the system fetches the first 10,000 products plus up to 10,000 per category discovered from these families, deduplicated by SKU. If not configured, only the first 10,000 products are pre-rendered.

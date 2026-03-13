@@ -541,6 +541,7 @@ export class SetupWizard extends LitElement {
             productPageUrlFormat: '/products/{urlKey}/{sku}',
             contentUrl: '',
             productsTemplate: '',
+            categoriesTemplate: '',
             storeUrl: '',
             configName: 'config',
             locales: null,
@@ -571,6 +572,7 @@ export class SetupWizard extends LitElement {
                 contentUrl: baseUrl,
                 storeUrl: baseUrl,
                 productsTemplate: `${baseUrl}/products/default`,
+                categoriesTemplate: `${baseUrl}/categories/default`,
             };
         }
     }
@@ -837,7 +839,8 @@ export class SetupWizard extends LitElement {
                     ...this.advancedSettings,
                     contentUrl: baseUrl,
                     storeUrl: baseUrl,
-                    productsTemplate: `${baseUrl}/products/default`
+                    productsTemplate: `${baseUrl}/products/default`,
+                    categoriesTemplate: `${baseUrl}/categories/default`
                 };
             }
         } else {
@@ -1104,6 +1107,7 @@ export class SetupWizard extends LitElement {
                 body: JSON.stringify({
                     contentUrl: this.advancedSettings.contentUrl,
                     productsTemplate: this.advancedSettings.productsTemplate,
+                    categoriesTemplate: this.advancedSettings.categoriesTemplate,
                     productPageUrlFormat: this.advancedSettings.productPageUrlFormat,
                     storeUrl: this.advancedSettings.storeUrl,
                     locales: this.advancedSettings.locales,
@@ -1544,6 +1548,13 @@ export class SetupWizard extends LitElement {
                                     id="products-template"
                                     .value=${this.advancedSettings.productsTemplate}
                                     @input=${e => this.handleAdvancedSettingInput('productsTemplate', e.target.value)}
+                                ></sp-textfield>
+
+                                <sp-field-label for="categories-template">Categories Template</sp-field-label>
+                                <sp-textfield
+                                    id="categories-template"
+                                    .value=${this.advancedSettings.categoriesTemplate}
+                                    @input=${e => this.handleAdvancedSettingInput('categoriesTemplate', e.target.value)}
                                 ></sp-textfield>
 
                                 <sp-field-label for="store-url" required>Commerce Store URL</sp-field-label>

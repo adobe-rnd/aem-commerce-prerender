@@ -15,6 +15,7 @@ governing permissions and limitations under the License.
 const fs = require("fs");
 const path = require("path");
 const Handlebars = require("handlebars");
+const cheerio = require("cheerio");
 const striptags = require("striptags");
 const { requestSaaS } = require("../utils");
 const { CategoryProductsQuery } = require("../queries");
@@ -22,6 +23,8 @@ const {
   generateItemListLdJson,
   generateBreadcrumbListLdJson,
 } = require("./ldJson");
+
+const categoryTemplateCache = {};
 
 /**
  * Builds the breadcrumb trail for a category by walking up parentSlug references.
@@ -93,6 +96,50 @@ function getSubcategories(category, categoriesMap, storeUrl) {
 }
 
 /**
+ * Fetches an authored AEM page and replaces specified blocks with Handlebars partials.
+ *
+ * @param {string} url - URL of the AEM template page.
+ * @param {string[]} blocks - Block class names to replace with Handlebars partials.
+ * @param {Object} context - Runtime context with siteToken, locale, etc.
+ * @returns {Promise<string>} Adapted base template HTML.
+ */
+async function prepareBaseTemplate(url, blocks, context) {
+  if (context.locale && context.locale !== "default") {
+    url = url
+      .replace(/\s+/g, "")
+      .replace(/\/$/, "")
+      .replace("{locale}", context.locale);
+  }
+
+  const { siteToken } = context;
+  let options;
+
+  if (typeof siteToken === "string" && siteToken.trim()) {
+    options = { headers: { authorization: `token ${siteToken}` } };
+  }
+
+  const baseTemplateHtml = await fetch(`${url}.plain.html`, {
+    ...options,
+  }).then((resp) => resp.text());
+
+  const $ = cheerio.load(`<main>${baseTemplateHtml}</main>`);
+
+  blocks.forEach((block) => {
+    const existing = $(`.${block}`);
+    if (existing.length) {
+      existing.replaceWith(`{{> ${block} }}`);
+    } else {
+      $("main").prepend(`{{> ${block} }}\n`);
+    }
+  });
+
+  let adaptedBaseTemplate = $("main").prop("innerHTML");
+  adaptedBaseTemplate = adaptedBaseTemplate.replace(/&gt;/g, ">") + "\n";
+
+  return adaptedBaseTemplate;
+}
+
+/**
  * Renders a complete HTML page for a single category.
  *
  * @param {Object} category - Full category detail from the tree API.
@@ -139,9 +186,31 @@ async function renderCategoryPage(category, categoriesMap, context) {
       ),
   );
 
+  Handlebars.registerPartial("category-details", categoryHbs);
+
+  const blocksToReplace = ["category-details"];
+  const localeKey = context.locale || "default";
+
+  if (context.categoriesTemplate) {
+    const categoriesTemplateURL = context.categoriesTemplate
+      .replace(/\s+/g, "")
+      .replace("{locale}", localeKey);
+    if (!categoryTemplateCache[localeKey]) categoryTemplateCache[localeKey] = {};
+    if (!categoryTemplateCache[localeKey].baseTemplate) {
+      categoryTemplateCache[localeKey].baseTemplate = prepareBaseTemplate(
+        categoriesTemplateURL,
+        blocksToReplace,
+        context,
+      );
+    }
+    const baseTemplate = await categoryTemplateCache[localeKey].baseTemplate;
+    Handlebars.registerPartial("content", baseTemplate);
+  } else {
+    Handlebars.registerPartial("content", `<div>${categoryHbs}</div>`);
+  }
+
   const pageTemplate = Handlebars.compile(pageHbs);
   Handlebars.registerPartial("head", headHbs);
-  Handlebars.registerPartial("content", categoryHbs);
 
   return pageTemplate(templateData);
 }
