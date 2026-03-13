@@ -13,10 +13,11 @@ governing permissions and limitations under the License.
 */
 
 const { Core } = require("@adobe/aio-sdk");
-const { getConfig, getSiteType, SITE_TYPES } = require("../utils");
+const { getConfig, getSiteType, SITE_TYPES, createBatches } = require("../utils");
 const { getRuntimeConfig } = require("../lib/runtimeConfig");
 const { handleActionError } = require("../lib/errorHandler");
 const { Timings } = require("../lib/benchmark");
+const { AdminAPI } = require("../lib/aem");
 const {
   getCategoryDetailsFromFamilies,
   hasFamilies,
@@ -88,14 +89,93 @@ async function main(params) {
         }),
       ),
     );
-    timings.sample("renderCategories");
-
     const rendered = results.filter((r) => r.html);
     const failed = results.filter((r) => r.error);
+    timings.sample("renderCategories");
 
     logger.info(
       `Rendered ${rendered.length} categories, ${failed.length} failed`,
     );
+
+    const publishCounts = { previewed: 0, published: 0, failed: 0 };
+
+    if (rendered.length > 0 && cfg.adminAuthToken && cfg.org && cfg.site) {
+      let filesLib;
+      try {
+        const { Files } = require("@adobe/aio-sdk");
+        filesLib = await Files.init();
+        logger.info("Files SDK initialized");
+      } catch (e) {
+        logger.error(`Files SDK init failed: ${e.message}`);
+      }
+
+      if (filesLib) {
+        try {
+          await Promise.all(
+            rendered.map(async ({ slug, html }) => {
+              const htmlPath = `/public/pdps/${slug}.html`;
+              await filesLib.write(htmlPath, html);
+              logger.info(`Wrote overlay: ${htmlPath}`);
+            }),
+          );
+          timings.sample("writeOverlay");
+        } catch (e) {
+          logger.error(`Overlay write failed: ${e.message}`);
+        }
+      } else {
+        logger.info("Skipping overlay write, Files SDK unavailable");
+      }
+
+      const adminApi = new AdminAPI(
+        { org: cfg.org, site: cfg.site },
+        { ...context },
+        { authToken: cfg.adminAuthToken },
+      );
+
+      await adminApi.startProcessing();
+
+      try {
+        const records = rendered.map(({ slug }) => ({
+          slug,
+          path: `/${slug}`,
+        }));
+        const batches = createBatches(records);
+
+        await Promise.all(
+          batches.map((batch, batchNumber) => {
+            const batchRecords = batch.map(({ slug, path }) => ({
+              slug,
+              path,
+            }));
+            return adminApi
+              .previewAndPublish(batchRecords, null, batchNumber + 1)
+              .then(({ records: publishedRecords }) => {
+                for (const record of publishedRecords) {
+                  if (record.previewedAt) publishCounts.previewed++;
+                  if (record.publishedAt) publishCounts.published++;
+                  if (!record.previewedAt && !record.publishedAt)
+                    publishCounts.failed++;
+                }
+              })
+              .catch((err) => {
+                logger.error(
+                  `Failed to publish batch ${batchNumber + 1}:`,
+                  err,
+                );
+                publishCounts.failed += batch.length;
+              });
+          }),
+        );
+      } finally {
+        await adminApi.stopProcessing();
+      }
+
+      timings.sample("publishCategories");
+    } else {
+      logger.info(
+        "Skipping publish: missing adminAuthToken, org, or site configuration",
+      );
+    }
 
     return {
       statusCode: 200,
@@ -103,6 +183,8 @@ async function main(params) {
         status: "completed",
         categoriesRendered: rendered.length,
         categoriesFailed: failed.length,
+        categoriesPublished: publishCounts.published,
+        categoriesPublishFailed: publishCounts.failed,
         timings: timings.measures,
         categories: rendered,
         ...(failed.length > 0 && { errors: failed }),

@@ -8,7 +8,7 @@ application:
           ORG: "${ORG}"
           SITE: "${SITE}"
           PRODUCT_PAGE_URL_FORMAT: "${PRODUCT_PAGE_URL_FORMAT}"
-          LOG_LEVEL: "error"
+          LOG_LEVEL: "info"
           LOG_INGESTOR_ENDPOINT: "https://log-ingestor.aem-storefront.com/api/v1/services/change-detector"
           CONTENT_URL: "${CONTENT_URL}"
           PRODUCTS_TEMPLATE: "${PRODUCTS_TEMPLATE}"
@@ -51,6 +51,8 @@ application:
             function: "actions/render-all-categories/index.js"
             web: "yes"
             runtime: "nodejs:22"
+            inputs:
+              AEM_ADMIN_API_AUTH_TOKEN: "${AEM_ADMIN_API_AUTH_TOKEN}"
             annotations:
               final: true
             include:
