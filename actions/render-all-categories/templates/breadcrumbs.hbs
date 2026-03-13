@@ -1,7 +1,7 @@
-<div class="breadcrumbs">
-  <ol>
+<nav class="breadcrumbs">
+  <ol class="breadcrumbs breadcrumbs__list" aria-label="Breadcrumb" data-component="breadcrumbs">
     {{#each breadcrumbs}}
     <li>{{#if @last}}{{this.name}}{{else}}<a href="{{this.url}}">{{this.name}}</a>{{/if}}</li>
     {{/each}}
   </ol>
-</div>
+</nav>

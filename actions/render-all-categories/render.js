@@ -193,7 +193,7 @@ async function renderCategoryPage(category, categoriesMap, context) {
   Handlebars.registerPartial("breadcrumbs", breadcrumbsHbs);
   Handlebars.registerPartial("category-details", categoryHbs);
 
-  const blocksToReplace = ["breadcrumbs", "category-details"];
+  const blocksToReplace = ["category-details"];
   const localeKey = context.locale || "default";
 
   if (context.categoriesTemplate) {
@@ -213,7 +213,7 @@ async function renderCategoryPage(category, categoriesMap, context) {
   } else {
     Handlebars.registerPartial(
       "content",
-      `<div>${breadcrumbsHbs}${categoryHbs}</div>`,
+      `<div>${categoryHbs}</div>`,
     );
   }
 
