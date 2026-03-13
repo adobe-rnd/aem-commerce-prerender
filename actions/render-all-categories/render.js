@@ -178,17 +178,22 @@ async function renderCategoryPage(category, categoriesMap, context) {
     breadcrumbListLdJson: JSON.stringify(breadcrumbListLdJson),
   };
 
-  const [pageHbs, headHbs, categoryHbs] = ["page", "head", "category"].map(
-    (t) =>
-      fs.readFileSync(
-        path.join(__dirname, "templates", `${t}.hbs`),
-        "utf8",
-      ),
+  const [pageHbs, headHbs, breadcrumbsHbs, categoryHbs] = [
+    "page",
+    "head",
+    "breadcrumbs",
+    "category",
+  ].map((t) =>
+    fs.readFileSync(
+      path.join(__dirname, "templates", `${t}.hbs`),
+      "utf8",
+    ),
   );
 
+  Handlebars.registerPartial("breadcrumbs", breadcrumbsHbs);
   Handlebars.registerPartial("category-details", categoryHbs);
 
-  const blocksToReplace = ["category-details"];
+  const blocksToReplace = ["breadcrumbs", "category-details"];
   const localeKey = context.locale || "default";
 
   if (context.categoriesTemplate) {
@@ -206,7 +211,10 @@ async function renderCategoryPage(category, categoriesMap, context) {
     const baseTemplate = await categoryTemplateCache[localeKey].baseTemplate;
     Handlebars.registerPartial("content", baseTemplate);
   } else {
-    Handlebars.registerPartial("content", `<div>${categoryHbs}</div>`);
+    Handlebars.registerPartial(
+      "content",
+      `<div>${breadcrumbsHbs}${categoryHbs}</div>`,
+    );
   }
 
   const pageTemplate = Handlebars.compile(pageHbs);

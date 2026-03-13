@@ -1,0 +1,7 @@
+<div class="breadcrumbs">
+  <ol>
+    {{#each breadcrumbs}}
+    <li>{{#if @last}}{{this.name}}{{else}}<a href="{{this.url}}">{{this.name}}</a>{{/if}}</li>
+    {{/each}}
+  </ol>
+</div>
