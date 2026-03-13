@@ -17,6 +17,8 @@ const {
   CategoriesQuery,
   CategoryTreeQuery,
   CategoryTreeBySlugsQuery,
+  CategoryTreeDetailQuery,
+  CategoryTreeDetailBySlugsQuery,
 } = require("./queries");
 
 const MAX_TREE_DEPTH = 3;
@@ -123,4 +125,61 @@ async function getCategories(context) {
   return byLevel;
 }
 
-module.exports = { getCategorySlugsFromFamilies, getCategories, hasFamilies };
+/**
+ * Resolves all categories with full detail from the given ACO category families.
+ *
+ * Same BFS approach as getCategorySlugsFromFamilies but retains the full
+ * category objects (name, level, parentSlug, metaTags, etc.) so callers
+ * can render complete category pages.
+ *
+ * @param {Object} context - Request context (config, logger, headers, etc.).
+ * @param {string[]} families - ACO category family identifiers.
+ * @returns {Promise<Map<string, Object>>} Map of slug → category detail object.
+ */
+async function getCategoryDetailsFromFamilies(context, families) {
+  const allCategories = new Map();
+
+  for (const family of families) {
+    const firstLevel = await requestSaaS(
+      CategoryTreeDetailQuery,
+      "getCategoryTreeDetail",
+      { family },
+      context,
+    );
+
+    let pending = [];
+    for (const cat of firstLevel.data.categoryTree) {
+      allCategories.set(cat.slug, cat);
+      pending.push(...(cat.childrenSlugs || []));
+    }
+
+    while (pending.length) {
+      pending = pending.filter((slug) => !allCategories.has(slug));
+      if (!pending.length) break;
+
+      const childrenRes = await requestSaaS(
+        CategoryTreeDetailBySlugsQuery,
+        "getCategoryTreeDetailBySlugs",
+        { family, slugs: pending, depth: MAX_TREE_DEPTH },
+        context,
+      );
+
+      pending = [];
+      for (const cat of childrenRes.data.categoryTree) {
+        allCategories.set(cat.slug, cat);
+        for (const child of cat.childrenSlugs || []) {
+          if (!allCategories.has(child)) pending.push(child);
+        }
+      }
+    }
+  }
+
+  return allCategories;
+}
+
+module.exports = {
+  getCategorySlugsFromFamilies,
+  getCategoryDetailsFromFamilies,
+  getCategories,
+  hasFamilies,
+};

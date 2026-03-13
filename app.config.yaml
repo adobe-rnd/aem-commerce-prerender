@@ -47,6 +47,15 @@ application:
             runtime: "nodejs:22"
             annotations:
               final: true
+          render-all-categories:
+            function: "actions/render-all-categories/index.js"
+            web: "yes"
+            runtime: "nodejs:22"
+            annotations:
+              final: true
+            include:
+              - - "actions/render-all-categories/templates/*.hbs"
+                - "templates/"
           get-overlay-url:
             function: "actions/get-overlay-url/index.js"
             runtime: "nodejs:22"

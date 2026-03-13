@@ -283,6 +283,65 @@ const CategoryTreeBySlugsQuery = `
   }
 `;
 
+const CategoryTreeDetailQuery = `
+  query getCategoryTreeDetail($family: String!) {
+    categoryTree(family: $family) {
+      slug
+      name
+      level
+      parentSlug
+      childrenSlugs
+      metaTags {
+        title
+        description
+        keywords
+      }
+    }
+  }
+`;
+
+const CategoryTreeDetailBySlugsQuery = `
+  query getCategoryTreeDetailBySlugs($family: String!, $slugs: [String!], $depth: Int!) {
+    categoryTree(family: $family, slugs: $slugs, depth: $depth) {
+      slug
+      name
+      level
+      parentSlug
+      childrenSlugs
+      metaTags {
+        title
+        description
+        keywords
+      }
+    }
+  }
+`;
+
+const CategoryProductsQuery = `
+  query getCategoryProducts($currentPage: Int, $categoryPath: String!) {
+    productSearch(
+      phrase: "",
+      filter: [{ attribute: "categoryPath", eq: $categoryPath }],
+      page_size: 500,
+      current_page: $currentPage,
+      sort: { attribute: "name", direction: ASC }
+    ) {
+      items {
+        productView {
+          urlKey
+          sku
+          name
+        }
+      }
+      page_info {
+        current_page
+        total_pages
+      }
+      total_count
+    }
+  }
+`;
+
 module.exports = {
   ProductQuery,
   ProductByUrlKeyQuery,
@@ -295,4 +354,7 @@ module.exports = {
   GetUrlKeyQuery,
   CategoryTreeQuery,
   CategoryTreeBySlugsQuery,
+  CategoryTreeDetailQuery,
+  CategoryTreeDetailBySlugsQuery,
+  CategoryProductsQuery,
 };

@@ -1,0 +1,11 @@
+<head>
+  <meta charset="UTF-8">
+  <title>{{metaTitle}}</title>
+
+  {{#if metaDescription ~}}<meta name="description" content="{{metaDescription}}">{{/if ~}}
+  {{#if metaKeywords ~}}<meta name="keywords" content="{{metaKeywords}}">{{/if ~}}
+  {{#if slug ~}}<meta name="slug" content="{{slug}}">{{/if ~}}
+
+  <script type="application/ld+json">{{{ itemListLdJson }}}</script>
+  <script type="application/ld+json">{{{ breadcrumbListLdJson }}}</script>
+</head>

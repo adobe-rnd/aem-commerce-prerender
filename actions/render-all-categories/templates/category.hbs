@@ -1,0 +1,32 @@
+<nav class="breadcrumbs">
+  <ol>
+    {{#each breadcrumbs}}
+    <li>{{#if @last}}{{this.name}}{{else}}<a href="{{this.url}}">{{this.name}}</a>{{/if}}</li>
+    {{/each}}
+  </ol>
+</nav>
+<div class="category-details">
+  <div>
+    <div>
+      <h1>{{name}}</h1>
+    </div>
+  </div>
+  {{#if hasDescription}}
+  <div>
+    <div><h2>Description</h2></div>
+    <div><p>{{description}}</p></div>
+  </div>
+  {{/if}}
+  {{#if hasSubcategories}}
+  <div>
+    <div><h2>Subcategories</h2></div>
+    <div>
+      <ul>
+        {{#each subcategories}}
+        <li><a href="{{this.url}}">{{this.name}}</a></li>
+        {{/each}}
+      </ul>
+    </div>
+  </div>
+  {{/if}}
+</div>
