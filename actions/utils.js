@@ -22,6 +22,7 @@ const SITE_TYPES = Object.freeze({
 /* This file exposes some common utilities for your actions */
 
 const FILE_PREFIX = 'check-product-changes';
+const PLP_FILE_PREFIX = 'render-all-categories';
 const [STATE_FILE_EXT, PDP_FILE_EXT] = ['csv', 'html'];
 
 /**
@@ -507,6 +508,36 @@ function getProductUrl(product, context, addStore = true) {
  * @param {object} params The parameters object.
  * @returns {string} The default store URL.
  */
+/**
+ * Constructs the URL path for a category page.
+ *
+ * For ACO, the category slug IS the URL path (e.g. "electronics/computers-tablets"),
+ * so no configurable path format is needed (unlike PDP's PRODUCT_PAGE_URL_FORMAT).
+ * If a configurable PLP URL format is needed in the future, a CATEGORY_PAGE_URL_FORMAT
+ * env variable can be added following the same pattern as getProductUrl.
+ *
+ * @param {string} categorySlug - The category slug (e.g. "electronics/computers-tablets").
+ * @param {Object} context - The context object containing locale and storeUrl.
+ * @param {boolean} [addStore=true] - Whether to prepend the store URL.
+ * @returns {string} The category URL path.
+ */
+function getCategoryUrl(categorySlug, context, addStore = true) {
+  const { storeUrl } = context;
+  const segments = [];
+
+  if (context.locale) {
+    segments.push(context.locale);
+  }
+  segments.push(categorySlug);
+
+  const path = helixSharedStringLib.sanitizePath(`/${segments.join('/')}`);
+
+  if (addStore && storeUrl) {
+    return `${storeUrl}${path}`;
+  }
+  return path;
+}
+
 function getDefaultStoreURL(params) {
   const {
     ORG: orgName,
@@ -536,12 +567,14 @@ module.exports = {
   requestSpreadsheet,
   isValidUrl,
   getProductUrl,
+  getCategoryUrl,
   getDefaultStoreURL,
   formatMemoryUsage,
   requestPublishedProductsIndex,
   getSiteType,
   SITE_TYPES,
   FILE_PREFIX,
+  PLP_FILE_PREFIX,
   PDP_FILE_EXT,
   STATE_FILE_EXT,
 }

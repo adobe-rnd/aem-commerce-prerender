@@ -253,19 +253,19 @@ const CategoryTreeQuery = `
   query getCategoryTree($family: String!) {
     categoryTree(family: $family) {
       slug
-      # name
-      # level
-      # metaTags {
-      #   title
-      #   description
-      #   keywords
-      # }
-      # images {
-      #   url
-      #   label
-      #   roles
-      #   customRoles
-      # }
+      name
+      level
+      metaTags {
+        title
+        description
+        keywords
+      }
+      images {
+        url
+        label
+        roles
+        customRoles
+      }
       childrenSlugs
     }
   }
@@ -275,10 +275,50 @@ const CategoryTreeBySlugsQuery = `
   query getCategoryTreeBySlugs($family: String!, $slugs: [String!], $depth: Int!) {
     categoryTree(family: $family, slugs: $slugs, depth: $depth) {
       slug
-      # name
-      # level
-      # parentSlug
+      name
+      level
+      parentSlug
+      metaTags {
+        title
+        description
+        keywords
+      }
+      images {
+        url
+        label
+        roles
+        customRoles
+      }
       childrenSlugs
+    }
+  }
+`;
+
+const PlpProductSearchQuery = `
+  query plpProductSearch($categoryPath: String!, $pageSize: Int!, $currentPage: Int!) {
+    productSearch(
+      phrase: "",
+      filter: [{ attribute: "categoryPath", eq: $categoryPath }],
+      page_size: $pageSize,
+      current_page: $currentPage
+    ) {
+      items {
+        productView {
+          name
+          sku
+          urlKey
+          images(roles: ["image"]) {
+            url
+            label
+            roles
+          }
+        }
+      }
+      total_count
+      page_info {
+        current_page
+        total_pages
+      }
     }
   }
 `;
@@ -295,4 +335,5 @@ module.exports = {
   GetUrlKeyQuery,
   CategoryTreeQuery,
   CategoryTreeBySlugsQuery,
+  PlpProductSearchQuery,
 };
