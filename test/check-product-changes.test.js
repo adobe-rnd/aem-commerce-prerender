@@ -11,7 +11,9 @@ governing permissions and limitations under the License.
 */
 
 const assert = require('node:assert/strict');
-const { loadState, saveState, getFileLocation, poll } = require('../actions/check-product-changes/poller');
+const { poll } = require('../actions/check-product-changes/poller');
+const { loadState, saveState, getFileLocation } = require('../actions/renderUtils');
+const { FILE_PREFIX } = require('../actions/utils');
 const Files = require('./__mocks__/files');
 const { AdminAPI } = require('../actions/lib/aem');
 const { requestSaaS, isValidUrl, requestPublishedProductsIndex } = require('../actions/utils');
@@ -43,17 +45,21 @@ const mockLogger = {
   debug: jest.fn(),
 };
 
-jest.mock('../actions/utils', () => ({
-  requestSaaS: jest.fn(),
-  requestPublishedProductsIndex: jest.fn(),
-  isValidUrl: jest.fn(() => true),
-  getProductUrl: jest.fn(({ urlKey }) => `/p/${urlKey}`),
-  getDefaultStoreURL: jest.fn(() => 'https://content.com'),
-  formatMemoryUsage: jest.fn(() => '100MB'),
-  FILE_PREFIX: 'check-product-changes',
-  STATE_FILE_EXT: 'csv',
-  PDP_FILE_EXT: 'html',
-}));
+jest.mock('../actions/utils', () => {
+  const actual = jest.requireActual('../actions/utils');
+  return {
+    requestSaaS: jest.fn(),
+    requestPublishedProductsIndex: jest.fn(),
+    isValidUrl: jest.fn(() => true),
+    getProductUrl: jest.fn(({ urlKey }) => `/p/${urlKey}`),
+    getDefaultStoreURL: jest.fn(() => 'https://content.com'),
+    formatMemoryUsage: jest.fn(() => '100MB'),
+    createBatches: actual.createBatches,
+    FILE_PREFIX: 'check-product-changes',
+    STATE_FILE_EXT: 'csv',
+    PDP_FILE_EXT: 'html',
+  };
+});
 
 jest.spyOn(AdminAPI.prototype, 'startProcessing').mockImplementation(jest.fn());
 jest.spyOn(AdminAPI.prototype, 'stopProcessing').mockImplementation(jest.fn());
@@ -64,7 +70,7 @@ jest.spyOn(AdminAPI.prototype, 'previewAndPublish').mockImplementation((batch) =
       ...record,
       previewedAt: record.sku === 'sku-failed-due-preview' ? null : new Date(),
       publishedAt: record.sku === 'sku-failed-due-publishing' ? null : new Date(),
-    }))
+    })),
   });
 });
 
@@ -93,11 +99,11 @@ jest.mock('crypto', () => {
               if (content === '<html>Product 456</html>') return 'current-hash-for-product-456';
               if (content === '<html>Product 789</html>') return 'current-hash-for-product-789';
               return 'default-hash';
-            })
+            }),
           };
-        })
+        }),
       };
-    })
+    }),
   };
 });
 
@@ -127,17 +133,15 @@ describe('Poller', () => {
   };
 
   const setupSkuData = (filesLib, stateLib, skuData, lastQueriedAt) => {
-    const skuEntries = Object.entries(skuData).map(([sku, { timestamp, hash = '' }]) => 
-      `${sku},${timestamp},${hash}`
-    ).join('\n');
+    const skuEntries = Object.entries(skuData)
+      .map(([sku, { timestamp, hash = '' }]) => `${sku},${timestamp},${hash}`)
+      .join('\n');
 
-    let skuInfo = Object.entries(skuData).map(([sku]) => (
-      {
-        sku: `${sku}`
-      }
-    ));
+    let skuInfo = Object.entries(skuData).map(([sku]) => ({
+      sku: `${sku}`,
+    }));
 
-    skuInfo = JSON.stringify(skuInfo);    
+    skuInfo = JSON.stringify(skuInfo);
     filesLib.read.mockResolvedValueOnce(skuEntries).mockResolvedValueOnce(skuInfo);
     stateLib.get.mockResolvedValueOnce({ value: lastQueriedAt });
   };
@@ -148,18 +152,18 @@ describe('Poller', () => {
         return Promise.resolve({
           data: {
             productSearch: {
-              items: skus.map(sku => ({ productView: {sku} }))
-            }
+              items: skus.map((sku) => ({ productView: { sku } })),
+            },
           },
         });
       }
       if (operation === 'getLastModified') {
         return Promise.resolve({
           data: {
-            products: variables.skus.map(sku => ({ 
-              urlKey: `url-${sku}`, 
-              sku, 
-              lastModifiedAt: new Date().getTime() - lastModifiedOffset 
+            products: variables.skus.map((sku) => ({
+              urlKey: `url-${sku}`,
+              sku,
+              lastModifiedAt: new Date().getTime() - lastModifiedOffset,
             })),
           },
         });
@@ -177,29 +181,26 @@ describe('Poller', () => {
   it('loadState returns default state', async () => {
     const filesLib = new Files(0);
     const stateLib = new MockState(0);
-    const state = await loadState('uk', { filesLib, stateLib });
-    assert.deepEqual(
-      state,
-      {
-        locale: 'uk',
-        skus: {},
-      }
-    );
+    const state = await loadState('uk', { filesLib, stateLib }, FILE_PREFIX, 'skus');
+    assert.deepEqual(state, {
+      locale: 'uk',
+      skus: {},
+    });
   });
 
   it('loadState returns parsed state', async () => {
     const filesLib = new Files(0);
     const stateLib = new MockState(0);
-    await filesLib.write(getFileLocation('uk', 'csv'), EXAMPLE_STATE);
-    const state = await loadState('uk', { filesLib, stateLib });
+    await filesLib.write(getFileLocation(FILE_PREFIX, 'uk', 'csv'), EXAMPLE_STATE);
+    const state = await loadState('uk', { filesLib, stateLib }, FILE_PREFIX, 'skus');
     assert.deepEqual(state, EXAMPLE_EXPECTED_STATE);
   });
 
   it('loadState after saveState', async () => {
     const filesLib = new Files(0);
     const stateLib = new MockState(0);
-    await filesLib.write(getFileLocation('uk', 'csv'), EXAMPLE_STATE);
-    const state = await loadState('uk', { filesLib, stateLib });
+    await filesLib.write(getFileLocation(FILE_PREFIX, 'uk', 'csv'), EXAMPLE_STATE);
+    const state = await loadState('uk', { filesLib, stateLib }, FILE_PREFIX, 'skus');
     assert.deepEqual(state, EXAMPLE_EXPECTED_STATE);
     state.skus['sku1'] = {
       lastRenderedAt: new Date(4),
@@ -209,20 +210,20 @@ describe('Poller', () => {
       lastRenderedAt: new Date(5),
       hash: 'hash2',
     };
-    await saveState(state, { filesLib, stateLib });
+    await saveState(state, { filesLib, stateLib }, FILE_PREFIX, 'skus');
 
-    const serializedState = await filesLib.read(getFileLocation('uk', 'csv'));
+    const serializedState = await filesLib.read(getFileLocation(FILE_PREFIX, 'uk', 'csv'));
     assert.equal(serializedState, 'sku1,4,hash1\nsku2,5,hash2\nsku3,3,');
 
-    const newState = await loadState('uk', { filesLib, stateLib });
+    const newState = await loadState('uk', { filesLib, stateLib }, FILE_PREFIX, 'skus');
     assert.deepEqual(newState, state);
   });
 
   it('loadState after saveState with null storeCode', async () => {
     const filesLib = new Files(0);
     const stateLib = new MockState(0);
-    await filesLib.write(getFileLocation('default', 'csv'), EXAMPLE_STATE);
-    const state = await loadState('default', { filesLib, stateLib });
+    await filesLib.write(getFileLocation(FILE_PREFIX, 'default', 'csv'), EXAMPLE_STATE);
+    const state = await loadState('default', { filesLib, stateLib }, FILE_PREFIX, 'skus');
     const expectedState = {
       ...EXAMPLE_EXPECTED_STATE,
       locale: 'default',
@@ -236,9 +237,9 @@ describe('Poller', () => {
       lastRenderedAt: new Date(5),
       hash: 'hash2',
     };
-    await saveState(state, { filesLib, stateLib });
+    await saveState(state, { filesLib, stateLib }, FILE_PREFIX, 'skus');
 
-    const serializedState = await filesLib.read(getFileLocation('default', 'csv'));
+    const serializedState = await filesLib.read(getFileLocation(FILE_PREFIX, 'default', 'csv'));
     assert.equal(serializedState, 'sku1,4,hash1\nsku2,5,hash2\nsku3,3,');
   });
 
@@ -246,12 +247,13 @@ describe('Poller', () => {
     it('should throw an error if required parameters are missing', async () => {
       const params = { ...defaultParams };
       delete params.configName;
-      
+
       const filesLib = mockFiles();
       const stateLib = mockState();
 
-      await expect(poll(params, { filesLib, stateLib }, mockLogger))
-        .rejects.toThrow('Missing required parameters: configName');
+      await expect(poll(params, { filesLib, stateLib }, mockLogger)).rejects.toThrow(
+        'Missing required parameters: configName',
+      );
     });
 
     it('should throw an error if STORE_URL is invalid', async () => {
@@ -260,12 +262,11 @@ describe('Poller', () => {
         ...defaultParams,
         storeUrl: 'invalid-url',
       };
-      
+
       const filesLib = mockFiles();
       const stateLib = mockState();
 
-      await expect(poll(params, { filesLib, stateLib }, mockLogger))
-        .rejects.toThrow('Invalid storeUrl');
+      await expect(poll(params, { filesLib, stateLib }, mockLogger)).rejects.toThrow('Invalid storeUrl');
     });
   });
 
@@ -277,12 +278,12 @@ describe('Poller', () => {
 
       // Setup initial state with existing products
       setupSkuData(
-          filesLib,
-          stateLib,
-          {
-            'sku-123': { timestamp: now - 100000, hash: 'old-hash-for-product-123' }
-          },
-          now - 700000
+        filesLib,
+        stateLib,
+        {
+          'sku-123': { timestamp: now - 100000, hash: 'old-hash-for-product-123' },
+        },
+        now - 700000,
       );
 
       // Mock catalog service responses
@@ -297,23 +298,18 @@ describe('Poller', () => {
 
       // Verify hash was updated
       expect(filesLib.write).toHaveBeenCalledWith(
-          expect.any(String),
-          expect.stringContaining('current-hash-for-product-123')
+        expect.any(String),
+        expect.stringContaining('current-hash-for-product-123'),
       );
 
       // Verify HTML file was saved
-      expect(filesLib.write).toHaveBeenCalledWith(
-        '/public/pdps/p/url-sku-123.html',
-        '<html>Product 123</html>'
-      );
+      expect(filesLib.write).toHaveBeenCalledWith('/public/pdps/p/url-sku-123.html', '<html>Product 123</html>');
 
       // Verify API calls
       expect(AdminAPI.prototype.previewAndPublish).toHaveBeenCalledWith(
-          expect.arrayContaining([
-            expect.objectContaining({ path: '/p/url-sku-123', sku: 'sku-123' })
-          ]),
-          null,
-          1
+        expect.arrayContaining([expect.objectContaining({ path: '/p/url-sku-123', sku: 'sku-123' })]),
+        null,
+        1,
       );
       expect(AdminAPI.prototype.startProcessing).toHaveBeenCalledTimes(1);
       expect(AdminAPI.prototype.stopProcessing).toHaveBeenCalledTimes(1);
@@ -353,34 +349,34 @@ describe('Poller', () => {
       const filesLib = mockFiles();
       const stateLib = mockState();
       const lastRenderedAt = now - 10000;
-      
+
       // Setup initial state with existing products that have current hash
       setupSkuData(
-        filesLib, 
-        stateLib, 
+        filesLib,
+        stateLib,
         {
-          'sku-456': { timestamp: lastRenderedAt, hash: 'current-hash-for-product-456' }
-        }, 
-        now - 700000
+          'sku-456': { timestamp: lastRenderedAt, hash: 'current-hash-for-product-456' },
+        },
+        now - 700000,
       );
-      
+
       // Mock catalog service responses
       mockSaaSResponse(['sku-456'], 5000);
-      
+
       const result = await poll(defaultParams, { filesLib, stateLib }, mockLogger);
 
       // Verify results
       expect(result.state).toBe('completed');
       expect(result.status.published).toBe(0);
       expect(result.status.ignored).toBe(1);
-      
+
       // Verify no preview/publish was called
       expect(AdminAPI.prototype.previewAndPublish).not.toHaveBeenCalled();
 
       // Verify state was updated with the lastRenderedAt
       expect(filesLib.write).toHaveBeenCalledWith(
         'check-product-changes/default.csv',
-        expect.not.stringContaining(String(lastRenderedAt))
+        expect.not.stringContaining(String(lastRenderedAt)),
       );
     });
 
@@ -388,28 +384,28 @@ describe('Poller', () => {
       const now = new Date().getTime();
       const filesLib = mockFiles();
       const stateLib = mockState();
-      
+
       // Setup initial state with existing products
       setupSkuData(
-        filesLib, 
-        stateLib, 
+        filesLib,
+        stateLib,
         {
           'sku-failed-due-preview': { timestamp: now - 100000 },
-          'sku-failed-due-publishing': { timestamp: now - 100000 }
-        }, 
-        now - 700000
+          'sku-failed-due-publishing': { timestamp: now - 100000 },
+        },
+        now - 700000,
       );
-      
+
       // Mock catalog service responses
       mockSaaSResponse(['sku-failed-due-preview', 'sku-failed-due-publishing'], 20000);
-      
+
       const result = await poll(defaultParams, { filesLib, stateLib }, mockLogger);
 
       // Verify results
       expect(result.state).toBe('completed');
       expect(result.status.published).toBe(0);
       expect(result.status.failed).toBe(2);
-      
+
       // Verify API calls
       expect(AdminAPI.prototype.previewAndPublish).toHaveBeenCalledTimes(1);
     });
@@ -418,19 +414,19 @@ describe('Poller', () => {
       const now = new Date().getTime();
       const filesLib = mockFiles();
       const stateLib = mockState();
-      
+
       // Setup initial state with recently processed products
       setupSkuData(
-        filesLib, 
-        stateLib, 
+        filesLib,
+        stateLib,
         {
           'sku-123': { timestamp: now - 10000 },
           'sku-456': { timestamp: now - 10000 },
-          'sku-789': { timestamp: now - 10000 }
-        }, 
-        now - 100000 // Recent query time
+          'sku-789': { timestamp: now - 10000 },
+        },
+        now - 100000, // Recent query time
       );
-      
+
       // Mock catalog service responses with older modification times
       requestSaaS.mockImplementation((query, operation) => {
         if (operation === 'getLastModified') {
@@ -446,14 +442,14 @@ describe('Poller', () => {
         }
         return Promise.resolve({});
       });
-      
+
       const result = await poll(defaultParams, { filesLib, stateLib }, mockLogger);
 
       // Verify results
       expect(result.state).toBe('completed');
       expect(result.status.published).toBe(0);
       expect(result.status.ignored).toBe(3);
-      
+
       // Verify no processing occurred
       expect(AdminAPI.prototype.previewAndPublish).not.toHaveBeenCalled();
       expect(filesLib.write).not.toHaveBeenCalled();
@@ -463,8 +459,15 @@ describe('Poller', () => {
   // Test: Poller › Product unpublishing › should unpublish products that are not in the catalog
   describe('Product unpublishing', () => {
     it.each([
-        [[{ sku: 'sku-456', path: '/p/url-sku-456' }, { sku: 'sku-failed', path: '/p/url-sku-failed' }], 1, 1],
-        [[{ sku: 'sku-456', path: '/p/url-sku-456' }], 1, 0],
+      [
+        [
+          { sku: 'sku-456', path: '/p/url-sku-456' },
+          { sku: 'sku-failed', path: '/p/url-sku-failed' },
+        ],
+        1,
+        1,
+      ],
+      [[{ sku: 'sku-456', path: '/p/url-sku-456' }], 1, 0],
     ])('should unpublish products that are not in the catalog', async (spreadsheetResponse, unpublished, failed) => {
       const now = new Date().getTime();
       const filesLib = mockFiles();
@@ -472,14 +475,14 @@ describe('Poller', () => {
 
       // Setup initial state with products that will be partially removed
       setupSkuData(
-          filesLib,
-          stateLib,
-          {
-            'sku-123': { timestamp: now - 10000 },
-            'sku-456': { timestamp: now - 10000 },
-            'sku-failed': { timestamp: now - 10000 }
-          },
-          now - 100000
+        filesLib,
+        stateLib,
+        {
+          'sku-123': { timestamp: now - 10000 },
+          'sku-456': { timestamp: now - 10000 },
+          'sku-failed': { timestamp: now - 10000 },
+        },
+        now - 100000,
       );
 
       // Mock catalog service to only return one product
@@ -487,9 +490,7 @@ describe('Poller', () => {
         if (operation === 'getLastModified') {
           return Promise.resolve({
             data: {
-              products: [
-                { urlKey: 'url-sku-123', sku: 'sku-123', lastModifiedAt: now - 20000 },
-              ],
+              products: [{ urlKey: 'url-sku-123', sku: 'sku-123', lastModifiedAt: now - 20000 }],
             },
           });
         }
@@ -544,9 +545,9 @@ describe('Poller', () => {
         stateLib,
         {
           'sku-123': { timestamp: now - 10000 },
-          'sku-456': { timestamp: now - 10000 }
+          'sku-456': { timestamp: now - 10000 },
         },
-        now - 100000
+        now - 100000,
       );
 
       // Mock catalog service to only return no products (all should be unpublished)
@@ -566,7 +567,7 @@ describe('Poller', () => {
         return Promise.resolve({
           data: [
             { sku: 'sku-123', path: '/p/url-sku-123' },
-            { sku: 'sku-456', path: '/p/url-sku-456' }
+            { sku: 'sku-456', path: '/p/url-sku-456' },
           ],
         });
       });
@@ -578,8 +579,8 @@ describe('Poller', () => {
             sku,
             path,
             liveUnpublishedAt: new Date(),
-            previewUnpublishedAt: new Date()
-          }))
+            previewUnpublishedAt: new Date(),
+          })),
         });
       });
 

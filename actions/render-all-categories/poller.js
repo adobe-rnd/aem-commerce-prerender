@@ -10,130 +10,47 @@ OF ANY KIND, either express or implied. See the License for the specific languag
 governing permissions and limitations under the License.
 */
 
-const crypto = require("crypto");
-const { Timings, aggregate } = require("../lib/benchmark");
-const { AdminAPI } = require("../lib/aem");
+const crypto = require('crypto');
+const { Timings, aggregate } = require('../lib/benchmark');
+const { AdminAPI } = require('../lib/aem');
 const {
   requestSaaS,
-  isValidUrl,
   getCategoryUrl,
+  getConfig,
+  getSiteType,
   formatMemoryUsage,
+  createBatches,
   PLP_FILE_PREFIX,
-  STATE_FILE_EXT,
-} = require("../utils");
-const { PlpProductSearchQuery } = require("../queries");
-const { getCategoryDataFromFamilies } = require("../categories");
-const { generateCategoryHtml } = require("../plp-renderer/render");
-const { JobFailedError, ERROR_CODES } = require("../lib/errorHandler");
-
-const BATCH_SIZE = 50;
-const PLP_FILE_EXT = "html";
-
-function getFileLocation(stateKey, extension) {
-  return `${PLP_FILE_PREFIX}/${stateKey}.${extension}`;
-}
-
-/**
- * Loads the PLP state from the cloud file system.
- *
- * @param {string} locale - The locale.
- * @param {Object} aioLibs - { filesLib, stateLib }.
- * @returns {Promise<Object>} State object with { locale, categories: { [slug]: { lastRenderedAt, hash } } }.
- */
-async function loadState(locale, aioLibs) {
-  const { filesLib } = aioLibs;
-  const stateObj = { locale, categories: {} };
-  try {
-    const stateKey = locale || "default";
-    const fileLocation = getFileLocation(stateKey, STATE_FILE_EXT);
-    const buffer = await filesLib.read(fileLocation);
-    const stateData = buffer?.toString();
-    if (stateData) {
-      const lines = stateData.split("\n");
-      stateObj.categories = lines.reduce((acc, line) => {
-        // format: <categorySlug>,<timestamp>,<hash>
-        const [slug, time, hash] = line.split(",");
-        if (slug) {
-          acc[slug] = { lastRenderedAt: new Date(parseInt(time)), hash };
-        }
-        return acc;
-      }, {});
-    }
-    // eslint-disable-next-line no-unused-vars
-  } catch (e) {
-    stateObj.categories = {};
-  }
-  return stateObj;
-}
-
-/**
- * Saves the PLP state to the cloud file system.
- *
- * @param {Object} state - State object with { locale, categories }.
- * @param {Object} aioLibs - { filesLib, stateLib }.
- * @returns {Promise<void>}
- */
-async function saveState(state, aioLibs) {
-  const { filesLib } = aioLibs;
-  const stateKey = state.locale || "default";
-  const fileLocation = getFileLocation(stateKey, STATE_FILE_EXT);
-  const csvData = Object.entries(state.categories)
-    .filter(([, { lastRenderedAt }]) => Boolean(lastRenderedAt))
-    .map(
-      ([slug, { lastRenderedAt, hash }]) =>
-        `${slug},${lastRenderedAt.getTime()},${hash || ""}`,
-    )
-    .join("\n");
-  return await filesLib.write(fileLocation, csvData);
-}
-
-function shouldPreviewAndPublish({ currentHash, newHash }) {
-  return newHash && currentHash !== newHash;
-}
-
-function createBatches(items) {
-  return items.reduce((acc, item) => {
-    if (!acc.length || acc[acc.length - 1].length === BATCH_SIZE) {
-      acc.push([]);
-    }
-    acc[acc.length - 1].push(item);
-    return acc;
-  }, []);
-}
+  SITE_TYPES,
+} = require('../utils');
+const {
+  getHtmlFilePath,
+  getFileLocation,
+  loadState,
+  saveState,
+  shouldPreviewAndPublish,
+  processPublishedBatch,
+  validateRequiredParams,
+} = require('../renderUtils');
+const { PlpProductSearchQuery } = require('../queries');
+const { getCategoryDataFromFamilies } = require('../categories');
+const { generateCategoryHtml } = require('../plp-renderer/render');
+const { JobFailedError, ERROR_CODES } = require('../lib/errorHandler');
+const DATA_KEY = 'categories';
 
 function checkParams(params) {
-  const requiredParams = [
-    "site",
-    "org",
-    "adminAuthToken",
-    "configName",
-    "contentUrl",
-    "storeUrl",
-  ];
-  const missingParams = requiredParams.filter((param) => !params[param]);
-  if (missingParams.length > 0) {
-    throw new JobFailedError(
-      `Missing required parameters: ${missingParams.join(", ")}`,
-      ERROR_CODES.VALIDATION_ERROR,
-      400,
-      { missingParams },
-    );
-  }
-
-  if (params.storeUrl && !isValidUrl(params.storeUrl)) {
-    throw new JobFailedError(
-      "Invalid storeUrl",
-      ERROR_CODES.VALIDATION_ERROR,
-      400,
-    );
-  }
+  validateRequiredParams(params, [
+    'site',
+    'org',
+    'pathFormat',
+    'adminAuthToken',
+    'configName',
+    'contentUrl',
+    'storeUrl',
+  ]);
 
   if (!params.categoryFamilies?.length) {
-    throw new JobFailedError(
-      "Missing ACO_CATEGORY_FAMILIES configuration",
-      ERROR_CODES.VALIDATION_ERROR,
-      400,
-    );
+    throw new JobFailedError('Missing ACO_CATEGORY_FAMILIES configuration', ERROR_CODES.VALIDATION_ERROR, 400);
   }
 }
 
@@ -145,7 +62,7 @@ async function renderCategory(categoryData, categoryMap, context) {
   const { logger } = context;
 
   if (!renderLimit$) {
-    renderLimit$ = import("p-limit").then(({ default: pLimit }) => pLimit(50));
+    renderLimit$ = import('p-limit').then(({ default: pLimit }) => pLimit(50));
   }
 
   return (await renderLimit$)(async () => {
@@ -160,7 +77,7 @@ async function renderCategory(categoryData, categoryMap, context) {
       // Fetch first page of products for this category
       const productsRes = await requestSaaS(
         PlpProductSearchQuery,
-        "plpProductSearch",
+        'plpProductSearch',
         {
           categoryPath: slug,
           pageSize: context.plpProductsPerPage,
@@ -169,25 +86,18 @@ async function renderCategory(categoryData, categoryMap, context) {
         context,
       );
 
-      const products = productsRes.data.productSearch.items.map(
-        (item) => item.productView,
-      );
+      const products = productsRes.data.productSearch.items.map((item) => item.productView);
 
       // Render HTML
-      const html = generateCategoryHtml(
-        categoryData,
-        products,
-        categoryMap,
-        context,
-      );
+      const html = generateCategoryHtml(categoryData, products, categoryMap, context);
       result.renderedAt = new Date();
-      result.newHash = crypto.createHash("sha256").update(html).digest("hex");
+      result.newHash = crypto.createHash('sha256').update(html).digest('hex');
 
       // Save HTML if changed
       if (shouldPreviewAndPublish(result) && html) {
         try {
           const { filesLib } = context.aioLibs;
-          const htmlPath = `/public/plps${result.path}.${PLP_FILE_EXT}`;
+          const htmlPath = getHtmlFilePath(result.path);
           await filesLib.write(htmlPath, html);
           logger.debug(`Saved HTML for category ${slug} to ${htmlPath}`);
         } catch (e) {
@@ -204,29 +114,53 @@ async function renderCategory(categoryData, categoryMap, context) {
 }
 
 /**
- * Processes a published batch and updates state.
+ * Unpublishes and deletes categories that are no longer in the category tree.
  */
-async function processPublishedBatch(
-  publishedBatch,
-  state,
-  counts,
-  renderedCategories,
-  aioLibs,
-) {
-  const { records } = publishedBatch;
-  records.forEach((record) => {
-    if (record.previewedAt && record.publishedAt) {
-      const category = renderedCategories.find((c) => c.slug === record.slug);
-      state.categories[record.slug] = {
-        lastRenderedAt: record.renderedAt,
-        hash: category?.newHash,
-      };
-      counts.published++;
-    } else {
-      counts.failed++;
+async function processRemovedCategories(discoveredSlugs, state, context, adminApi) {
+  const { locale, counts, logger, aioLibs } = context;
+  const { filesLib } = aioLibs;
+  const stateSlugs = Object.keys(state.categories);
+  const removedSlugs = stateSlugs.filter((slug) => !discoveredSlugs.has(slug));
+
+  if (!removedSlugs.length) return;
+
+  logger.info(`Found ${removedSlugs.length} categories to unpublish for locale ${locale}`);
+
+  try {
+    const records = removedSlugs.map((slug) => ({
+      slug,
+      path: getCategoryUrl(slug, context, false).toLowerCase(),
+    }));
+
+    const batches = createBatches(records);
+    const pendingBatches = [];
+    for (let batchNumber = 0; batchNumber < batches.length; batchNumber++) {
+      const batchRecords = batches[batchNumber];
+      const pendingBatch = adminApi.unpublishAndDelete(batchRecords, locale, batchNumber + 1).then(({ records }) => {
+        records.forEach((record) => {
+          if (record.liveUnpublishedAt && record.previewUnpublishedAt) {
+            try {
+              const htmlPath = getHtmlFilePath(record.path);
+              filesLib.delete(htmlPath);
+              logger.debug(`Deleted HTML file for category ${record.slug} from ${htmlPath}`);
+            } catch (e) {
+              logger.warn(`Error deleting HTML file for category ${record.slug}:`, e);
+            }
+
+            delete state.categories[record.slug];
+            counts.unpublished++;
+          } else {
+            counts.failed++;
+          }
+        });
+      });
+      pendingBatches.push(pendingBatch);
     }
-  });
-  await saveState(state, aioLibs);
+    await Promise.all(pendingBatches);
+    await saveState(state, aioLibs, PLP_FILE_PREFIX, DATA_KEY);
+  } catch (e) {
+    logger.error('Error processing removed categories:', e);
+  }
 }
 
 /**
@@ -236,7 +170,7 @@ async function poll(params, aioLibs, logger) {
   try {
     checkParams(params);
 
-    const counts = { published: 0, ignored: 0, failed: 0 };
+    const counts = { published: 0, unpublished: 0, ignored: 0, failed: 0 };
     const {
       org,
       site,
@@ -256,9 +190,9 @@ async function poll(params, aioLibs, logger) {
 
     const locales = Array.isArray(rawLocales)
       ? rawLocales
-      : typeof rawLocales === "string" && rawLocales.trim()
+      : typeof rawLocales === 'string' && rawLocales.trim()
         ? rawLocales
-            .split(",")
+            .split(',')
             .map((s) => s.trim())
             .filter(Boolean)
         : [null];
@@ -286,7 +220,7 @@ async function poll(params, aioLibs, logger) {
 
     logger.info(`Starting PLP poll from ${storeUrl} for locales ${locales}`);
 
-    let stateText = "completed";
+    let stateText = 'completed';
 
     try {
       await adminApi.startProcessing();
@@ -295,23 +229,28 @@ async function poll(params, aioLibs, logger) {
         locales.map(async (locale) => {
           const timings = new Timings();
           const context = { ...sharedContext, startTime: new Date() };
+          const siteConfig = await getConfig(context);
+          const siteType = getSiteType(siteConfig);
           if (locale) context.locale = locale;
 
           logger.info(`PLP polling for locale ${locale}`);
 
           // Discover all categories
-          const categoryMap = await getCategoryDataFromFamilies(
-            context,
-            categoryFamilies,
-          );
-          timings.sample("discover-categories");
+          let categoryMap;
+          if (siteType === SITE_TYPES.ACO) {
+            categoryMap = await getCategoryDataFromFamilies(context, categoryFamilies);
+          } else {
+            throw new JobFailedError(
+              'ACCS is not yet support for PLP pre-rendering',
+              ERROR_CODES.VALIDATION_ERROR,
+              400,
+            );
+          }
+          timings.sample('discover-categories');
 
           // Save category list for reference
           const { filesLib } = aioLibs;
-          const categoriesFileName = getFileLocation(
-            `${locale || "default"}-categories`,
-            "json",
-          );
+          const categoriesFileName = getFileLocation(PLP_FILE_PREFIX, `${locale || 'default'}-categories`, 'json');
           const categoryList = [...categoryMap.entries()]
             .filter(([, data]) => data != null)
             .map(([slug, data]) => ({
@@ -319,30 +258,19 @@ async function poll(params, aioLibs, logger) {
               name: data.name,
               level: data.level,
             }));
-          await filesLib.write(
-            categoriesFileName,
-            JSON.stringify(categoryList),
-          );
+          await filesLib.write(categoriesFileName, JSON.stringify(categoryList));
 
           // Load state
-          const state = await loadState(locale, aioLibs);
+          const state = await loadState(locale, aioLibs, PLP_FILE_PREFIX, DATA_KEY);
           context.state = state;
 
-          logger.info(
-            `Discovered ${categoryMap.size} categories for locale ${locale}`,
-          );
+          logger.info(`Discovered ${categoryMap.size} categories for locale ${locale}`);
 
           // Render all categories in batches
-          const categorySlugs = [...categoryMap.keys()].filter(
-            (slug) => categoryMap.get(slug) != null,
-          );
+          const categorySlugs = [...categoryMap.keys()].filter((slug) => categoryMap.get(slug) != null);
           const batches = createBatches(categorySlugs);
           const pendingBatches = batches.map((batch, batchNumber) => {
-            return Promise.all(
-              batch.map((slug) =>
-                renderCategory(categoryMap.get(slug), categoryMap, context),
-              ),
-            )
+            return Promise.all(batch.map((slug) => renderCategory(categoryMap.get(slug), categoryMap, context)))
               .then(async (renderedCategories) => {
                 // Filter to only those that changed
                 const toPublish = [];
@@ -350,54 +278,46 @@ async function poll(params, aioLibs, logger) {
                 for (const category of renderedCategories) {
                   if (shouldPreviewAndPublish(category)) {
                     toPublish.push(category);
+                  } else if (!category.renderedAt) {
+                    counts.failed++;
                   } else {
                     counts.ignored++;
-                    // Update lastRenderedAt even if hash unchanged
-                    if (category.renderedAt) {
-                      state.categories[category.slug] = {
-                        lastRenderedAt: category.renderedAt,
-                        hash: category.currentHash,
-                      };
-                    }
+                    state.categories[category.slug] = {
+                      lastRenderedAt: category.renderedAt,
+                      hash: category.currentHash,
+                    };
                     toIgnore.push(category);
                   }
                 }
 
                 if (toIgnore.length) {
-                  await saveState(state, aioLibs);
+                  await saveState(state, aioLibs, PLP_FILE_PREFIX, DATA_KEY);
                 }
 
                 return toPublish;
               })
               .then((categories) => {
                 if (categories.length) {
-                  const records = categories.map(
-                    ({ slug, path, renderedAt }) => ({
-                      slug,
-                      path,
-                      renderedAt,
-                    }),
-                  );
+                  const records = categories.map(({ slug, path, renderedAt }) => ({
+                    slug,
+                    path,
+                    renderedAt,
+                  }));
                   return adminApi
                     .previewAndPublish(records, locale, batchNumber + 1)
                     .then((publishedBatch) =>
-                      processPublishedBatch(
-                        publishedBatch,
-                        state,
-                        counts,
-                        categories,
-                        aioLibs,
-                      ),
+                      processPublishedBatch(publishedBatch, state, counts, categories, aioLibs, {
+                        dataKey: DATA_KEY,
+                        keyField: 'slug',
+                        filePrefix: PLP_FILE_PREFIX,
+                      }),
                     )
                     .catch((error) => {
                       if (error.code === ERROR_CODES.BATCH_ERROR) {
-                        logger.warn(
-                          `Batch ${batchNumber + 1} failed, continuing:`,
-                          {
-                            error: error.message,
-                            details: error.details,
-                          },
-                        );
+                        logger.warn(`Batch ${batchNumber + 1} failed, continuing:`, {
+                          error: error.message,
+                          details: error.details,
+                        });
                         counts.failed += categories.length;
                         return {
                           failed: true,
@@ -413,7 +333,16 @@ async function poll(params, aioLibs, logger) {
               });
           });
           await Promise.all(pendingBatches);
-          timings.sample("rendered-categories");
+          timings.sample('rendered-categories');
+
+          // Unpublish categories that are no longer in the tree
+          const discoveredSlugs = new Set(categorySlugs);
+          if (Object.keys(state.categories).some((slug) => !discoveredSlugs.has(slug))) {
+            await processRemovedCategories(discoveredSlugs, state, context, adminApi);
+            timings.sample('unpublished-categories');
+          } else {
+            timings.sample('unpublished-categories', 0);
+          }
 
           return timings.measures;
         }),
@@ -425,8 +354,7 @@ async function poll(params, aioLibs, logger) {
       for (const measure of results) {
         for (const [name, value] of Object.entries(measure)) {
           if (!timings.measures[name]) timings.measures[name] = [];
-          if (!Array.isArray(timings.measures[name]))
-            timings.measures[name] = [timings.measures[name]];
+          if (!Array.isArray(timings.measures[name])) timings.measures[name] = [timings.measures[name]];
           timings.measures[name].push(value);
         }
       }
@@ -435,13 +363,13 @@ async function poll(params, aioLibs, logger) {
       }
       timings.measures.previewDuration = aggregate(adminApi.previewDurations);
     } catch (e) {
-      logger.error("Error during PLP poll processing:", {
+      logger.error('Error during PLP poll processing:', {
         message: e.message,
         code: e.code,
         stack: e.stack,
       });
       await adminApi.stopProcessing();
-      stateText = "failure";
+      stateText = 'failure';
 
       if (e.isJobFailed) {
         throw e;
@@ -476,7 +404,7 @@ async function poll(params, aioLibs, logger) {
       memoryUsage,
     };
   } catch (error) {
-    logger.error("PLP poll failed with error:", {
+    logger.error('PLP poll failed with error:', {
       message: error.message,
       code: error.code,
       stack: error.stack,
@@ -495,9 +423,4 @@ async function poll(params, aioLibs, logger) {
   }
 }
 
-module.exports = {
-  poll,
-  loadState,
-  saveState,
-  getFileLocation,
-};
+module.exports = { poll };

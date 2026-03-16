@@ -12,12 +12,8 @@ governing permissions and limitations under the License.
 
 */
 
-const { requestSaaS } = require("./utils");
-const {
-  CategoriesQuery,
-  CategoryTreeQuery,
-  CategoryTreeBySlugsQuery,
-} = require("./queries");
+const { requestSaaS } = require('./utils');
+const { CategoriesQuery, CategoryTreeQuery, CategoryTreeBySlugsQuery } = require('./queries');
 
 const MAX_TREE_DEPTH = 3;
 
@@ -50,18 +46,13 @@ function hasFamilies(families) {
  * @returns {Promise<Map<string, Object>>} Map of category slug to category metadata.
  */
 async function fetchCategoryTree(context, families) {
-  console.debug("Getting category data from families:", families);
+  console.debug('Getting category data from families:', families);
   const categoryMap = new Map();
 
   for (const family of families) {
-    console.debug("Getting category data from family:", family);
+    console.debug('Getting category data from family:', family);
     // Get root-level categories for this family
-    const firstLevel = await requestSaaS(
-      CategoryTreeQuery,
-      "getCategoryTree",
-      { family },
-      context,
-    );
+    const firstLevel = await requestSaaS(CategoryTreeQuery, 'getCategoryTree', { family }, context);
 
     let pending = [];
     for (const cat of firstLevel.data.categoryTree) {
@@ -78,7 +69,7 @@ async function fetchCategoryTree(context, families) {
 
       const childrenRes = await requestSaaS(
         CategoryTreeBySlugsQuery,
-        "getCategoryTreeBySlugs",
+        'getCategoryTreeBySlugs',
         { family, slugs: pending, depth: MAX_TREE_DEPTH },
         context,
       );
@@ -97,7 +88,7 @@ async function fetchCategoryTree(context, families) {
       }
     }
   }
-  console.debug("Category slugs resolved:", [...categoryMap.keys()]);
+  console.debug('Category slugs resolved:', [...categoryMap.keys()]);
 
   return categoryMap;
 }
@@ -130,15 +121,13 @@ async function getCategoryDataFromFamilies(context, families) {
 }
 
 /**
- * Last-resort fallback: converts a slug segment to a human-readable name
- * when the category is not found in the map (e.g. if a childSlug was
- * referenced but not returned by the API).
+ * Converts a slug segment to a category name if a name is not provided.
  * E.g. "computers-tablets" → "Computers Tablets"
  *
  * Callers should always prefer category.name from the API response.
  */
-function humanizeSlugSegment(segment) {
-  return segment.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+function getCategoryNameFromSlug(segment) {
+  return segment.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 /**
@@ -149,13 +138,13 @@ function humanizeSlugSegment(segment) {
  * @returns {Array<{name: string, slug: string}>} Breadcrumb entries.
  */
 function buildBreadcrumbs(slug, categoryMap) {
-  const segments = slug.split("/");
+  const segments = slug.split('/');
   const breadcrumbs = [];
 
   for (let i = 0; i < segments.length; i++) {
-    const ancestorSlug = segments.slice(0, i + 1).join("/");
+    const ancestorSlug = segments.slice(0, i + 1).join('/');
     const category = categoryMap.get(ancestorSlug);
-    const name = category?.name || humanizeSlugSegment(segments[i]);
+    const name = category?.name || getCategoryNameFromSlug(segments[i]);
     breadcrumbs.push({ name, slug: ancestorSlug });
   }
 
@@ -173,12 +162,7 @@ function buildBreadcrumbs(slug, categoryMap) {
  * @returns {Promise<string[][]>} Sparse array where index N holds urlPath strings at level N.
  */
 async function getCategories(context) {
-  const categoriesRes = await requestSaaS(
-    CategoriesQuery,
-    "getCategories",
-    {},
-    context,
-  );
+  const categoriesRes = await requestSaaS(CategoriesQuery, 'getCategories', {}, context);
   const byLevel = [];
   for (const { urlPath, level } of categoriesRes.data.categories) {
     const idx = parseInt(level);

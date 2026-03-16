@@ -23,66 +23,65 @@ const { handleActionError } = require('../lib/errorHandler');
  * @returns {Promise<Object>}
  */
 async function main(params) {
-    let logger;
+  let logger;
+
+  try {
+    const cfg = getRuntimeConfig(params, { validateToken: true });
+    logger = Core.Logger('main', { level: cfg.logLevel });
+
+    const observabilityClient = new ObservabilityClient(logger, {
+      token: cfg.adminAuthToken,
+      endpoint: cfg.logIngestorEndpoint,
+      org: cfg.org,
+      site: cfg.site,
+    });
+
+    const stateLib = await State.init(params.libInit || {});
+    const filesLib = await Files.init(params.libInit || {});
+    const stateMgr = new StateManager(stateLib, { logger });
+
+    let activationResult;
+
+    const running = await stateMgr.get('plp-running');
+    if (running?.value === 'true') {
+      activationResult = { state: 'skipped' };
+
+      try {
+        await observabilityClient.sendActivationResult(activationResult);
+      } catch (obsErr) {
+        logger.warn('Failed to send activation result (skipped).', obsErr);
+      }
+
+      return activationResult;
+    }
 
     try {
-        const cfg = getRuntimeConfig(params, { validateToken: true });
-        logger = Core.Logger('main', { level: cfg.logLevel });
+      await stateMgr.put('plp-running', 'true', { ttl: 3600 });
 
-        const observabilityClient = new ObservabilityClient(logger, {
-            token: cfg.adminAuthToken,
-            endpoint: cfg.logIngestorEndpoint,
-            org: cfg.org,
-            site: cfg.site
-        });
-
-        const stateLib = await State.init(params.libInit || {});
-        const filesLib = await Files.init(params.libInit || {});
-        const stateMgr = new StateManager(stateLib, { logger });
-
-        let activationResult;
-
-        const running = await stateMgr.get('plp-running');
-        if (running?.value === 'true') {
-            activationResult = { state: 'skipped' };
-
-            try {
-                await observabilityClient.sendActivationResult(activationResult);
-            } catch (obsErr) {
-                logger.warn('Failed to send activation result (skipped).', obsErr);
-            }
-
-            return activationResult;
-        }
-
-        try {
-            await stateMgr.put('plp-running', 'true', { ttl: 3600 });
-
-            activationResult = await poll(cfg, { stateLib: stateMgr, filesLib }, logger);
-        } finally {
-            try {
-                await stateMgr.put('plp-running', 'false');
-            } catch (stateErr) {
-                (logger || Core.Logger('main', { level: 'error' }))
-                    .error('Failed to reset running state.', stateErr);
-            }
-        }
-
-        try {
-            await observabilityClient.sendActivationResult(activationResult);
-        } catch (obsErr) {
-            logger.warn('Failed to send activation result.', obsErr);
-        }
-
-        return activationResult;
-    } catch (error) {
-        logger = logger || Core.Logger('main', { level: 'error' });
-
-        return handleActionError(error, {
-            logger,
-            actionName: 'Render all categories'
-        });
+      activationResult = await poll(cfg, { stateLib: stateMgr, filesLib }, logger);
+    } finally {
+      try {
+        await stateMgr.put('plp-running', 'false');
+      } catch (stateErr) {
+        (logger || Core.Logger('main', { level: 'error' })).error('Failed to reset running state.', stateErr);
+      }
     }
+
+    try {
+      await observabilityClient.sendActivationResult(activationResult);
+    } catch (obsErr) {
+      logger.warn('Failed to send activation result.', obsErr);
+    }
+
+    return activationResult;
+  } catch (error) {
+    logger = logger || Core.Logger('main', { level: 'error' });
+
+    return handleActionError(error, {
+      logger,
+      actionName: 'Render all categories',
+    });
+  }
 }
 
 exports.main = main;

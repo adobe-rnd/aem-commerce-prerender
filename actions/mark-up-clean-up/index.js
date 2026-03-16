@@ -18,9 +18,9 @@ const { AdminAPI } = require('../lib/aem');
 const {
   requestSaaS,
   requestPublishedProductsIndex,
-  PDP_FILE_EXT,
   createBatches,
 } = require('../utils');
+const { getHtmlFilePath } = require('../renderUtils');
 
 /**
  * helper function for markUpCleanUP() below
@@ -74,9 +74,10 @@ async function markUpCleanUP(context, filesLib, logger, adminApi) {
 
     for (const product of redundantpublishedProducts) {
       try {        
-        const result = await filesLib.delete(`/public/pdps${product.path}.${PDP_FILE_EXT}`);
+        const htmlPath = getHtmlFilePath(product.path);
+        const result = await filesLib.delete(htmlPath);
         if (result.length > 0) {
-          logger.info(`Deleted redundant markup at ${product.path}.${PDP_FILE_EXT} for product ${product.sku}`);
+          logger.info(`Deleted redundant markup at ${htmlPath} for product ${product.sku}`);
           context.counts.deleted++;          
         }
       } catch (e) {

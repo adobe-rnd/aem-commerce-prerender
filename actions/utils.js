@@ -12,6 +12,7 @@ governing permissions and limitations under the License.
 const deepmerge = require('@fastify/deepmerge')();
 const helixSharedStringLib = require('@adobe/helix-shared-string');
 const { ERROR_CODES } = require('./lib/errorHandler');
+
 const BATCH_SIZE = 50;
 
 const SITE_TYPES = Object.freeze({
@@ -54,13 +55,16 @@ function createBatches(products) {
  * @returns {array}
  * @private
  */
-function getMissingKeys (obj, required) {
-  return required.filter(r => {
-    const splits = r.split('.')
-    const last = splits[splits.length - 1]
-    const traverse = splits.slice(0, -1).reduce((tObj, split) => { tObj = (tObj[split] || {}); return tObj }, obj)
-    return traverse[last] === undefined || traverse[last] === '' // missing default params are empty string
-  })
+function getMissingKeys(obj, required) {
+  return required.filter((r) => {
+    const splits = r.split('.');
+    const last = splits[splits.length - 1];
+    const traverse = splits.slice(0, -1).reduce((tObj, split) => {
+      tObj = tObj[split] || {};
+      return tObj;
+    }, obj);
+    return traverse[last] === undefined || traverse[last] === ''; // missing default params are empty string
+  });
 }
 
 /**
@@ -77,29 +81,29 @@ function getMissingKeys (obj, required) {
  * @returns {string} if the return value is not null, then it holds an error message describing the missing inputs.
  *
  */
-function checkMissingRequestInputs (params, requiredParams = [], requiredHeaders = []) {
-  let errorMessage = null
+function checkMissingRequestInputs(params, requiredParams = [], requiredHeaders = []) {
+  let errorMessage = null;
 
   // input headers are always lowercase
-  requiredHeaders = requiredHeaders.map(h => h.toLowerCase())
+  requiredHeaders = requiredHeaders.map((h) => h.toLowerCase());
   // check for missing headers
-  const missingHeaders = getMissingKeys(params.__ow_headers || {}, requiredHeaders)
+  const missingHeaders = getMissingKeys(params.__ow_headers || {}, requiredHeaders);
   if (missingHeaders.length > 0) {
-    errorMessage = `missing header(s) '${missingHeaders}'`
+    errorMessage = `missing header(s) '${missingHeaders}'`;
   }
 
   // check for missing parameters
-  const missingParams = getMissingKeys(params, requiredParams)
+  const missingParams = getMissingKeys(params, requiredParams);
   if (missingParams.length > 0) {
     if (errorMessage) {
-      errorMessage += ' and '
+      errorMessage += ' and ';
     } else {
-      errorMessage = ''
+      errorMessage = '';
     }
-    errorMessage += `missing parameter(s) '${missingParams}'`
+    errorMessage += `missing parameter(s) '${missingParams}'`;
   }
 
-  return errorMessage
+  return errorMessage;
 }
 
 /**
@@ -111,13 +115,15 @@ function checkMissingRequestInputs (params, requiredParams = [], requiredHeaders
  * @returns {string|undefined} the token string or undefined if not set in request headers.
  *
  */
-function getBearerToken (params) {
-  if (params.__ow_headers &&
-      params.__ow_headers.authorization &&
-      params.__ow_headers.authorization.startsWith('Bearer ')) {
-    return params.__ow_headers.authorization.substring('Bearer '.length)
+function getBearerToken(params) {
+  if (
+    params.__ow_headers &&
+    params.__ow_headers.authorization &&
+    params.__ow_headers.authorization.startsWith('Bearer ')
+  ) {
+    return params.__ow_headers.authorization.substring('Bearer '.length);
   }
-  return undefined
+  return undefined;
 }
 
 /**
@@ -134,18 +140,18 @@ function getBearerToken (params) {
  * @returns {object} the error object, ready to be returned from the action main's function.
  *
  */
-function errorResponse (statusCode, message, logger) {
+function errorResponse(statusCode, message, logger) {
   if (logger && typeof logger.info === 'function') {
-    logger.info(`${statusCode}: ${message}`)
+    logger.info(`${statusCode}: ${message}`);
   }
   return {
     error: {
       statusCode,
       body: {
-        error: message
-      }
-    }
-  }
+        error: message,
+      },
+    },
+  };
 }
 
 /**
@@ -184,11 +190,15 @@ async function request(name, url, req, timeout = 60000) {
   } else {
     try {
       responseText = await resp.text();
-    // eslint-disable-next-line no-unused-vars
-    } catch (e) { /* nothing to be done */ }
+      // eslint-disable-next-line no-unused-vars
+    } catch (e) {
+      /* nothing to be done */
+    }
   }
 
-  throw new Error(`Request '${name}' to '${url}' failed (${resp.status}): ${resp.headers.get('x-error') || resp.statusText}${responseText.length > 0 ? ` responseText: ${responseText}` : ''}`);
+  throw new Error(
+    `Request '${name}' to '${url}' failed (${resp.status}): ${resp.headers.get('x-error') || resp.statusText}${responseText.length > 0 ? ` responseText: ${responseText}` : ''}`,
+  );
 }
 
 /**
@@ -207,10 +217,10 @@ async function requestSpreadsheet(name, sheet, context, offset = 0) {
   let options = undefined;
   // Site Token Validation: needs to be a non empty string
   if (typeof siteToken === 'string' && siteToken.trim()) {
-   options = {headers:{'authorization': `token ${siteToken}`}}
+    options = { headers: { authorization: `token ${siteToken}` } };
   }
 
-  let sheetUrl = `${contentUrl}/${name}.json`
+  let sheetUrl = `${contentUrl}/${name}.json`;
   const requestURL = new URL(sheetUrl);
 
   if (sheet) {
@@ -234,7 +244,6 @@ async function requestSpreadsheet(name, sheet, context, offset = 0) {
  * @returns {Promise<object>} spreadsheet data as JSON.
  */
 async function requestPublishedProductsIndex(context) {
-  
   const publishedProductsIndex = await requestSpreadsheet('published-products-index', null, context, 0);
 
   for (let offset = 1000; offset < publishedProductsIndex.total; offset += 1000) {
@@ -242,7 +251,7 @@ async function requestPublishedProductsIndex(context) {
     publishedProductsIndex.data.push(...tempPublishedProductsIndex.data);
   }
   publishedProductsIndex.limit = publishedProductsIndex.total;
-  
+
   return publishedProductsIndex;
 }
 
@@ -252,16 +261,16 @@ async function requestConfigService(context) {
   let options = undefined;
   // Site Token Validation: needs to be a non empty string
   if (typeof siteToken === 'string' && siteToken.trim()) {
-   options = {headers:{'authorization': `token ${siteToken}`}}
+    options = { headers: { authorization: `token ${siteToken}` } };
   }
 
-  let publicConfig = `${contentUrl}/${configName}.json`
+  let publicConfig = `${contentUrl}/${configName}.json`;
   return request('configservice', publicConfig, options);
 }
 
 /**
  * Returns the parsed configuration. It first tries to fetch the config from the config service,
- * and if that fails, it falls back to the spreadsheet. The configuration returned from config 
+ * and if that fails, it falls back to the spreadsheet. The configuration returned from config
  * service must contain a default config and may contain a specific config for the current locale.
  * In this case the configuration is merged.
  *
@@ -278,12 +287,19 @@ async function getConfig(context) {
     try {
       const configObj = await requestConfigService(context);
       const defaultConfig = configObj?.public.default;
-      if (!defaultConfig){
+      if (!defaultConfig) {
         throw new Error('No default config found');
       }
       // get the matching root path
       // see https://github.com/hlxsites/aem-boilerplate-commerce/blob/53fb19440df441723c0c891d22e3a3396d2968ce/scripts/configs.js#L59-L81
-      let pathname = `${getProductUrl({ /* no product */}, context, false)}` || '';
+      let pathname =
+        `${getProductUrl(
+          {
+            /* no product */
+          },
+          context,
+          false,
+        )}` || '';
       if (!pathname.endsWith('/')) pathname += '/';
 
       let rootPath = Object.keys(configObj.public)
@@ -294,18 +310,18 @@ async function getConfig(context) {
           return bSegments - aSegments;
         })
         .find((key) => pathname === key || pathname.startsWith(key));
-  
+
       context.config = rootPath ? deepmerge(defaultConfig, configObj.public[rootPath]) : defaultConfig;
       return context.config;
     } catch (e) {
       logger.debug(`Failed to fetch public config. Falling back to spreadsheet`, e);
     }
-    
+
     // fallback to spreadsheet in a locale specific folder if locale is provided
     let spreadsheetPath = locale ? `${locale}/${configName}` : configName;
     logger.debug(`Fetching config ${configName}`);
     const configData = await requestSpreadsheet(spreadsheetPath, configSheet, context);
-    if(configData.data) {
+    if (configData.data) {
       context.config = configData.data.reduce((acc, { key, value }) => ({ ...acc, [key]: value }), {});
       context.config.__hasLegacyFormat = true;
     } else {
@@ -317,20 +333,18 @@ async function getConfig(context) {
 
 /**
  * Converts the keys of an object to lowercase.
- * 
+ *
  * @param {Object} obj - The object to convert the keys of.
  * @returns {Object} The object with the keys converted to lowercase.
  */
 function lowercaseKeys(obj) {
   if (!obj || typeof obj !== 'object') return {};
-  return Object.fromEntries(
-    Object.entries(obj).map(([k, v]) => [k.toLowerCase(), v]),
-  );
+  return Object.fromEntries(Object.entries(obj).map(([k, v]) => [k.toLowerCase(), v]));
 }
 
 /**
  * Returns the Commerce Catalog Service headers based on the site type and configuration.
- * 
+ *
  * @param {Object} config - The site configuration object returned by getConfig().
  * @returns {Object} The Commerce Catalog Service headers.
  */
@@ -341,8 +355,7 @@ function getCsHeaders(config) {
   if (siteType === SITE_TYPES.ACO) {
     const configHeaders = lowercaseKeys(config.headers?.cs);
     const policyHeaders = Object.fromEntries(
-      Object.entries(configHeaders)
-        .filter(([key]) => key.startsWith('ac-policy-')),
+      Object.entries(configHeaders).filter(([key]) => key.startsWith('ac-policy-')),
     );
     csHeaders = {
       'ac-view-id': configHeaders['ac-view-id'],
@@ -352,10 +365,13 @@ function getCsHeaders(config) {
   } else {
     if (config.__hasLegacyFormat) {
       csHeaders = {
-        'magento-customer-group': config['commerce.headers.cs.Magento-Customer-Group'] || config['commerce-customer-group'],
-        'magento-environment-id': config['commerce.headers.cs.Magento-Environment-Id'] || config['commerce-environment-id'],
+        'magento-customer-group':
+          config['commerce.headers.cs.Magento-Customer-Group'] || config['commerce-customer-group'],
+        'magento-environment-id':
+          config['commerce.headers.cs.Magento-Environment-Id'] || config['commerce-environment-id'],
         'magento-store-code': config['commerce.headers.cs.Magento-Store-Code'] || config['commerce-store-code'],
-        'magento-store-view-code': config['commerce.headers.cs.Magento-Store-View-Code'] || config['commerce-store-view-code'],
+        'magento-store-view-code':
+          config['commerce.headers.cs.Magento-Store-View-Code'] || config['commerce-store-view-code'],
         'magento-website-code': config['commerce.headers.cs.Magento-Website-Code'] || config['commerce-website-code'],
         'x-api-key': config['commerce.headers.cs.x-api-key'] || config['commerce-x-api-key'],
       };
@@ -388,31 +404,27 @@ function getCsHeaders(config) {
 async function requestSaaS(query, operationName, variables, context) {
   const { storeUrl, logger, configOverrides = {} } = context;
   const config = {
-    ... (await getConfig(context)),
-    ...configOverrides
+    ...(await getConfig(context)),
+    ...configOverrides,
   };
 
   const headers = {
     'Content-Type': 'application/json',
-    'origin': storeUrl,
+    origin: storeUrl,
     ...getCsHeaders(config),
     'Magento-Is-Preview': true, // bypass LiveSearch cache
   };
   const method = 'POST';
 
-  const response = await request(
-    `${operationName}(${JSON.stringify(variables)})`,
-    config['commerce-endpoint'],
-    {
-      method,
-      headers,
-      body: JSON.stringify({
-        operationName,
-        query,
-        variables,
-      })
-    }
-  );
+  const response = await request(`${operationName}(${JSON.stringify(variables)})`, config['commerce-endpoint'], {
+    method,
+    headers,
+    body: JSON.stringify({
+      operationName,
+      query,
+      variables,
+    }),
+  });
 
   // Log GraphQL errors
   if (response?.errors) {
@@ -437,9 +449,7 @@ function getSiteType(config) {
     return SITE_TYPES.ACO;
   }
   const csHeaders = config.headers?.cs;
-  if (csHeaders && Object.keys(csHeaders).some(
-    (key) => key.toLowerCase().startsWith('ac-')
-  )) {
+  if (csHeaders && Object.keys(csHeaders).some((key) => key.toLowerCase().startsWith('ac-'))) {
     return SITE_TYPES.ACO;
   }
   return SITE_TYPES.ACCS;
@@ -476,15 +486,16 @@ function getProductUrl(product, context, addStore = true) {
     sku: product.sku,
     urlKey: product.urlKey,
   };
-  
+
   // Only add locale if it has a valid value
   if (context.locale) {
     availableParams.locale = context.locale;
   }
 
-  let path = pathFormat.split('/')
+  let path = pathFormat
+    .split('/')
     .filter(Boolean)
-    .map(part => {
+    .map((part) => {
       if (part.startsWith('{') && part.endsWith('}')) {
         const key = part.substring(1, part.length - 1);
         // Skip parts where we don't have a value
@@ -539,21 +550,18 @@ function getCategoryUrl(categorySlug, context, addStore = true) {
 }
 
 function getDefaultStoreURL(params) {
-  const {
-    ORG: orgName,
-    SITE: siteName,
-  } = params;
-  return  `https://main--${siteName}--${orgName}.aem.live`;
+  const { ORG: orgName, SITE: siteName } = params;
+  return `https://main--${siteName}--${orgName}.aem.live`;
 }
 
 /**
  * Formats a memory usage value in bytes to a human-readable string in megabytes.
- * 
+ *
  * @param {number} data - The memory usage value in bytes
  * @returns {string} The formatted memory usage string in MB with 2 decimal places
  */
 function formatMemoryUsage(data) {
-  return `${Math.round(data / 1024 / 1024 * 100) / 100} MB`;
+  return `${Math.round((data / 1024 / 1024) * 100) / 100} MB`;
 }
 
 module.exports = {
@@ -577,4 +585,4 @@ module.exports = {
   PLP_FILE_PREFIX,
   PDP_FILE_EXT,
   STATE_FILE_EXT,
-}
+};

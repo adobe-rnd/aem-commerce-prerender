@@ -17,13 +17,13 @@
     "diff": "^8.0.2",
     "dotenv-stringify": "^3.0.1",
     "handlebars": "^4.7.8",
+    "itty-router": "^5.0.0",
     "js-yaml": "^4.1.0",
     "node-fetch": "^2.6.0",
     "p-limit": "^6.2.0",
     "striptags": "^3.2.0",
     "vega": "^6.0.0",
-    "vega-lite": "^6.0.0",
-    "itty-router": "^5.0.0"
+    "vega-lite": "^6.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
@@ -34,11 +34,14 @@
     "eslint-plugin-jest": "^29.0.0",
     "globals": "^16.0.0",
     "jest": "^30.0.0",
-    "msw": "^2.7.0"
+    "msw": "^2.7.0",
+    "prettier": "^3.8.1"
   },
   "scripts": {
     "test": "c8 node --experimental-vm-modules node_modules/jest/bin/jest.js --passWithNoTests ./test",
     "e2e": "node --experimental-vm-modules node_modules/jest/bin/jest.js --collectCoverage=false --testRegex ./e2e",
+    "format": "prettier --write \"actions/**/*.js\" \"test/**/*.js\"",
+    "format:check": "prettier --check \"actions/**/*.js\" \"test/**/*.js\"",
     "lint": "eslint --ignore-pattern web-src --no-error-on-unmatched-pattern test src actions",
     "lint:fix": "npm run lint -- --fix",
     "deploy": "rm -r dist; aio app deploy",

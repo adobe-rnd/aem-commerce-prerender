@@ -304,13 +304,42 @@ const PlpProductSearchQuery = `
     ) {
       items {
         productView {
+          __typename
           name
           sku
           urlKey
+          inStock
+          shortDescription
           images(roles: ["image"]) {
             url
             label
             roles
+          }
+          attributes(roles: []) {
+            name
+            value
+          }
+          ... on SimpleProductView {
+            price {
+              final {
+                amount {
+                  value
+                  currency
+                }
+              }
+            }
+          }
+          ... on ComplexProductView {
+            priceRange {
+              minimum {
+                final {
+                  amount {
+                    value
+                    currency
+                  }
+                }
+              }
+            }
           }
         }
       }

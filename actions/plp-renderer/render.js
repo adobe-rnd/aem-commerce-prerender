@@ -10,13 +10,27 @@ OF ANY KIND, either express or implied. See the License for the specific languag
 governing permissions and limitations under the License.
 */
 
-const fs = require("fs");
-const path = require("path");
-const Handlebars = require("handlebars");
-const { sanitize } = require("../common-renderer/lib");
-const { generatePlpLdJson } = require("./ldJson");
-const { getCategoryUrl } = require("../utils");
-const { buildBreadcrumbs } = require("../categories");
+const fs = require('fs');
+const path = require('path');
+const Handlebars = require('handlebars');
+const { sanitize } = require('../renderUtils');
+const { generatePlpLdJson } = require('./ldJson');
+const { getCategoryUrl, getProductUrl } = require('../utils');
+const { buildBreadcrumbs } = require('../categories');
+
+let compiledTemplate;
+function getCompiledTemplate() {
+  if (!compiledTemplate) {
+    const [pageHbs, headHbs, productListingHbs] = ['page', 'plp-head', 'product-listing'].map((template) =>
+      fs.readFileSync(path.join(__dirname, 'templates', `${template}.hbs`), 'utf8'),
+    );
+    const handlebars = Handlebars.create();
+    handlebars.registerPartial('head', headHbs);
+    handlebars.registerPartial('content', productListingHbs);
+    compiledTemplate = handlebars.compile(pageHbs);
+  }
+  return compiledTemplate;
+}
 
 /**
  * Generates the HTML for a category listing page.
@@ -32,70 +46,40 @@ function generateCategoryHtml(categoryData, products, categoryMap, context) {
 
   // Build template data
   const categoryDescription = categoryData.metaTags?.description
-    ? sanitize(categoryData.metaTags.description, "all")
+    ? sanitize(categoryData.metaTags.description, 'all')
     : null;
 
   const categoryImage = categoryData.images?.find(
-    (img) => img.roles?.includes("image") || img.customRoles?.includes("hero"),
+    (img) => img.roles?.includes('image') || img.customRoles?.includes('hero'),
   );
 
   const templateData = {
-    categoryName: sanitize(categoryData.name, "inline"),
+    categoryName: sanitize(categoryData.name, 'inline'),
     categoryDescription,
     slug: categoryData.slug,
-    metaTitle: sanitize(
-      categoryData.metaTags?.title || categoryData.name,
-      "no",
-    ),
-    metaDescription: categoryData.metaTags?.description
-      ? sanitize(categoryData.metaTags.description, "no")
-      : null,
-    metaKeywords: categoryData.metaTags?.keywords
-      ? sanitize(categoryData.metaTags.keywords, "no")
-      : null,
+    metaTitle: sanitize(categoryData.metaTags?.title || categoryData.name, 'no'),
+    metaDescription: categoryData.metaTags?.description ? sanitize(categoryData.metaTags.description, 'no') : null,
+    metaKeywords: categoryData.metaTags?.keywords ? sanitize(categoryData.metaTags.keywords, 'no') : null,
     metaImage: categoryImage?.url || null,
     breadcrumbs: breadcrumbs.map((crumb) => ({
-      name: sanitize(crumb.name, "inline"),
+      name: sanitize(crumb.name, 'inline'),
       url: getCategoryUrl(crumb.slug, context),
     })),
     products: products.map((product) => ({
-      name: sanitize(product.name, "inline"),
-      url: getCategoryUrl(product.urlKey, context),
-      image:
-        product.images?.find((img) => img.roles?.includes("image"))?.url ||
-        null,
+      name: sanitize(product.name, 'inline'),
+      url: getProductUrl({ urlKey: product.urlKey, sku: product.sku }, context),
+      image: product.images?.find((img) => img.roles?.includes('image'))?.url || null,
     })),
     hasProducts: products.length > 0,
   };
 
-  // Generate JSON-LD
-  const { itemListLdJson, breadcrumbLdJson } = generatePlpLdJson(
-    categoryData,
-    products,
-    breadcrumbs,
-    context,
-  );
+  const ldJson = generatePlpLdJson(categoryData, products, breadcrumbs, context);
 
-  // Load and compile Handlebars templates
-  const [pageHbs, headHbs, productListingHbs] = [
-    "page",
-    "plp-head",
-    "product-listing",
-  ].map((template) =>
-    fs.readFileSync(
-      path.join(__dirname, "templates", `${template}.hbs`),
-      "utf8",
-    ),
-  );
-
-  const pageTemplate = Handlebars.compile(pageHbs);
-  Handlebars.registerPartial("head", headHbs);
-  Handlebars.registerPartial("content", productListingHbs);
+  const pageTemplate = getCompiledTemplate();
 
   return pageTemplate({
     ...templateData,
-    itemListLdJson,
-    breadcrumbLdJson,
+    ldJson,
   });
 }
 
