@@ -12,30 +12,18 @@ governing permissions and limitations under the License.
 
 */
 
-const { Core, Files } = require("@adobe/aio-sdk");
-const {
-  getConfig,
-  getSiteType,
-  requestSaaS,
-  SITE_TYPES,
-  FILE_PREFIX,
-} = require("../utils");
-const { ProductsQuery, ProductCountQuery } = require("../queries");
-const { Timings } = require("../lib/benchmark");
-const { getRuntimeConfig } = require("../lib/runtimeConfig");
-const { handleActionError } = require("../lib/errorHandler");
-const {
-  getCategorySlugsFromFamilies,
-  getCategories,
-  hasFamilies,
-} = require("../categories");
+const { Core, Files } = require('@adobe/aio-sdk');
+const { getConfig, getSiteType, requestSaaS, SITE_TYPES, FILE_PREFIX } = require('../utils');
+const { ProductsQuery, ProductCountQuery } = require('../queries');
+const { Timings } = require('../lib/benchmark');
+const { getRuntimeConfig } = require('../lib/runtimeConfig');
+const { handleActionError } = require('../lib/errorHandler');
+const { getCategorySlugsFromFamilies, getCategories, hasFamilies } = require('../categories');
 
 const MAX_PRODUCTS_PER_CATEGORY = 10000; // page_size: 500 * 20 pages = 10000 products
 const MAX_PAGES_FETCHED = 20;
 const CONCURRENCY = 5;
-const pLimitPromise = import("p-limit").then(({ default: pLimit }) =>
-  pLimit(CONCURRENCY),
-);
+const pLimitPromise = import('p-limit').then(({ default: pLimit }) => pLimit(CONCURRENCY));
 
 const productMapper = ({ productView }) => ({
   urlKey: productView.urlKey,
@@ -50,21 +38,17 @@ const productMapper = ({ productView }) => ({
  * @returns {Promise<Array<{urlKey: string, sku: string}>>} Products in this category.
  */
 async function getProductsByCategory(categoryPath, context) {
+  const { logger } = context;
   const limit = await pLimitPromise;
 
-  const firstPage = await requestSaaS(
-    ProductsQuery,
-    "getProducts",
-    { currentPage: 1, categoryPath },
-    context,
-  );
+  const firstPage = await requestSaaS(ProductsQuery, 'getProducts', { currentPage: 1, categoryPath }, context);
   const products = firstPage.data.productSearch.items.map(productMapper);
   let maxPage = firstPage.data.productSearch.page_info.total_pages;
   const totalCount = firstPage.data.productSearch.total_count;
 
   if (maxPage > MAX_PAGES_FETCHED) {
-    console.warn(
-      `Category ${categoryPath || "(root)"} contains ${totalCount} products, which is more than the maximum supported of ${MAX_PRODUCTS_PER_CATEGORY}. 
+    logger.warn(
+      `Category ${categoryPath || '(root)'} contains ${totalCount} products, which is more than the maximum supported of ${MAX_PRODUCTS_PER_CATEGORY}. 
       Only the first ${MAX_PRODUCTS_PER_CATEGORY} products will be fetched for this category.`,
     );
     maxPage = MAX_PAGES_FETCHED;
@@ -73,14 +57,7 @@ async function getProductsByCategory(categoryPath, context) {
   const pages = Array.from({ length: maxPage - 1 }, (_, i) => i + 2);
   const results = await Promise.all(
     pages.map((page) =>
-      limit(() =>
-        requestSaaS(
-          ProductsQuery,
-          "getProducts",
-          { currentPage: page, categoryPath },
-          context,
-        ),
-      ),
+      limit(() => requestSaaS(ProductsQuery, 'getProducts', { currentPage: page, categoryPath }, context)),
     ),
   );
   for (const pageRes of results) {
@@ -111,12 +88,7 @@ function collectProducts(productsBySku, batchResults) {
  * @returns {Promise<number|undefined>} Total number of pages (each page = 1 product at page_size 1).
  */
 async function getProductCount(context) {
-  const countRes = await requestSaaS(
-    ProductCountQuery,
-    "getProductCount",
-    { categoryPath: "" },
-    context,
-  );
+  const countRes = await requestSaaS(ProductCountQuery, 'getProductCount', { categoryPath: '' }, context);
   return countRes.data.productSearch?.page_info?.total_pages;
 }
 
@@ -131,9 +103,7 @@ async function getProductCount(context) {
  */
 async function getAllProductsByCategoryFamily(context, categoryFamilies) {
   if (categoryFamilies.length === 0) {
-    throw new Error(
-      "Tried to retrieve products by category family, but no category families are configured.",
-    );
+    throw new Error('Tried to retrieve products by category family, but no category families are configured.');
   }
 
   const slugs = await getCategorySlugsFromFamilies(context, categoryFamilies);
@@ -142,9 +112,7 @@ async function getAllProductsByCategoryFamily(context, categoryFamilies) {
   const slugBatchSize = 50;
   for (let i = 0; i < slugs.length; i += slugBatchSize) {
     const batch = slugs.slice(i, i + slugBatchSize);
-    const results = await Promise.all(
-      batch.map((slug) => getProductsByCategory(slug, context)),
-    );
+    const results = await Promise.all(batch.map((slug) => getProductsByCategory(slug, context)));
     collectProducts(productsBySku, results);
   }
 
@@ -161,6 +129,7 @@ async function getAllProductsByCategoryFamily(context, categoryFamilies) {
  * @returns {Promise<Array<{urlKey: string, sku: string}>>} Deduplicated product list.
  */
 async function getAllProductsByCategory(context, productCount) {
+  const { logger } = context;
   const productsBySku = new Map();
   const categories = await getCategories(context);
 
@@ -168,9 +137,7 @@ async function getAllProductsByCategory(context, productCount) {
     if (!levelGroup) continue;
     while (levelGroup.length) {
       const batch = levelGroup.splice(0, 50);
-      const results = await Promise.all(
-        batch.map((urlPath) => getProductsByCategory(urlPath, context)),
-      );
+      const results = await Promise.all(batch.map((urlPath) => getProductsByCategory(urlPath, context)));
       collectProducts(productsBySku, results);
       if (productsBySku.size >= productCount) {
         // All products collected, break out of the outer loop
@@ -180,9 +147,7 @@ async function getAllProductsByCategory(context, productCount) {
   }
 
   if (productsBySku.size !== productCount) {
-    console.warn(
-      `Expected ${productCount} products, but got ${productsBySku.size}.`,
-    );
+    logger.warn(`Expected ${productCount} products, but got ${productsBySku.size}.`);
   }
 
   return [...productsBySku.values()];
@@ -197,34 +162,28 @@ async function getAllProductsByCategory(context, productCount) {
  * @returns {Promise<Array<{urlKey: string, sku: string}>>}
  */
 async function getAllProducts(siteType, context, categoryFamilies) {
+  const { logger } = context;
   const productCount = await getProductCount(context);
 
   if (!productCount) {
-    throw new Error("Could not fetch product count from catalog.");
+    throw new Error('Could not fetch product count from catalog.');
   }
 
   if (productCount <= MAX_PRODUCTS_PER_CATEGORY) {
-    console.info(
+    logger.info(
       `Catalog has less than ${MAX_PRODUCTS_PER_CATEGORY} products. Fetching all products from the default category.`,
     );
-    return getProductsByCategory("", context);
+    return getProductsByCategory('', context);
   }
 
   if (siteType === SITE_TYPES.ACO) {
-    console.info(
-      `Fetching the first ${MAX_PRODUCTS_PER_CATEGORY} products from the catalog.`,
-    );
-    const defaultProducts = await getProductsByCategory("", context);
+    logger.info(`Fetching the first ${MAX_PRODUCTS_PER_CATEGORY} products from the catalog.`);
+    const defaultProducts = await getProductsByCategory('', context);
     if (!hasFamilies(categoryFamilies)) {
       return defaultProducts;
     }
-    console.info(
-      "Category families are configured. Fetching additional products by category family.",
-    );
-    const familyProducts = await getAllProductsByCategoryFamily(
-      context,
-      categoryFamilies,
-    );
+    logger.info('Category families are configured. Fetching additional products by category family.');
+    const familyProducts = await getAllProductsByCategoryFamily(context, categoryFamilies);
     const productsBySku = new Map();
     collectProducts(productsBySku, [defaultProducts, familyProducts]);
     return [...productsBySku.values()];
@@ -244,49 +203,46 @@ async function getAllProducts(siteType, context, categoryFamilies) {
 async function main(params) {
   try {
     const cfg = getRuntimeConfig(params);
-    const logger = Core.Logger("main", { level: cfg.logLevel });
+    const logger = Core.Logger('main', { level: cfg.logLevel });
 
     const sharedContext = { ...cfg, logger };
+    logger.info(`Fetching all products for locales ${cfg.locales.join(', ')}`);
 
     const results = await Promise.all(
       cfg.locales.map(async (locale) => {
+        logger.info(`Fetching all products for locale ${locale}`);
         const context = { ...sharedContext };
         if (locale) {
           context.locale = locale;
         }
         const timings = new Timings();
-        const stateFilePrefix = locale || "default";
+        const stateFilePrefix = locale || 'default';
 
         const siteConfig = await getConfig(context);
         const siteType = getSiteType(siteConfig);
-        const allProducts = await getAllProducts(
-          siteType,
-          context,
-          cfg.categoryFamilies,
-        );
+        const allProducts = await getAllProducts(siteType, context, cfg.categoryFamilies);
 
-        timings.sample("getAllProducts");
+        timings.sample('getAllProducts');
         const filesLib = await Files.init(params.libInit || {});
-        timings.sample("saveFile");
+        timings.sample('saveFile');
         const productsFileName = `${FILE_PREFIX}/${stateFilePrefix}-products.json`;
+        logger.debug(`Saving products to ${productsFileName}`);
         await filesLib.write(productsFileName, JSON.stringify(allProducts));
-        console.debug(
-          `${allProducts.length} total products saved to ${productsFileName}`,
-        );
+        logger.debug(`${allProducts.length} total products saved to ${productsFileName}`);
         return timings.measures;
       }),
     );
 
     return {
       statusCode: 200,
-      body: { status: "completed", timings: results },
+      body: { status: 'completed', timings: results },
     };
   } catch (error) {
-    const logger = Core.Logger("main", { level: "error" });
+    const logger = Core.Logger('main', { level: 'error' });
 
     return handleActionError(error, {
       logger,
-      actionName: "Fetch all products",
+      actionName: 'Fetch all products',
     });
   }
 }

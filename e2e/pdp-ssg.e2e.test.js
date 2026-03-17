@@ -1,5 +1,5 @@
 /*
-Copyright 2025 Adobe. All rights reserved.
+Copyright 2026 Adobe. All rights reserved.
 This file is licensed to you under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License. You may obtain a copy
 of the License at http://www.apache.org/licenses/LICENSE-2.0
@@ -13,198 +13,183 @@ governing permissions and limitations under the License.
 const { Config } = require('@adobe/aio-sdk').Core;
 const fetch = require('node-fetch');
 const cheerio = require('cheerio');
+const config = require('./config.json');
 
-// get action url
-const namespace = Config.get('runtime.namespace')
-const hostname = Config.get('cna.hostname') || 'adobeioruntime.net'
-const runtimePackage = 'aem-commerce-ssg'
-const actionUrl = `https://${namespace}.${hostname}/api/v1/web/${runtimePackage}/pdp-renderer`
+const namespace = Config.get('runtime.namespace');
+const hostname = Config.get('cna.hostname') || 'adobeioruntime.net';
+const runtimePackage = 'aem-commerce-ssg';
+const actionUrl = `https://${namespace}.${hostname}/api/v1/web/${runtimePackage}/pdp-renderer`;
 
-test('simple product markup', async () => {
-  const res = await fetch(`${actionUrl}/products-ssg/bezier-tee/adb177?sku=ADB177`);
-  const content = await res.text();
+const sku = config.pdpSku;
 
-  // Parse markup and compare
-  const $ = cheerio.load(content);
+function isValidUrl(str) {
+  try {
+    new URL(str);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
-  // Validate H1
-  expect($('h1').text()).toEqual('Bezier tee');
+function validateOffer(offer, expectedSku) {
+  expect(offer['@type']).toBe('Offer');
+  expect(offer.sku).toBe(expectedSku);
+  expect(isValidUrl(offer.url)).toBe(true);
+  expect(['https://schema.org/InStock', 'https://schema.org/OutOfStock']).toContain(offer.availability);
+  expect(typeof offer.price).toBe('number');
+  expect(typeof offer.priceCurrency).toBe('string');
+  expect(offer.priceCurrency.length).toBeGreaterThan(0);
+  expect(offer.itemCondition).toBe('https://schema.org/NewCondition');
 
-  // Validate price
-  expect($('.product-details > div > div:contains("Price")').next().text()).toEqual('$23.00');
+  if (offer.priceSpecification) {
+    expect(offer.priceSpecification['@type']).toBe('UnitPriceSpecification');
+    expect(typeof offer.priceSpecification.priceType).toBe('string');
+    expect(typeof offer.priceSpecification.price).toBe('number');
+    expect(typeof offer.priceSpecification.priceCurrency).toBe('string');
+  }
+}
 
-  // Validate images
-  expect($('.product-details > div > div:contains("Images")').next().find('img').map((_, e) => $(e).prop('outerHTML')).toArray()).toMatchInlineSnapshot(`
-[
-  "<img src="https://www.aemshop.net/media/catalog/product/adobestoredata/ADB177.jpg">",
-  "<img src="https://www.aemshop.net/media/catalog/product/adobestoredata/ADB177-2.jpg">",
-  "<img src="https://www.aemshop.net/media/catalog/product/adobestoredata/ADB177-3.jpg">",
-]
-`);
+describe(`PDP e2e - SKU: ${sku}`, () => {
+  let $;
+  let ldJson;
 
-  // Validate no options
-  expect($('.product-details > div > div:contains("Options")')).toHaveLength(0);
+  beforeAll(async () => {
+    const res = await fetch(`${actionUrl}?sku=${sku}`);
+    expect(res.status).toBe(200);
+    const content = await res.text();
+    $ = cheerio.load(content);
+    ldJson = JSON.parse($('script[type="application/ld+json"]').html());
+  }, 30000);
 
-  // Validate description
-  expect($('.product-details > div > div:contains("Description")').next().html().trim()).toEqual('<div><span>This is an anodized aluminum push-action pen with a soft capacitive stylus. The stylus pen can be used for writing on paper and clicking on touch screen. The stylus helps protect your screen from smudges and increase sensitivity.Choose from different colored pens. Ink color: black.Adobe wordmark laser engraved near clip.<br><br></span></div>');
+  test('h1 exists and is non-empty', () => {
+    const h1 = $('h1').text().trim();
+    expect(h1.length).toBeGreaterThan(0);
+  });
 
-  // Validate LD-JSON
-  const ldJson = JSON.parse($('script[type="application/ld+json"]').html());
-  const expected = {
-    "@context": "http://schema.org",
-    "@type": "Product",
-    "sku": "ADB177",
-    "name": "Bezier tee",
-    "gtin": "",
-    "description": "Bezier tee",
-    "@id": "https://main--aem-boilerplate-commerce-staging--hlxsites.aem.live/products-ssg/bezier-tee/ADB177",
-    "offers": [
-      {
-        "@type": "Offer",
-        "sku": "ADB177",
-        "url": "https://main--aem-boilerplate-commerce-staging--hlxsites.aem.live/products-ssg/bezier-tee/ADB177",
-        "availability": "https://schema.org/InStock",
-        "price": 23,
-        "priceCurrency": "USD",
-        "itemCondition": "https://schema.org/NewCondition"
-      }
-    ],
-    "image": "https://www.aemshop.net/media/catalog/product/adobestoredata/ADB177.jpg"
-  };
-  expect(ldJson).toEqual(expected);
+  test('price is present and matches currency pattern', () => {
+    const priceText = $('.product-details > div > div:contains("Price")').next().text().trim();
+    expect(priceText.length).toBeGreaterThan(0);
+    expect(priceText).toMatch(/\$[\d,.]+(-\$[\d,.]+)?/);
+  });
+
+  test('at least one image with a valid URL', () => {
+    const images = $('.product-details > div > div:contains("Images")').next().find('img');
+    expect(images.length).toBeGreaterThan(0);
+    images.each((_, el) => {
+      const src = $(el).attr('src');
+      expect(isValidUrl(src)).toBe(true);
+    });
+  });
+
+  test('meta description exists', () => {
+    const metaDesc = $('meta[name="description"]');
+    expect(metaDesc).toHaveLength(1);
+  });
+
+  test('LD+JSON is valid and has correct @context', () => {
+    expect(ldJson).toBeDefined();
+    expect(ldJson['@context']).toBe('http://schema.org');
+  });
+
+  test('LD+JSON @type is Product or ProductGroup', () => {
+    expect(['Product', 'ProductGroup']).toContain(ldJson['@type']);
+  });
+
+  test('LD+JSON sku matches input', () => {
+    expect(ldJson.sku).toBe(sku);
+  });
+
+  test('LD+JSON name is a non-empty string', () => {
+    expect(typeof ldJson.name).toBe('string');
+    expect(ldJson.name.length).toBeGreaterThan(0);
+  });
+
+  test('LD+JSON gtin is a string', () => {
+    expect(typeof ldJson.gtin).toBe('string');
+  });
+
+  test('LD+JSON description is a string or null', () => {
+    if (ldJson.description !== null) {
+      expect(typeof ldJson.description).toBe('string');
+    }
+  });
+
+  test('LD+JSON @id is a valid URL', () => {
+    expect(isValidUrl(ldJson['@id'])).toBe(true);
+  });
+
+  test('LD+JSON image is a valid URL or null', () => {
+    if (ldJson.image !== null) {
+      expect(isValidUrl(ldJson.image)).toBe(true);
+    }
+  });
+
+  test('LD+JSON offers array with valid entries (simple product only)', () => {
+    if (ldJson['@type'] !== 'Product') return;
+    expect(Array.isArray(ldJson.offers)).toBe(true);
+    expect(ldJson.offers.length).toBeGreaterThan(0);
+    ldJson.offers.forEach((offer) => validateOffer(offer, sku));
+  });
+
+  test('options section matches product type', () => {
+    const optionsSection = $('.product-details > div > div:contains("Options")');
+    if (ldJson['@type'] === 'ProductGroup') {
+      expect(optionsSection.length).toBeGreaterThanOrEqual(1);
+    } else {
+      expect(optionsSection).toHaveLength(0);
+    }
+  });
+
+  describe('ProductGroup-specific fields', () => {
+    test('productGroupId matches sku', () => {
+      if (ldJson?.['@type'] !== 'ProductGroup') return;
+      expect(ldJson.productGroupId).toBe(sku);
+    });
+
+    test('variesBy is an array of non-empty strings', () => {
+      if (ldJson?.['@type'] !== 'ProductGroup') return;
+      expect(Array.isArray(ldJson.variesBy)).toBe(true);
+      expect(ldJson.variesBy.length).toBeGreaterThan(0);
+      ldJson.variesBy.forEach((v) => {
+        expect(typeof v).toBe('string');
+        expect(v.length).toBeGreaterThan(0);
+      });
+    });
+
+    test('hasVariant is an array with valid variant entries', () => {
+      if (ldJson?.['@type'] !== 'ProductGroup') return;
+      expect(Array.isArray(ldJson.hasVariant)).toBe(true);
+      expect(ldJson.hasVariant.length).toBeGreaterThan(0);
+
+      ldJson.hasVariant.forEach((variant) => {
+        expect(variant['@type']).toBe('Product');
+        expect(typeof variant.sku).toBe('string');
+        expect(variant.sku.length).toBeGreaterThan(0);
+        expect(typeof variant.name).toBe('string');
+        expect(variant.name.length).toBeGreaterThan(0);
+        expect(typeof variant.gtin).toBe('string');
+
+        if (variant.image !== null && variant.image !== undefined) {
+          expect(isValidUrl(variant.image)).toBe(true);
+        }
+
+        expect(Array.isArray(variant.offers)).toBe(true);
+        expect(variant.offers.length).toBeGreaterThan(0);
+        variant.offers.forEach((offer) => validateOffer(offer, variant.sku));
+      });
+    });
+
+    test('variants have at least one dynamic attribute from variesBy', () => {
+      if (ldJson?.['@type'] !== 'ProductGroup') return;
+      const axes = ldJson.variesBy.map((v) => {
+        const match = v.match(/schema\.org\/(.+)$/);
+        return match ? match[1] : v;
+      });
+
+      ldJson.hasVariant.forEach((variant) => {
+        const hasAtLeastOneAxis = axes.some((axis) => variant[axis] !== undefined);
+        expect(hasAtLeastOneAxis).toBe(true);
+      });
+    });
+  });
 });
-
-test('complex product markup', async () => {
-  const res = await fetch(`${actionUrl}/products-ssg/ssg-configurable-product/ssgconfig123?sku=SSGCONFIG123`);
-  const content = await res.text();
-
-  // Parse markup and compare
-  const $ = cheerio.load(content);
-
-  // Validate H1
-  expect($('h1').text()).toEqual('BYOM Configurable Product');
-
-  // Validate price
-  expect($('.product-details > div > div:contains("Price")').next().text()).toEqual('$40.00-$80.00');
-
-  // Validate images
-  expect($('.product-details > div > div:contains("Images")').next().find('img').map((_, e) => $(e).prop('outerHTML')).toArray()).toMatchInlineSnapshot(`
-[
-  "<img src="https://www.aemshop.net/media/catalog/product/a/d/adb124.jpg">",
-]
-`);
-
-  // Validate options
-  expect($('.product-details > div > div:contains("Options")')).toHaveLength(1);
-  const optionsHtml = $('.product-details > div > div:contains("Options")').next().html().trim();
-
-  expect(optionsHtml).toEqual(`<ul>
-              <li>
-                <h3>Color</h3>
-                option id <em>color</em>
-                required <em>false</em>
-                <ul>
-                  <li>
-                    <a href="https://main--aem-boilerplate-commerce-staging--hlxsites.aem.live/products-ssg/ssg-configurable-product/ssgconfig123?optionsUIDs=Y29uZmlndXJhYmxlLzI3OS80NQ==">blue <em>in stock</em></a>
-                  </li>
-                  <li>
-                    <a href="https://main--aem-boilerplate-commerce-staging--hlxsites.aem.live/products-ssg/ssg-configurable-product/ssgconfig123?optionsUIDs=Y29uZmlndXJhYmxlLzI3OS80Mg==">green <em>in stock</em></a>
-                  </li>
-                  <li>
-                    <a href="https://main--aem-boilerplate-commerce-staging--hlxsites.aem.live/products-ssg/ssg-configurable-product/ssgconfig123?optionsUIDs=Y29uZmlndXJhYmxlLzI3OS8zOQ==">red <em>in stock</em></a>
-                  </li>
-                </ul>
-              </li>
-            </ul>`);
-
-  // Validate description
-  expect($('meta[name="description"]').attr('content')).toEqual('SSG Configurable Product');
-
-  // Validate LD-JSON
-  const ldJson = JSON.parse($('script[type="application/ld+json"]').html());
-  const expected = {
-    "@context": "http://schema.org",
-    "@type": "ProductGroup",
-    "sku": "SSGCONFIG123",
-    "productGroupId": "SSGCONFIG123",
-    "name": "BYOM Configurable Product",
-    "gtin": "",
-    "variesBy": [
-      "https://schema.org/color"
-    ],
-    "description": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
-    "@id": "https://main--aem-boilerplate-commerce-staging--hlxsites.aem.live/products-ssg/ssg-configurable-product/SSGCONFIG123",
-    "hasVariant": [
-      {
-        "@type": "Product",
-        "sku": "SSGCONFIG123-blue",
-        "name": "BYOM Configurable Product-blue",
-        "gtin": "",
-        "image": "https://www.aemshop.net/media/catalog/product/a/d/adb402_1.jpg",
-        "offers": [
-          {
-            "@type": "Offer",
-            "sku": "SSGCONFIG123-blue",
-            "url": "https://main--aem-boilerplate-commerce-staging--hlxsites.aem.live/products-ssg/ssg-configurable-product/SSGCONFIG123?optionsUIDs=Y29uZmlndXJhYmxlLzI3OS80NQ%3D%3D",
-            "availability": "https://schema.org/InStock",
-            "price": 60,
-            "priceCurrency": "USD",
-            "itemCondition": "https://schema.org/NewCondition"
-          }
-        ],
-        "color": "blue"
-      },
-      {
-        "@type": "Product",
-        "sku": "SSGCONFIG123-green",
-        "name": "BYOM Configurable Product-green",
-        "gtin": "",
-        "image": "https://www.aemshop.net/media/catalog/product/a/d/adb412_1.jpg",
-        "offers": [
-          {
-            "@type": "Offer",
-            "sku": "SSGCONFIG123-green",
-            "url": "https://main--aem-boilerplate-commerce-staging--hlxsites.aem.live/products-ssg/ssg-configurable-product/SSGCONFIG123?optionsUIDs=Y29uZmlndXJhYmxlLzI3OS80Mg%3D%3D",
-            "availability": "https://schema.org/InStock",
-            "price": 80,
-            "priceCurrency": "USD",
-            "itemCondition": "https://schema.org/NewCondition"
-          }
-        ],
-        "color": "green"
-      },
-      {
-        "@type": "Product",
-        "sku": "SSGCONFIG123-red",
-        "name": "BYOM Configurable Product-red",
-        "gtin": "",
-        "image": "https://www.aemshop.net/media/catalog/product/a/d/adb187_1.jpg",
-        "offers": [
-          {
-            "@type": "Offer",
-            "sku": "SSGCONFIG123-red",
-            "url": "https://main--aem-boilerplate-commerce-staging--hlxsites.aem.live/products-ssg/ssg-configurable-product/SSGCONFIG123?optionsUIDs=Y29uZmlndXJhYmxlLzI3OS8zOQ%3D%3D",
-            "availability": "https://schema.org/InStock",
-            "price": 40,
-            "priceCurrency": "USD",
-            "itemCondition": "https://schema.org/NewCondition"
-          }
-        ],
-        "color": "red"
-      }
-    ],
-    "image": "https://www.aemshop.net/media/catalog/product/a/d/adb124.jpg"
-  };
-  expect(ldJson).toEqual(expected);
-});
-
-test('product by urlKey', async () => {
-  const res = await fetch(`${actionUrl}/bezier-tee?urlKey=bezier-tee`);
-  const content = await res.text();
-
-  // Parse markup and compare
-  const $ = cheerio.load(content);
-
-  // Validate H1
-  expect($('h1').text()).toEqual('Bezier tee');
-})

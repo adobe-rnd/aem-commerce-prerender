@@ -1,8 +1,10 @@
 # Rendering Logic & Customizations
 
-## Structured data
+## PDP (Product Detail Pages)
 
-### GTIN & Product Codes
+### Structured data
+
+#### GTIN & Product Codes
 
 GTIN [is strongly recommended](https://support.google.com/merchants/answer/6324461) in the structured data but not mandatory.
 
@@ -30,3 +32,41 @@ You can customize this function to use your own logic logic to retrieve the GTIN
 
 The main customization point to define markup structure is [the templates folder](/actions/pdp-renderer/templates)
 Those files follow the [Handlebars](https://handlebarsjs.com/) syntax and the referenced variables can be defined in [render.js](/actions/pdp-renderer/render.js)
+
+## PLP (Product Listing Pages)
+
+### Structured data
+
+The PLP renderer generates [CollectionPage](https://schema.org/CollectionPage) JSON-LD with an `ItemList` of products and a `BreadcrumbList`. The logic is defined in [ldJson.js](/actions/plp-renderer/ldJson.js).
+
+### Templates
+
+PLP markup templates follow the same [Handlebars](https://handlebarsjs.com/) pattern as PDP. The templates are in [the templates folder](/actions/plp-renderer/templates) and the referenced variables can be defined in [render.js](/actions/plp-renderer/render.js).
+
+## E2E Testing
+
+End-to-end tests verify that the deployed `pdp-renderer` and `plp-renderer` actions return correctly structured HTML and JSON-LD. They run against your live Adobe I/O Runtime deployment.
+
+### Configuration
+
+Test inputs are defined in [`e2e/config.json`](/e2e/config.json):
+
+```json
+{
+  "pdpSku": "ADB177",
+  "plpSlug": "apparel"
+}
+```
+
+- `pdpSku` -- the product SKU to use for PDP rendering tests
+- `plpSlug` -- the category slug to use for PLP rendering tests
+
+Update these values to match products and categories available in your catalog.
+
+### Running the tests
+
+```bash
+npm run e2e
+```
+
+The tests validate structural correctness and field-level checks on the rendered HTML and JSON-LD, without asserting on catalog-specific values like product names or image domains.

@@ -42,8 +42,11 @@ async function main(params) {
 
     let activationResult;
 
+    logger.debug('Checking if PLP pre-rendering is already running');
     const running = await stateMgr.get('plp-running');
+    logger.debug('PLP pre-rendering is already running:', running?.value);
     if (running?.value === 'true') {
+      logger.warn('PLP pre-rendering is already running. Skipping this execution...');
       activationResult = { state: 'skipped' };
 
       try {
@@ -56,6 +59,7 @@ async function main(params) {
     }
 
     try {
+      logger.debug('Starting PLP pre-rendering');
       await stateMgr.put('plp-running', 'true', { ttl: 3600 });
 
       activationResult = await poll(cfg, { stateLib: stateMgr, filesLib }, logger);
@@ -73,6 +77,7 @@ async function main(params) {
       logger.warn('Failed to send activation result.', obsErr);
     }
 
+    logger.debug('PLP pre-rendering completed');
     return activationResult;
   } catch (error) {
     logger = logger || Core.Logger('main', { level: 'error' });

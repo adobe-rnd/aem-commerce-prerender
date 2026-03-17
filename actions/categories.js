@@ -46,11 +46,12 @@ function hasFamilies(families) {
  * @returns {Promise<Map<string, Object>>} Map of category slug to category metadata.
  */
 async function fetchCategoryTree(context, families) {
-  console.debug('Getting category data from families:', families);
+  const { logger } = context;
+  logger.debug('Getting category data from families:', families);
   const categoryMap = new Map();
 
   for (const family of families) {
-    console.debug('Getting category data from family:', family);
+    logger.debug('Getting category data from family:', family);
     // Get root-level categories for this family
     const firstLevel = await requestSaaS(CategoryTreeQuery, 'getCategoryTree', { family }, context);
 
@@ -88,7 +89,7 @@ async function fetchCategoryTree(context, families) {
       }
     }
   }
-  console.debug('Category slugs resolved:', [...categoryMap.keys()]);
+  logger.debug('Category slugs resolved:', [...categoryMap.keys()]);
 
   return categoryMap;
 }

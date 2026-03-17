@@ -39,7 +39,7 @@
   },
   "scripts": {
     "test": "c8 node --experimental-vm-modules node_modules/jest/bin/jest.js --passWithNoTests ./test",
-    "e2e": "node --experimental-vm-modules node_modules/jest/bin/jest.js --collectCoverage=false --testRegex ./e2e",
+    "e2e": "node --experimental-vm-modules node_modules/jest/bin/jest.js --collectCoverage=false --testRegex 'e2e/.*\\.e2e\\.test\\.js$'",
     "format": "prettier --write \"actions/**/*.js\" \"test/**/*.js\"",
     "format:check": "prettier --check \"actions/**/*.js\" \"test/**/*.js\"",
     "lint": "eslint --ignore-pattern web-src --no-error-on-unmatched-pattern test src actions",

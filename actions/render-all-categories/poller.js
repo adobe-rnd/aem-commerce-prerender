@@ -48,10 +48,6 @@ function checkParams(params) {
     'contentUrl',
     'storeUrl',
   ]);
-
-  if (!params.categoryFamilies?.length) {
-    throw new JobFailedError('Missing ACO_CATEGORY_FAMILIES configuration', ERROR_CODES.VALIDATION_ERROR, 400);
-  }
 }
 
 /**
@@ -238,10 +234,17 @@ async function poll(params, aioLibs, logger) {
           // Discover all categories
           let categoryMap;
           if (siteType === SITE_TYPES.ACO) {
+            if (!categoryFamilies?.length) {
+              throw new JobFailedError(
+                'Missing ACO_CATEGORY_FAMILIES configuration',
+                ERROR_CODES.VALIDATION_ERROR,
+                400,
+              );
+            }
             categoryMap = await getCategoryDataFromFamilies(context, categoryFamilies);
           } else {
             throw new JobFailedError(
-              'ACCS is not yet support for PLP pre-rendering',
+              'ACCS is not yet supported for PLP pre-rendering',
               ERROR_CODES.VALIDATION_ERROR,
               400,
             );
@@ -279,8 +282,10 @@ async function poll(params, aioLibs, logger) {
                   if (shouldPreviewAndPublish(category)) {
                     toPublish.push(category);
                   } else if (!category.renderedAt) {
+                    logger.warn(`Category ${category.slug} failed to render`);
                     counts.failed++;
                   } else {
+                    logger.debug(`Category ${category.slug} has not changed. Ignoring...`);
                     counts.ignored++;
                     state.categories[category.slug] = {
                       lastRenderedAt: category.renderedAt,
@@ -290,6 +295,7 @@ async function poll(params, aioLibs, logger) {
                   }
                 }
 
+                // Update lastRenderedAt for the categories to ignore to avoid re-rendering unnecessarily
                 if (toIgnore.length) {
                   await saveState(state, aioLibs, PLP_FILE_PREFIX, DATA_KEY);
                 }
@@ -303,9 +309,12 @@ async function poll(params, aioLibs, logger) {
                     path,
                     renderedAt,
                   }));
+                  // Preview and publish the categories
+                  logger.debug(`Previewing and publishing ${categories.length} categories in batch ${batchNumber + 1}`);
                   return adminApi
                     .previewAndPublish(records, locale, batchNumber + 1)
                     .then((publishedBatch) =>
+                      // Process the published batch and update the state
                       processPublishedBatch(publishedBatch, state, counts, categories, aioLibs, {
                         dataKey: DATA_KEY,
                         keyField: 'slug',
@@ -313,11 +322,13 @@ async function poll(params, aioLibs, logger) {
                       }),
                     )
                     .catch((error) => {
+                      // Handle batch errors gracefully - don't fail the entire job
                       if (error.code === ERROR_CODES.BATCH_ERROR) {
                         logger.warn(`Batch ${batchNumber + 1} failed, continuing:`, {
                           error: error.message,
                           details: error.details,
                         });
+                        // Update counts to reflect failed batch
                         counts.failed += categories.length;
                         return {
                           failed: true,
@@ -325,6 +336,7 @@ async function poll(params, aioLibs, logger) {
                           error: error.message,
                         };
                       } else {
+                        // Re-throw global errors
                         throw error;
                       }
                     });
@@ -338,6 +350,7 @@ async function poll(params, aioLibs, logger) {
           // Unpublish categories that are no longer in the tree
           const discoveredSlugs = new Set(categorySlugs);
           if (Object.keys(state.categories).some((slug) => !discoveredSlugs.has(slug))) {
+            logger.debug(`Unpublishing categories that are no longer in the tree`);
             await processRemovedCategories(discoveredSlugs, state, context, adminApi);
             timings.sample('unpublished-categories');
           } else {
