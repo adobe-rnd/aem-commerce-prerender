@@ -220,6 +220,7 @@ async function main(params) {
 
         const siteConfig = await getConfig(context);
         const siteType = getSiteType(siteConfig);
+        logger.debug(`Detected site type: ${siteType}`);
         const allProducts = await getAllProducts(siteType, context, cfg.categoryFamilies);
 
         timings.sample('getAllProducts');

@@ -9,20 +9,23 @@
 GTIN [is strongly recommended](https://support.google.com/merchants/answer/6324461) in the structured data but not mandatory.
 
 From [ldJson.js](/actions/pdp-renderer/ldJson.js#L73)
+
 ```js
 /**
  * Extracts the GTIN (Global Trade Item Number) from a product's attributes.
  * Checks for GTIN, UPC, or EAN attributes as defined in the Catalog.
- * 
+ *
  * @param {Object} product - The product object containing attributes
  * @returns {string} The GTIN value if found, empty string otherwise
  */
 function getGTIN(product) {
-  return product?.attributes?.find(attr => attr.name === 'gtin')?.value
-    || product?.attributes?.find(attr => attr.name === 'upc')?.value
-    || product?.attributes?.find(attr => attr.name === 'ean')?.value
-    || product?.attributes?.find(attr => attr.name === 'isbn')?.value
-    || '';
+  return (
+    product?.attributes?.find((attr) => attr.name === 'gtin')?.value ||
+    product?.attributes?.find((attr) => attr.name === 'upc')?.value ||
+    product?.attributes?.find((attr) => attr.name === 'ean')?.value ||
+    product?.attributes?.find((attr) => attr.name === 'isbn')?.value ||
+    ''
+  );
 }
 ```
 
@@ -38,6 +41,18 @@ Those files follow the [Handlebars](https://handlebarsjs.com/) syntax and the re
 ### Structured data
 
 The PLP renderer generates [CollectionPage](https://schema.org/CollectionPage) JSON-LD with an `ItemList` of products and a `BreadcrumbList`. The logic is defined in [ldJson.js](/actions/plp-renderer/ldJson.js).
+
+### Category Image Selection
+
+The PLP renderer selects a category image for the `og:image` meta tag and general display. By default it prefers an image with the `BASE` role, falling back to the first available image.
+
+From [render.js](/actions/plp-renderer/render.js):
+
+```js
+const categoryImage = categoryData.images?.find((img) => img.roles?.includes('BASE')) || categoryData.images?.[0];
+```
+
+You can customize this to match a different role (`SMALL`, `THUMBNAIL`, `SWATCH`) or a custom role defined in your catalog.
 
 ### Templates
 

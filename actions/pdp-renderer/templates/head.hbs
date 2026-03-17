@@ -1,15 +1,25 @@
 <head>
   <meta charset="UTF-8">
   <title>{{metaTitle}}</title>
-
-  {{#if metaDescription ~}}<meta name="description" content="{{metaDescription}}">{{/if ~}}
-  {{#if metaKeyword ~}}<meta name="keywords" content="{{metaKeyword}}">{{/if ~}}
-  {{#if metaImage ~}}<meta name="image" content="{{metaImage}}">{{/if ~}}
-  {{#if externalId ~}}<meta name="id" content="{{externalId}}">{{/if ~}}
-  {{#if sku ~}}<meta name="sku" content="{{sku}}">{{/if ~}}
-  {{#if __typename ~}}<meta name="__typename" content="{{__typename}}">{{/if ~}}
+{{#if metaDescription}}
+  <meta name="description" content="{{metaDescription}}">
+{{/if}}
+{{#if metaKeyword}}
+  <meta name="keywords" content="{{metaKeyword}}">
+{{/if}}
+{{#if metaImage}}
+  <meta name="image" content="{{metaImage}}">
+{{/if}}
+{{#if externalId}}
+  <meta name="id" content="{{externalId}}">
+{{/if}}
+{{#if sku}}
+  <meta name="sku" content="{{sku}}">
+{{/if}}
+{{#if __typename}}
+  <meta name="__typename" content="{{__typename}}">
+{{/if}}
   <meta property="og:type" content="og:product">
-
   <script type="application/ld+json">{{{ ldJson }}}</script>
 </head>
 

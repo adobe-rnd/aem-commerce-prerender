@@ -33,7 +33,7 @@ const {
   validateRequiredParams,
 } = require('../renderUtils');
 const { PlpProductSearchQuery } = require('../queries');
-const { getCategoryDataFromFamilies } = require('../categories');
+const { getCategoryMapFromFamilies, getCategoryMap } = require('../categories');
 const { generateCategoryHtml } = require('../plp-renderer/render');
 const { JobFailedError, ERROR_CODES } = require('../lib/errorHandler');
 const DATA_KEY = 'categories';
@@ -227,6 +227,8 @@ async function poll(params, aioLibs, logger) {
           const context = { ...sharedContext, startTime: new Date() };
           const siteConfig = await getConfig(context);
           const siteType = getSiteType(siteConfig);
+          logger.debug(`Detected site type: ${siteType}`);
+
           if (locale) context.locale = locale;
 
           logger.info(`PLP polling for locale ${locale}`);
@@ -241,13 +243,9 @@ async function poll(params, aioLibs, logger) {
                 400,
               );
             }
-            categoryMap = await getCategoryDataFromFamilies(context, categoryFamilies);
+            categoryMap = await getCategoryMapFromFamilies(context, categoryFamilies);
           } else {
-            throw new JobFailedError(
-              'ACCS is not yet supported for PLP pre-rendering',
-              ERROR_CODES.VALIDATION_ERROR,
-              400,
-            );
+            categoryMap = await getCategoryMap(context);
           }
           timings.sample('discover-categories');
 

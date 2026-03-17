@@ -39,7 +39,7 @@ function hasFamilies(families) {
  * Handles trees of arbitrary depth even when the API caps depth at
  * MAX_TREE_DEPTH per call — each iteration advances up to that many levels.
  *
- * Shared by getCategorySlugsFromFamilies and getCategoryDataFromFamilies.
+ * Shared by getCategorySlugsFromFamilies and getCategoryMapFromFamilies.
  *
  * @param {Object} context - Request context (config, logger, headers, etc.).
  * @param {string[]} families - ACO category family identifiers.
@@ -117,7 +117,7 @@ async function getCategorySlugsFromFamilies(context, families) {
  * @param {string[]} families - ACO category family identifiers.
  * @returns {Promise<Map<string, Object>>} Map of category slug to category metadata.
  */
-async function getCategoryDataFromFamilies(context, families) {
+async function getCategoryMapFromFamilies(context, families) {
   return fetchCategoryTree(context, families);
 }
 
@@ -153,7 +153,23 @@ function buildBreadcrumbs(slug, categoryMap) {
 }
 
 /**
- * Retrieves all ACCS categories grouped by level.
+ * Retrieves all categories as a Map of urlPath → category metadata.
+ *
+ * @param {Object} context - Request context (config, logger, headers, etc.).
+ * @returns {Promise<Map<string, Object>>} Map of urlPath to category metadata.
+ */
+async function getCategoryMap(context) {
+  const categoriesRes = await requestSaaS(CategoriesQuery, 'getCategories', {}, context);
+  const categoryMap = new Map();
+  for (const { name, level, urlPath } of categoriesRes.data.categories) {
+    if (!urlPath) continue;
+    categoryMap.set(urlPath, { slug: urlPath, name, level: parseInt(level) });
+  }
+  return categoryMap;
+}
+
+/**
+ * Retrieves all categories grouped by level.
  *
  * Returns a sparse array indexed by category level so callers can iterate
  * shallowest levels first (used for the early-exit optimization when
@@ -163,19 +179,19 @@ function buildBreadcrumbs(slug, categoryMap) {
  * @returns {Promise<string[][]>} Sparse array where index N holds urlPath strings at level N.
  */
 async function getCategories(context) {
-  const categoriesRes = await requestSaaS(CategoriesQuery, 'getCategories', {}, context);
+  const categoryMap = await getCategoryMap(context);
   const byLevel = [];
-  for (const { urlPath, level } of categoriesRes.data.categories) {
-    const idx = parseInt(level);
-    byLevel[idx] = byLevel[idx] || [];
-    byLevel[idx].push(urlPath);
+  for (const [, { slug, level }] of categoryMap) {
+    byLevel[level] = byLevel[level] || [];
+    byLevel[level].push(slug);
   }
   return byLevel;
 }
 
 module.exports = {
   getCategorySlugsFromFamilies,
-  getCategoryDataFromFamilies,
+  getCategoryMapFromFamilies,
+  getCategoryMap,
   getCategories,
   hasFamilies,
   buildBreadcrumbs,

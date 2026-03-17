@@ -16,7 +16,7 @@ const { generatePlpLdJson } = require('../actions/plp-renderer/ldJson');
 const {
   buildBreadcrumbs,
   getCategorySlugsFromFamilies,
-  getCategoryDataFromFamilies,
+  getCategoryMapFromFamilies,
 } = require('../actions/categories');
 const { getCategoryUrl } = require('../actions/utils');
 const Files = require('./__mocks__/files');
@@ -409,7 +409,7 @@ describe('getCategoryUrl', () => {
   });
 });
 
-// ─── getCategoryDataFromFamilies / getCategorySlugsFromFamilies ─────────────
+// ─── getCategoryMapFromFamilies / getCategorySlugsFromFamilies ─────────────
 
 describe('category tree fetching', () => {
   const server = useMockServer();
@@ -475,7 +475,7 @@ describe('category tree fetching', () => {
     expect(slugs).toHaveLength(2);
   });
 
-  test('getCategoryDataFromFamilies returns Map with full metadata', async () => {
+  test('getCategoryMapFromFamilies returns Map with full metadata', async () => {
     server.use(
       http.post('https://commerce.com/graphql', async ({ request }) => {
         const body = await request.json();
@@ -510,7 +510,7 @@ describe('category tree fetching', () => {
       }),
     );
 
-    const categoryMap = await getCategoryDataFromFamilies(mockContext, ['electronics']);
+    const categoryMap = await getCategoryMapFromFamilies(mockContext, ['electronics']);
     expect(categoryMap).toBeInstanceOf(Map);
     expect(categoryMap.has('electronics')).toBe(true);
 

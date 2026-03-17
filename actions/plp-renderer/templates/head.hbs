@@ -1,0 +1,27 @@
+<head>
+  <meta charset='UTF-8' />
+  <title>{{metaTitle}}</title>
+{{#if metaDescription}}
+  <meta name='description' content='{{metaDescription}}' />
+{{/if}}
+{{#if metaKeywords}}
+  <meta name='keywords' content='{{metaKeywords}}' />
+{{/if}}
+{{#if metaImage}}
+  <meta name='image' content='{{metaImage}}' />
+{{/if}}
+  <meta property='og:type' content='website' />
+{{#if metaTitle}}
+  <meta property='og:title' content='{{metaTitle}}' />
+{{/if}}
+{{#if metaDescription}}
+  <meta property='og:description' content='{{metaDescription}}' />
+{{/if}}
+{{#if categoryUrl}}
+  <meta property='og:url' content='{{categoryUrl}}' />
+{{/if}}
+{{#if metaImage}}
+  <meta property='og:image' content='{{metaImage}}' />
+{{/if}}
+  <script type='application/ld+json'>{{{ldJson}}}</script>
+</head>

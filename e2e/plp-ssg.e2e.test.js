@@ -63,9 +63,26 @@ describe(`PLP e2e - slug: ${slug}`, () => {
     expect(title.length).toBeGreaterThan(0);
   });
 
-  test('meta category-slug matches input slug', () => {
-    const metaSlug = $('meta[name="category-slug"]').attr('content');
-    expect(metaSlug).toBe(slug);
+  test('og tags are present and non-empty', () => {
+    for (const property of ['og:type', 'og:title', 'og:url']) {
+      const content = $(`meta[property="${property}"]`).attr('content');
+      expect(content).toBeTruthy();
+    }
+  });
+
+  test('optional meta tags have non-empty content when present', () => {
+    for (const [attr, name] of [
+      ['name', 'description'],
+      ['name', 'keywords'],
+      ['name', 'image'],
+      ['property', 'og:description'],
+      ['property', 'og:image'],
+    ]) {
+      const el = $(`meta[${attr}="${name}"]`);
+      if (el.length) {
+        expect(el.attr('content')).toBeTruthy();
+      }
+    }
   });
 
   test('breadcrumb nav exists with at least one link', () => {

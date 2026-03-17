@@ -12,7 +12,7 @@ governing permissions and limitations under the License.
 
 const { Core } = require('@adobe/aio-sdk');
 const { errorResponse, getConfig, getSiteType, requestSaaS, SITE_TYPES } = require('../utils');
-const { getCategoryDataFromFamilies } = require('../categories');
+const { getCategoryMapFromFamilies, getCategoryMap } = require('../categories');
 const { generateCategoryHtml } = require('./render');
 const { getRuntimeConfig } = require('../lib/runtimeConfig');
 const { JobFailedError, ERROR_CODES } = require('../lib/errorHandler');
@@ -41,14 +41,7 @@ async function main(params) {
     }
     const siteConfig = await getConfig(context);
     const siteType = getSiteType(siteConfig);
-
-    if (siteType === SITE_TYPES.ACO) {
-      if (!cfg.categoryFamilies?.length) {
-        throw new JobFailedError('Missing ACO_CATEGORY_FAMILIES configuration', ERROR_CODES.VALIDATION_ERROR, 400);
-      }
-    } else {
-      throw new JobFailedError('ACCS is not yet supported for PLP pre-rendering', ERROR_CODES.VALIDATION_ERROR, 400);
-    }
+    logger.debug(`Detected site type: ${siteType}`);
 
     if (!slug) {
       throw new JobFailedError('Missing required parameter: slug must be provided', ERROR_CODES.VALIDATION_ERROR, 400);
@@ -56,9 +49,15 @@ async function main(params) {
 
     logger.info(`Rendering category slug: ${slug} for locale: ${locale || 'default'}`);
 
-    // Fetch full category tree (needed for breadcrumb resolution)
-    logger.info(`Fetching category tree for families: ${cfg.categoryFamilies}`);
-    const categoryMap = await getCategoryDataFromFamilies(context, cfg.categoryFamilies);
+    let categoryMap;
+    if (siteType === SITE_TYPES.ACO) {
+      if (!cfg.categoryFamilies?.length) {
+        throw new JobFailedError('Missing ACO_CATEGORY_FAMILIES configuration', ERROR_CODES.VALIDATION_ERROR, 400);
+      }
+      categoryMap = await getCategoryMapFromFamilies(context, cfg.categoryFamilies);
+    } else {
+      categoryMap = await getCategoryMap(context);
+    }
     logger.debug(`Category tree resolved with ${categoryMap.size} categories`);
 
     const categoryData = categoryMap.get(slug);

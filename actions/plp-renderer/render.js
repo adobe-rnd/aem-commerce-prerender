@@ -21,7 +21,7 @@ const { buildBreadcrumbs } = require('../categories');
 let compiledTemplate;
 function getCompiledTemplate() {
   if (!compiledTemplate) {
-    const [pageHbs, headHbs, productListingHbs] = ['page', 'plp-head', 'product-listing'].map((template) =>
+    const [pageHbs, headHbs, productListingHbs] = ['page', 'head', 'product-listing'].map((template) =>
       fs.readFileSync(path.join(__dirname, 'templates', `${template}.hbs`), 'utf8'),
     );
     const handlebars = Handlebars.create();
@@ -49,17 +49,15 @@ function generateCategoryHtml(categoryData, products, categoryMap, context) {
     ? sanitize(categoryData.metaTags.description, 'all')
     : null;
 
-  const categoryImage = categoryData.images?.find(
-    (img) => img.roles?.includes('image') || img.customRoles?.includes('hero'),
-  );
+  const categoryImage = categoryData.images?.find((img) => img.roles?.includes('BASE')) || categoryData.images?.[0];
 
   const templateData = {
     categoryName: sanitize(categoryData.name, 'inline'),
     categoryDescription,
-    slug: categoryData.slug,
+    categoryUrl: getCategoryUrl(categoryData.slug, context),
     metaTitle: sanitize(categoryData.metaTags?.title || categoryData.name, 'no'),
     metaDescription: categoryData.metaTags?.description ? sanitize(categoryData.metaTags.description, 'no') : null,
-    metaKeywords: categoryData.metaTags?.keywords ? sanitize(categoryData.metaTags.keywords, 'no') : null,
+    metaKeywords: categoryData.metaTags?.keywords ? sanitize(categoryData.metaTags.keywords.join(', '), 'no') : null,
     metaImage: categoryImage?.url || null,
     breadcrumbs: breadcrumbs.map((crumb) => ({
       name: sanitize(crumb.name, 'inline'),
