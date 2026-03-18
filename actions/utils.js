@@ -506,8 +506,7 @@ function getProductUrl(product, context, addStore = true) {
     .filter(Boolean); // Remove any empty segments
 
   if (addStore) {
-    path.unshift(storeUrl);
-    return helixSharedStringLib.sanitizePath(path.join('/'));
+    return `${storeUrl}${helixSharedStringLib.sanitizePath(`/${path.join('/')}`)}`;
   }
 
   return helixSharedStringLib.sanitizePath(`/${path.join('/')}`);
