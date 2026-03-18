@@ -65,7 +65,7 @@ function generateCategoryHtml(categoryData, products, categoryMap, context) {
     })),
     products: products.map((product) => ({
       name: sanitize(product.name, 'inline'),
-      url: getProductUrl({ urlKey: product.urlKey, sku: 'test_sku' }, context).toLowerCase(),
+      url: getProductUrl({ urlKey: product.urlKey, sku: product.sku }, context).toLowerCase(),
       image: product.images?.find((img) => img.roles?.includes('image'))?.url || null,
     })),
     hasProducts: products.length > 0,
