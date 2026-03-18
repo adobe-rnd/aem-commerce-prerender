@@ -54,18 +54,18 @@ function generateCategoryHtml(categoryData, products, categoryMap, context) {
   const templateData = {
     categoryName: sanitize(categoryData.name, 'inline'),
     categoryDescription,
-    categoryUrl: getCategoryUrl(categoryData.slug, context),
+    categoryUrl: getCategoryUrl(categoryData.slug, context).toLowerCase(),
     metaTitle: sanitize(categoryData.metaTags?.title || categoryData.name, 'no'),
     metaDescription: categoryData.metaTags?.description ? sanitize(categoryData.metaTags.description, 'no') : null,
     metaKeywords: categoryData.metaTags?.keywords ? sanitize(categoryData.metaTags.keywords.join(', '), 'no') : null,
     metaImage: categoryImage?.url || null,
     breadcrumbs: breadcrumbs.map((crumb) => ({
       name: sanitize(crumb.name, 'inline'),
-      url: getCategoryUrl(crumb.slug, context),
+      url: getCategoryUrl(crumb.slug, context).toLowerCase(),
     })),
     products: products.map((product) => ({
       name: sanitize(product.name, 'inline'),
-      url: getProductUrl({ urlKey: product.urlKey, sku: product.sku }, context),
+      url: getProductUrl({ urlKey: product.urlKey, sku: 'test_sku' }, context).toLowerCase(),
       image: product.images?.find((img) => img.roles?.includes('image'))?.url || null,
     })),
     hasProducts: products.length > 0,

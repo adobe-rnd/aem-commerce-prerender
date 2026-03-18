@@ -507,7 +507,7 @@ function getProductUrl(product, context, addStore = true) {
 
   if (addStore) {
     path.unshift(storeUrl);
-    return path.join('/');
+    return helixSharedStringLib.sanitizePath(path.join('/'));
   }
 
   return helixSharedStringLib.sanitizePath(`/${path.join('/')}`);
