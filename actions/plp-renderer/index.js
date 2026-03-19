@@ -35,6 +35,9 @@ async function main(params) {
 
   try {
     const { slug, locale } = params;
+    if (!slug) {
+      throw new JobFailedError('Missing required parameter: slug must be provided', ERROR_CODES.VALIDATION_ERROR, 400);
+    }
     const context = { ...cfg, logger };
     if (locale) {
       context.locale = locale;
@@ -42,10 +45,6 @@ async function main(params) {
     const siteConfig = await getConfig(context);
     const siteType = getSiteType(siteConfig);
     logger.debug(`Detected site type: ${siteType}`);
-
-    if (!slug) {
-      throw new JobFailedError('Missing required parameter: slug must be provided', ERROR_CODES.VALIDATION_ERROR, 400);
-    }
 
     logger.info(`Rendering category slug: ${slug} for locale: ${locale || 'default'}`);
 
