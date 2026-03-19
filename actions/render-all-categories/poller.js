@@ -65,7 +65,7 @@ async function renderCategory(categoryData, categoryMap, context) {
     const slug = categoryData.slug;
     const result = {
       slug,
-      path: getCategoryUrl(slug, context, false).toLowerCase(),
+      path: getCategoryUrl(slug, context, false),
       currentHash: context.state.categories[slug]?.hash || null,
     };
 
@@ -125,7 +125,7 @@ async function processRemovedCategories(discoveredSlugs, state, context, adminAp
   try {
     const records = removedSlugs.map((slug) => ({
       slug,
-      path: getCategoryUrl(slug, context, false).toLowerCase(),
+      path: getCategoryUrl(slug, context, false),
     }));
 
     const batches = createBatches(records);

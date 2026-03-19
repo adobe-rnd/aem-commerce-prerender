@@ -71,7 +71,7 @@ function enrichProductWithMetadata(product, state, context) {
   const { sku, urlKey, lastModifiedAt } = product;
   const lastRenderedDate = state.skus[sku]?.lastRenderedAt || new Date(0);
   const lastModifiedDate = new Date(lastModifiedAt);
-  const productUrl = getProductUrl({ urlKey, sku }, context, false).toLowerCase();
+  const productUrl = getProductUrl({ urlKey, sku }, context, false);
   const currentHash = state.skus[sku]?.hash || null;
 
   return {
