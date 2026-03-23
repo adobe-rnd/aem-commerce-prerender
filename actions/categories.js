@@ -12,12 +12,8 @@ governing permissions and limitations under the License.
 
 */
 
-const { requestSaaS } = require("./utils");
-const {
-  CategoriesQuery,
-  CategoryTreeQuery,
-  CategoryTreeBySlugsQuery,
-} = require("./queries");
+const { requestSaaS } = require('./utils');
+const { CategoriesQuery, CategoryTreeQuery, CategoryTreeBySlugsQuery } = require('./queries');
 
 const MAX_TREE_DEPTH = 3;
 
@@ -32,7 +28,8 @@ function hasFamilies(families) {
 }
 
 /**
- * Resolves all category slugs belonging to the given ACO category families.
+ * Resolves all categories belonging to the given ACO category families,
+ * returning a Map of slug → full category metadata.
  *
  * Uses BFS traversal of the categoryTree API:
  *  1. Query each family's root categories and their immediate childrenSlugs.
@@ -42,63 +39,137 @@ function hasFamilies(families) {
  * Handles trees of arbitrary depth even when the API caps depth at
  * MAX_TREE_DEPTH per call — each iteration advances up to that many levels.
  *
+ * Shared by getCategorySlugsFromFamilies and getCategoryMapFromFamilies.
+ *
  * @param {Object} context - Request context (config, logger, headers, etc.).
  * @param {string[]} families - ACO category family identifiers.
- * @returns {Promise<string[]>} Flat array of all unique category slugs.
+ * @returns {Promise<Map<string, Object>>} Map of category slug to category metadata.
  */
-async function getCategorySlugsFromFamilies(context, families) {
-  console.debug("Getting category slugs from families:", families);
-  const allSlugs = new Set();
+async function fetchCategoryTree(context, families) {
+  const { logger } = context;
+  logger.debug('Getting category data from families:', families);
+  const categoryMap = new Map();
 
   for (const family of families) {
-    console.debug("Getting category slugs from family:", family);
+    logger.debug('Getting category data from family:', family);
     // Get root-level categories for this family
-    const firstLevel = await requestSaaS(
-      CategoryTreeQuery,
-      "getCategoryTree",
-      { family },
-      context,
-    );
+    const firstLevel = await requestSaaS(CategoryTreeQuery, 'getCategoryTree', { family }, context);
 
     let pending = [];
     for (const cat of firstLevel.data.categoryTree) {
-      allSlugs.add(cat.slug);
+      categoryMap.set(cat.slug, cat);
       pending.push(...(cat.childrenSlugs || []));
     }
 
     // BFS: resolve children level by level until no new slugs remain
     while (pending.length) {
       // Mark pending as seen before querying to prevent re-processing
-      for (const slug of pending) allSlugs.add(slug);
+      for (const slug of pending) {
+        if (!categoryMap.has(slug)) categoryMap.set(slug, null);
+      }
 
       const childrenRes = await requestSaaS(
         CategoryTreeBySlugsQuery,
-        "getCategoryTreeBySlugs",
+        'getCategoryTreeBySlugs',
         { family, slugs: pending, depth: MAX_TREE_DEPTH },
         context,
       );
 
       // First pass: capture any descendant slugs included due to depth traversal
       for (const cat of childrenRes.data.categoryTree) {
-        allSlugs.add(cat.slug);
+        categoryMap.set(cat.slug, cat);
       }
 
       // Second pass: collect only new childrenSlugs for next iteration
       pending = [];
       for (const cat of childrenRes.data.categoryTree) {
         for (const child of cat.childrenSlugs || []) {
-          if (!allSlugs.has(child)) pending.push(child);
+          if (!categoryMap.has(child)) pending.push(child);
         }
       }
     }
   }
-  console.debug("Category slugs resolved:", [...allSlugs]);
+  logger.debug('Category slugs resolved:', [...categoryMap.keys()]);
 
-  return [...allSlugs];
+  return categoryMap;
 }
 
 /**
- * Retrieves all ACCS categories grouped by level.
+ * Resolves all category slugs belonging to the given ACO category families.
+ *
+ * Uses BFS traversal of the categoryTree API via fetchCategoryTree.
+ *
+ * @param {Object} context - Request context (config, logger, headers, etc.).
+ * @param {string[]} families - ACO category family identifiers.
+ * @returns {Promise<string[]>} Flat array of all unique category slugs.
+ */
+async function getCategorySlugsFromFamilies(context, families) {
+  const categoryMap = await fetchCategoryTree(context, families);
+  return [...categoryMap.keys()];
+}
+
+/**
+ * Resolves all categories with full metadata from the given ACO category families.
+ *
+ * Uses BFS traversal of the categoryTree API via fetchCategoryTree.
+ *
+ * @param {Object} context - Request context (config, logger, headers, etc.).
+ * @param {string[]} families - ACO category family identifiers.
+ * @returns {Promise<Map<string, Object>>} Map of category slug to category metadata.
+ */
+async function getCategoryMapFromFamilies(context, families) {
+  return fetchCategoryTree(context, families);
+}
+
+/**
+ * Converts a slug segment to a category name if a name is not provided.
+ * E.g. "computers-tablets" → "Computers Tablets"
+ *
+ * Callers should always prefer category.name from the API response.
+ */
+function getCategoryNameFromSlug(segment) {
+  return segment.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/**
+ * Derives breadcrumb trail from a category slug path.
+ *
+ * @param {string} slug - The category slug (e.g. "electronics/computers-tablets/laptops").
+ * @param {Map<string, Object>} categoryMap - The category map for name resolution.
+ * @returns {Array<{name: string, slug: string}>} Breadcrumb entries.
+ */
+function buildBreadcrumbs(slug, categoryMap) {
+  const segments = slug.split('/');
+  const breadcrumbs = [];
+
+  for (let i = 0; i < segments.length; i++) {
+    const ancestorSlug = segments.slice(0, i + 1).join('/');
+    const category = categoryMap.get(ancestorSlug);
+    const name = category?.name || getCategoryNameFromSlug(segments[i]);
+    breadcrumbs.push({ name, slug: ancestorSlug });
+  }
+
+  return breadcrumbs;
+}
+
+/**
+ * Retrieves all categories as a Map of urlPath → category metadata.
+ *
+ * @param {Object} context - Request context (config, logger, headers, etc.).
+ * @returns {Promise<Map<string, Object>>} Map of urlPath to category metadata.
+ */
+async function getCategoryMap(context) {
+  const categoriesRes = await requestSaaS(CategoriesQuery, 'getCategories', {}, context);
+  const categoryMap = new Map();
+  for (const { name, level, urlPath } of categoriesRes.data.categories) {
+    if (!urlPath) continue;
+    categoryMap.set(urlPath, { slug: urlPath, name, level: parseInt(level) });
+  }
+  return categoryMap;
+}
+
+/**
+ * Retrieves all categories grouped by level.
  *
  * Returns a sparse array indexed by category level so callers can iterate
  * shallowest levels first (used for the early-exit optimization when
@@ -108,19 +179,20 @@ async function getCategorySlugsFromFamilies(context, families) {
  * @returns {Promise<string[][]>} Sparse array where index N holds urlPath strings at level N.
  */
 async function getCategories(context) {
-  const categoriesRes = await requestSaaS(
-    CategoriesQuery,
-    "getCategories",
-    {},
-    context,
-  );
+  const categoryMap = await getCategoryMap(context);
   const byLevel = [];
-  for (const { urlPath, level } of categoriesRes.data.categories) {
-    const idx = parseInt(level);
-    byLevel[idx] = byLevel[idx] || [];
-    byLevel[idx].push(urlPath);
+  for (const [, { slug, level }] of categoryMap) {
+    byLevel[level] = byLevel[level] || [];
+    byLevel[level].push(slug);
   }
   return byLevel;
 }
 
-module.exports = { getCategorySlugsFromFamilies, getCategories, hasFamilies };
+module.exports = {
+  getCategorySlugsFromFamilies,
+  getCategoryMapFromFamilies,
+  getCategoryMap,
+  getCategories,
+  hasFamilies,
+  buildBreadcrumbs,
+};

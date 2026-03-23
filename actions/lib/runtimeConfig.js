@@ -20,7 +20,8 @@ const DEFAULTS = {
     STORE_URL: undefined,
     PRODUCTS_TEMPLATE: undefined,
     LOCALES: undefined,
-    SITE_TOKEN: undefined
+    SITE_TOKEN: undefined,
+    PLP_PRODUCTS_PER_PAGE: undefined
 };
 
 /**
@@ -116,7 +117,8 @@ function getRuntimeConfig(params = {}, options = {}) {
         configSheet: merged.CONFIG_SHEET,
         pathFormat: merged.PRODUCT_PAGE_URL_FORMAT,
         locales: localesArr,
-        categoryFamilies: categoryFamiliesArr
+        categoryFamilies: categoryFamiliesArr,
+        plpProductsPerPage: parseInt(merged.PLP_PRODUCTS_PER_PAGE, 10) || 9
     };
 
     // URL sanity checks

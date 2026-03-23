@@ -1,0 +1,37 @@
+<div class="product-listing">
+  <div>
+    <div>
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <ol>
+          {{#each breadcrumbs}}
+          <li><a href="{{url}}">{{name}}</a></li>
+          {{/each}}
+        </ol>
+      </nav>
+      <h1>{{categoryName}}</h1>
+    </div>
+  </div>
+  {{#if categoryDescription}}
+  <div>
+    <div><h2>Description</h2></div>
+    <div>{{{categoryDescription}}}</div>
+  </div>
+  {{/if}}
+  {{#if hasProducts}}
+  <div>
+    <div><h2>Products</h2></div>
+    <div>
+      <ul>
+        {{#each products}}
+        <li>
+          <a href="{{url}}">
+            {{#if image}}<img src="{{image}}" alt="{{name}}">{{/if}}
+            <h3>{{name}}</h3>
+          </a>
+        </li>
+        {{/each}}
+      </ul>
+    </div>
+  </div>
+  {{/if}}
+</div>
