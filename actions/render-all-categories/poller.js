@@ -85,7 +85,7 @@ async function renderCategory(categoryData, categoryMap, context) {
       const products = productsRes.data.productSearch.items.map((item) => item.productView);
 
       // Render HTML
-      const html = await generateCategoryHtml(categoryData, products, categoryMap, context);
+      const html = generateCategoryHtml(categoryData, products, categoryMap, context);
       result.renderedAt = new Date();
       result.newHash = crypto.createHash('sha256').update(html).digest('hex');
 
