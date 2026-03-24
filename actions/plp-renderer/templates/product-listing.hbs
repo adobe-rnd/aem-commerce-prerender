@@ -1,37 +1,32 @@
-<div class="product-listing">
+<div class="product-list-page">
+  <div>
+    <div>urlPath</div>
+    <div>{{categorySlug}}</div>
+  </div>
   <div>
     <div>
-      <nav class="breadcrumb" aria-label="Breadcrumb">
+      <nav aria-label="Breadcrumb">
         <ol>
           {{#each breadcrumbs}}
           <li><a href="{{url}}">{{name}}</a></li>
           {{/each}}
         </ol>
       </nav>
-      <h1>{{categoryName}}</h1>
-    </div>
-  </div>
-  {{#if categoryDescription}}
-  <div>
-    <div><h2>Description</h2></div>
-    <div>{{{categoryDescription}}}</div>
-  </div>
-  {{/if}}
-  {{#if hasProducts}}
-  <div>
-    <div><h2>Products</h2></div>
-    <div>
+      {{#if categoryDescription}}
+      <div>{{{categoryDescription}}}</div>
+      {{/if}}
+      {{#if hasProducts}}
       <ul>
         {{#each products}}
         <li>
           <a href="{{url}}">
             {{#if image}}<img src="{{image}}" alt="{{name}}">{{/if}}
-            <h3>{{name}}</h3>
+            <span>{{name}}</span>
           </a>
         </li>
         {{/each}}
       </ul>
+      {{/if}}
     </div>
   </div>
-  {{/if}}
 </div>

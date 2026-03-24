@@ -82,7 +82,7 @@ async function main(params) {
     const products = productsRes.data.productSearch.items.map((item) => item.productView);
     logger.debug(`Retrieved ${products.length} products for category "${slug}"`);
 
-    const categoryHtml = generateCategoryHtml(categoryData, products, categoryMap, context);
+    const categoryHtml = await generateCategoryHtml(categoryData, products, categoryMap, context);
 
     const response = {
       statusCode: 200,

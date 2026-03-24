@@ -13,23 +13,21 @@ governing permissions and limitations under the License.
 const fs = require('fs');
 const path = require('path');
 const Handlebars = require('handlebars');
-const { sanitize } = require('../renderUtils');
+const { sanitize, prepareBaseTemplate } = require('../renderUtils');
 const { generatePlpLdJson } = require('./ldJson');
 const { getCategoryUrl, getProductUrl } = require('../utils');
 const { buildBreadcrumbs } = require('../categories');
 
-let compiledTemplate;
-function getCompiledTemplate() {
-  if (!compiledTemplate) {
+let templateSources;
+const baseTemplateCache = {};
+function getTemplateSources() {
+  if (!templateSources) {
     const [pageHbs, headHbs, productListingHbs] = ['page', 'head', 'product-listing'].map((template) =>
       fs.readFileSync(path.join(__dirname, 'templates', `${template}.hbs`), 'utf8'),
     );
-    const handlebars = Handlebars.create();
-    handlebars.registerPartial('head', headHbs);
-    handlebars.registerPartial('content', productListingHbs);
-    compiledTemplate = handlebars.compile(pageHbs);
+    templateSources = { pageHbs, headHbs, productListingHbs };
   }
-  return compiledTemplate;
+  return templateSources;
 }
 
 /**
@@ -39,9 +37,9 @@ function getCompiledTemplate() {
  * @param {Array} products - Product items from productSearch (productView objects).
  * @param {Map} categoryMap - Full category map for breadcrumb resolution.
  * @param {Object} context - The context object with storeUrl, locale, pathFormat, logger.
- * @returns {string} Rendered HTML string.
+ * @returns {Promise<string>} Rendered HTML string.
  */
-function generateCategoryHtml(categoryData, products, categoryMap, context) {
+async function generateCategoryHtml(categoryData, products, categoryMap, context) {
   const breadcrumbs = buildBreadcrumbs(categoryData.slug, categoryMap);
 
   // Build template data
@@ -59,6 +57,7 @@ function generateCategoryHtml(categoryData, products, categoryMap, context) {
     metaDescription: categoryData.metaTags?.description ? sanitize(categoryData.metaTags.description, 'no') : null,
     metaKeywords: categoryData.metaTags?.keywords ? sanitize(categoryData.metaTags.keywords.join(', '), 'no') : null,
     metaImage: categoryImage?.url || null,
+    categorySlug: sanitize(categoryData.slug, 'no'),
     breadcrumbs: breadcrumbs.map((crumb) => ({
       name: sanitize(crumb.name, 'inline'),
       url: getCategoryUrl(crumb.slug, context),
@@ -72,8 +71,42 @@ function generateCategoryHtml(categoryData, products, categoryMap, context) {
   };
 
   const ldJson = generatePlpLdJson(categoryData, products, breadcrumbs, context);
+  const { pageHbs, headHbs, productListingHbs } = getTemplateSources();
+  const handlebars = Handlebars.create();
+  handlebars.registerPartial('head', headHbs);
+  handlebars.registerPartial('product-list-page', productListingHbs);
 
-  const pageTemplate = getCompiledTemplate();
+  // Fallback to template-only rendering if category base page cannot be fetched.
+  let contentPartial = productListingHbs;
+  const localeKey = context.locale || 'default';
+  const templateCacheKey = `${localeKey}:${categoryData.slug}`;
+
+  if (!baseTemplateCache[templateCacheKey]) {
+    const categoryTemplateURL = getCategoryUrl(categoryData.slug, context).toLowerCase();
+    baseTemplateCache[templateCacheKey] = prepareBaseTemplate(
+      categoryTemplateURL,
+      ['product-list-page'],
+      context,
+    );
+  }
+
+  try {
+    const baseTemplate = await baseTemplateCache[templateCacheKey];
+    if (baseTemplate) {
+      contentPartial = baseTemplate;
+    }
+  } catch (err) {
+    delete baseTemplateCache[templateCacheKey];
+    if (context.logger) {
+      context.logger.warn(
+        `Failed to prepare category base template for "${categoryData.slug}", using fallback template.`,
+        err,
+      );
+    }
+  }
+
+  handlebars.registerPartial('content', contentPartial);
+  const pageTemplate = handlebars.compile(pageHbs);
 
   return pageTemplate({
     ...templateData,
