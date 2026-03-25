@@ -26,7 +26,7 @@ function getCompiledTemplate() {
     );
     const handlebars = Handlebars.create();
     handlebars.registerPartial('head', headHbs);
-    handlebars.registerPartial('content', productListingHbs);
+    handlebars.registerPartial('content', `<div>${productListingHbs}</div>`);
     compiledTemplate = handlebars.compile(pageHbs);
   }
   return compiledTemplate;
