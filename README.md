@@ -32,6 +32,7 @@ Before you begin, make sure you have:
 * **Adobe I/O App Builder CLI** (`aio`) - [Installation guide](https://developer.adobe.com/app-builder/docs/getting_started/first_app/#1-install-aio-cli)
 * **Developer or System Administrator role** in your Adobe IMS organization to manage Developer Console projects and App Builder access - [See documentation](https://helpx.adobe.com/enterprise/using/manage-developers.html)
 * **Access to Adobe Commerce** with Catalog Service enabled
+* **AEM Edge Delivery Services organization** configured and the user who will perform prerender setup as a helix org admin
 * **AEM Edge Delivery Services site** configured with **Helix 5** enabled
 
 ## Quick Start
@@ -51,7 +52,7 @@ For detailed setup instructions, see the [Step-by-Step Configuration](#step-by-s
   1. **Repository Setup**: [Create a repository](https://github.com/new?template_name=aem-commerce-prerender&template_owner=adobe-rnd) from the template in your organization and clone it to your local machine. Run `npm install` to install dependencies
   1. **Download Configuration**: Download your App Builder project JSON file from the Developer Console (click "Download All" in the top-right)
   1. Run `npm run setup` to onboard and configure your environment. The wizard will guide you through the configuration process:
-     * **Step 1-2**: Provide your App Builder credentials and site information
+     * **Step 1-2**: Provide your App Builder credentials and site information. You will need to use the `auth_token` for a helix org admin, who can hit the sites endpoint for your organization: `https://admin.hlx.page/config/%7Borg%7D/sites.json`
      * **Step 3 - Advanced Settings**: The wizard will automatically detect and populate default values for `CONTENT_URL`, `STORE_URL`, `PRODUCTS_TEMPLATE`, and `PRODUCT_PAGE_URL_FORMAT` based on your site configuration. You can review and customize these settings in the advanced settings section. A `.env` file will be created with all necessary environment variables.
   1. **Configuration Variables**: After completing the setup wizard, the solution will use two types of configuration:
      
