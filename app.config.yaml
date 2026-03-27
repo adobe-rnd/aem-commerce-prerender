@@ -16,6 +16,8 @@ application:
           CONFIG_NAME: "config"
           LOCALES: "${LOCALES}"
           SITE_TOKEN: "${SITE_TOKEN}"
+          ACO_CATEGORY_FAMILIES: "${ACO_CATEGORY_FAMILIES}"
+          PLP_PRODUCTS_PER_PAGE: "${PLP_PRODUCTS_PER_PAGE}"
         actions:
           pdp-renderer:
             function: "actions/pdp-renderer/index.js"
@@ -58,26 +60,56 @@ application:
               AEM_ADMIN_API_AUTH_TOKEN: "${AEM_ADMIN_API_AUTH_TOKEN}"
             annotations:
               final: true
-#        triggers:
-#          productPollerTrigger:
-#            feed: "/whisk.system/alarms/interval"
-#            inputs:
-#              minutes: 5
-#          productScraperTrigger:
-#            feed: "/whisk.system/alarms/interval"
-#            inputs:
-#              minutes: 60
-#         markUpCleanUpTrigger:
-#            feed: "/whisk.system/alarms/interval"
-#            inputs:
-#              minutes: 60
-#        rules:
-#          productPollerRule:
-#            trigger: "productPollerTrigger"
-#            action: "check-product-changes"
-#          productScraperRule:
-#            trigger: "productScraperTrigger"
-#            action: "fetch-all-products"
-#          markUpCleanUpRule:
-#            trigger: "markUpCleanUpTrigger"
-#            action: "mark-up-clean-up"
+          plp-renderer:
+            function: "actions/plp-renderer/index.js"
+            web: "yes"
+            runtime: "nodejs:22"
+            annotations:
+              final: true
+            include:
+              - - "actions/plp-renderer/templates/*.hbs"
+                - "templates/"
+          render-all-categories:
+            function: "actions/render-all-categories/index.js"
+            web: "no"
+            runtime: "nodejs:22"
+            include:
+              - - "actions/plp-renderer/templates/*.hbs"
+                - "templates/"
+            limits:
+              memorySize: 256
+              timeout: 3600000
+            inputs:
+              AEM_ADMIN_API_AUTH_TOKEN: "${AEM_ADMIN_API_AUTH_TOKEN}"
+            annotations:
+              final: true
+        # triggers:
+        #   productPollerTrigger:
+        #     feed: "/whisk.system/alarms/interval"
+        #     inputs:
+        #       minutes: 5
+        #   productScraperTrigger:
+        #     feed: "/whisk.system/alarms/interval"
+        #     inputs:
+        #       minutes: 60
+        #   renderAllCategoriesTrigger:
+        #     feed: "/whisk.system/alarms/interval"
+        #     inputs:
+        #       minutes: 15
+        #   markUpCleanUpTrigger:
+        #     feed: "/whisk.system/alarms/interval"
+        #     inputs:
+        #       minutes: 60
+        # rules:
+        #   productPollerRule:
+        #     trigger: "productPollerTrigger"
+        #     action: "check-product-changes"
+        #   productScraperRule:
+        #     trigger: "productScraperTrigger"
+        #     action: "fetch-all-products"
+        #   renderAllCategoriesRule:
+        #     trigger: "renderAllCategoriesTrigger"
+        #     action: "render-all-categories"
+        #   markUpCleanUpRule:
+        #     trigger: "markUpCleanUpTrigger"
+        #     action: "mark-up-clean-up"

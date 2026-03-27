@@ -237,9 +237,113 @@ const ProductsQuery = `
       items {
         productView {
           urlKey
-          sku          
+          sku
         }
       }
+      page_info {
+        current_page
+        total_pages
+      }
+      total_count
+    }
+  }
+`;
+
+const CategoryTreeQuery = `
+  query getCategoryTree($family: String!) {
+    categoryTree(family: $family) {
+      slug
+      name
+      level
+      metaTags {
+        title
+        description
+        keywords
+      }
+      images {
+        url
+        label
+        roles
+        customRoles
+      }
+      childrenSlugs
+    }
+  }
+`;
+
+const CategoryTreeBySlugsQuery = `
+  query getCategoryTreeBySlugs($family: String!, $slugs: [String!], $depth: Int!) {
+    categoryTree(family: $family, slugs: $slugs, depth: $depth) {
+      slug
+      name
+      level
+      parentSlug
+      metaTags {
+        title
+        description
+        keywords
+      }
+      images {
+        url
+        label
+        roles
+        customRoles
+      }
+      childrenSlugs
+    }
+  }
+`;
+
+const PlpProductSearchQuery = `
+  query plpProductSearch($categoryPath: String!, $pageSize: Int!, $currentPage: Int!) {
+    productSearch(
+      phrase: "",
+      filter: [{ attribute: "categoryPath", eq: $categoryPath }],
+      page_size: $pageSize,
+      current_page: $currentPage
+    ) {
+      items {
+        productView {
+          __typename
+          name
+          sku
+          urlKey
+          inStock
+          shortDescription
+          images(roles: ["image"]) {
+            url
+            label
+            roles
+          }
+          attributes(roles: []) {
+            name
+            value
+          }
+          ... on SimpleProductView {
+            price {
+              final {
+                amount {
+                  value
+                  currency
+                }
+              }
+            }
+          }
+          ... on ComplexProductView {
+            priceRange {
+              minimum {
+                final {
+                  amount {
+                    value
+                    currency
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      total_count
       page_info {
         current_page
         total_pages
@@ -249,13 +353,16 @@ const ProductsQuery = `
 `;
 
 module.exports = {
-    ProductQuery,
-    ProductByUrlKeyQuery,
-    VariantsQuery,
-    GetAllSkusPaginatedQuery,
-    GetLastModifiedQuery,
-    CategoriesQuery,
-    ProductCountQuery,
-    ProductsQuery,
-    GetUrlKeyQuery
+  ProductQuery,
+  ProductByUrlKeyQuery,
+  VariantsQuery,
+  GetAllSkusPaginatedQuery,
+  GetLastModifiedQuery,
+  CategoriesQuery,
+  ProductCountQuery,
+  ProductsQuery,
+  GetUrlKeyQuery,
+  CategoryTreeQuery,
+  CategoryTreeBySlugsQuery,
+  PlpProductSearchQuery,
 };

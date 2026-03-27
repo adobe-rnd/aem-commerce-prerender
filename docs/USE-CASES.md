@@ -2,7 +2,8 @@
 
   * how many skus Customer has in the catalog, per store?
   * how many variants (as above)?
-  * e2e latency requirements, from when the change is set to when it is reflected in a public pdp page
+  * e2e latency requirements, from when the change is set to when it is reflected in a public pdp/plp page
+  * how many categories and what depth of category tree? (relevant for PLP pre-rendering)
   * is the AppBuilder environment with Runtime enabled?
   * is helix5 enabled?
   * is staging site repoless or backed by a different repo?
@@ -36,8 +37,8 @@
 
 ## Advantages:
 
-  * Enhanced Product Pages: Improves product detail pages by embedding custom metadata and essential markup ahead-of-time, making them available already within the initial server response.
-  * Tailored Implementation: Customize the injected [metadata](https://github.com/adobe-rnd/aem-commerce-ssg/blob/main/actions/pdp-renderer/ldJson.js) and [markup](https://github.com/adobe-rnd/aem-commerce-ssg/blob/main/actions/pdp-renderer/templates) to better suit Customer's specific requirements.
+  * Enhanced Product & Category Pages: Improves product detail pages and category listing pages by embedding custom metadata and essential markup ahead-of-time, making them available already within the initial server response.
+  * Tailored Implementation: Customize the injected metadata and markup for both [PDPs](https://github.com/adobe-rnd/aem-commerce-ssg/blob/main/actions/pdp-renderer) and [PLPs](https://github.com/adobe-rnd/aem-commerce-ssg/blob/main/actions/plp-renderer) to better suit Customer's specific requirements.
   * Boosted SEO: Significantly improves search engine crawlability and indexability for better visibility, especially in organic traffic.
   * Rich Social Media Previews: Ensures product links generate engaging and informative previews when shared on social platforms.
   * Reliable Merchant Center Data: Provides accurate and readily available product information for Google Merchant Center.

@@ -239,6 +239,20 @@ now, we can see at least one error and a whole batch that failed publish ops
 
 Issues with the rendering process can be found in the logs from above.
 
+## Category renderer (PLPs)
+
+The `render-all-categories` action runs every 15 minutes (configurable in `app.config.yaml`). For Commerce Optimizer sites, it discovers all categories from the configured `ACO_CATEGORY_FAMILIES`, renders PLPs, and detects changes via hash comparison. Logic is defined in [poller.js](../actions/render-all-categories/poller.js).
+
+A `plp-running` mutex prevents concurrent executions, similar to the PDP poller.
+
+### Force re-rendering all PLPs
+
+Follow the same pattern as PDPs: reset the PLP state files in Markup Storage (`render-all-categories/{locale}.json`) and wait for the next cycle to reprocess all categories.
+
+### Operation
+
+Activations appear as `aem-commerce-ssg/render-all-categories` in `aio rt activation list`. Inspect logs and results using the same workflow as the product change detector above.
+
 ## Product scraper
 
 from `aio rt activations list` you might notice the activations of the product scraper action (fetch-all-products)

@@ -31,7 +31,9 @@
 # Initial Rollout of Product Pages
 
   * After you completed the setup steps, you can deploy the AppBuilder project by [creating a release in GitHub](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository#creating-a-release) (recommended) or running the aio app deploy command with your production configuration.
-  * You can validate successful deployment of your action, by accessing "https://{namespace}.[adobeioruntime.net/api/v1/web/aem-commerce-ssg/pdp-renderer/products/{urlKey}/{sku](https://www.google.com/search?q=http://adobeioruntime.net/api/v1/web/aem-commerce-ssg/pdp-renderer/products/%7BurlKey%7D/%7Bsku%7D)". You should be able to see a rendered version of your product detail page.
+  * You can validate successful deployment of your actions by accessing:
+    * **PDP**: `https://{namespace}.adobeioruntime.net/api/v1/web/aem-commerce-ssg/pdp-renderer/products/{urlKey}/{sku}` -- you should see a rendered product detail page.
+    * **PLP**: `https://{namespace}.adobeioruntime.net/api/v1/web/aem-commerce-ssg/plp-renderer?slug={categorySlug}` -- you should see a rendered category listing page.
   * The rollout of PDPs might be required after the storefront is live and running, for example in order to refresh the pages to reflect changes that by design are not considered as a change in the Product model. See [Test, Monitoring and Ops](https://www.google.com/search?q=%23testing-monitoring-and-ops) for details.
   * The indexing process usually takes between 10-30 minutes, but in the first cold start it should be faster. You can check if the index was created by simply navigating to [https://store-base-url/published-product-index.json.](https://www.google.com/search?q=https://store-base-url/published-product-index.json.) Once it's ready, you can proceed with the next steps.
 
