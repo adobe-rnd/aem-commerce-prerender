@@ -16,7 +16,7 @@ const { main } = require('../actions/check-product-changes/index');
             ORG: process.env.ORG,
             STORE_URL: process.env.STORE_URL,
             CONTENT_URL: process.env.CONTENT_URL,
-            CONFIG_NAME: 'configs',
+            CONFIG_NAME: process.env.CONFIG_NAME,
             CONFIG_SHEET: process.env.CONFIG_SHEET,
             LOG_LEVEL: 'info',
             LOG_INGESTOR_ENDPOINT: process.env.LOG_INGESTOR_ENDPOINT,
