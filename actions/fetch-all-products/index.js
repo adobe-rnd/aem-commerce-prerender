@@ -40,11 +40,11 @@ const productMapper = ({ productView }) => ({
 async function getProductsByCategory(categoryPath, context) {
   const { logger } = context;
   const limit = await pLimitPromise;
-  logger.debug('Getting products for category:', categoryPath);
   const firstPage = await requestSaaS(ProductsQuery, 'getProducts', { currentPage: 1, categoryPath }, context);
   const products = firstPage.data.productSearch.items.map(productMapper);
   let maxPage = firstPage.data.productSearch.page_info.total_pages;
   const totalCount = firstPage.data.productSearch.total_count;
+  logger.debug(`found ${totalCount} products for category path ${categoryPath}`);
 
   if (maxPage > MAX_PAGES_FETCHED) {
     logger.warn(
