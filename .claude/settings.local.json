@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(aio activation *)",
+      "Bash(aio --help)"
+    ]
+  }
+}

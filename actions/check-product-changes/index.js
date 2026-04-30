@@ -10,6 +10,7 @@ governing permissions and limitations under the License.
 */
 
 const { Core, State, Files } = require('@adobe/aio-sdk');
+const { localFilesLib } = require('../lib/localFilesLib');
 const { poll } = require('./poller');
 const { StateManager } = require('../lib/state');
 const { ObservabilityClient } = require('../lib/observability');
@@ -38,8 +39,11 @@ async function main(params) {
         });
 
         // Init SDK libs and state manager
-        const stateLib = await State.init(params.libInit || {});
-        const filesLib = await Files.init(params.libInit || {});
+        const isLocal = !!params.LOCAL_FS;
+        const stateLib = isLocal
+            ? { get: async () => null, put: async () => {}, delete: async () => {} }
+            : await State.init(params.libInit || {});
+        const filesLib = isLocal ? localFilesLib : await Files.init(params.libInit || {});
         const stateMgr = new StateManager(stateLib, { logger });
 
         let activationResult;

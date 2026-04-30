@@ -11,6 +11,7 @@ governing permissions and limitations under the License.
 */
 
 const { Core, Files } = require('@adobe/aio-sdk');
+const { localFilesLib } = require('../lib/localFilesLib');
 const { ObservabilityClient } = require('../lib/observability');
 const { GetUrlKeyQuery } = require('../queries');
 const { getRuntimeConfig } = require('../lib/runtimeConfig');
@@ -117,7 +118,7 @@ async function main(params) {
     org: cfg.org,
     site: cfg.site
   });
-  const filesLib = await Files.init(params.libInit || {});  
+  const filesLib = params.LOCAL_FS ? localFilesLib : await Files.init(params.libInit || {});
 
   const {
     // required

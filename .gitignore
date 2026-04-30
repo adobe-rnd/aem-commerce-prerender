@@ -47,3 +47,6 @@ logs
 
 # AI
 .cursor/
+
+# LOCAL_FS=true files
+local-data/
