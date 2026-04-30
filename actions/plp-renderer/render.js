@@ -53,6 +53,7 @@ function generateCategoryHtml(categoryData, products, categoryMap, context) {
 
   const templateData = {
     categoryName: sanitize(categoryData.name, 'inline'),
+    categorySlug: categoryData.slug,
     categoryDescription,
     categoryUrl: getCategoryUrl(categoryData.slug, context),
     metaTitle: sanitize(categoryData.metaTags?.title || categoryData.name, 'no'),
