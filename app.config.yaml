@@ -36,7 +36,7 @@ application:
               - - "actions/pdp-renderer/templates/*.hbs"
                 - "templates/"
             limits:
-              memorySize: 256
+              memorySize: 512
               timeout: 3600000
             inputs:
               AEM_ADMIN_API_AUTH_TOKEN: "${AEM_ADMIN_API_AUTH_TOKEN}"
@@ -48,6 +48,9 @@ application:
             runtime: "nodejs:22"
             annotations:
               final: true
+            limits:
+              memorySize: 512
+              timeout: 180000 # 3 minutes
           get-overlay-url:
             function: "actions/get-overlay-url/index.js"
             runtime: "nodejs:22"
