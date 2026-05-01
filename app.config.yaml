@@ -37,7 +37,7 @@ application:
                 - "templates/"
             limits:
               memorySize: 4096
-              timeout: 3600000
+              timeout: 10800000 # 3 hours – must match ACTION_TIMEOUT_MS in actions/check-product-changes/index.js
             inputs:
               AEM_ADMIN_API_AUTH_TOKEN: "${AEM_ADMIN_API_AUTH_TOKEN}"
             annotations:
@@ -86,33 +86,33 @@ application:
               AEM_ADMIN_API_AUTH_TOKEN: "${AEM_ADMIN_API_AUTH_TOKEN}"
             annotations:
               final: true
-        triggers:
-          productPollerTrigger:
-            feed: "/whisk.system/alarms/interval"
-            inputs:
-              minutes: 5
-          productScraperTrigger:
-            feed: "/whisk.system/alarms/interval"
-            inputs:
-              minutes: 60
-          renderAllCategoriesTrigger:
-            feed: "/whisk.system/alarms/interval"
-            inputs:
-              minutes: 15
-          markUpCleanUpTrigger:
-            feed: "/whisk.system/alarms/interval"
-            inputs:
-              minutes: 60
-        rules:
-          productPollerRule:
-            trigger: "productPollerTrigger"
-            action: "check-product-changes"
-          productScraperRule:
-            trigger: "productScraperTrigger"
-            action: "fetch-all-products"
-          renderAllCategoriesRule:
-            trigger: "renderAllCategoriesTrigger"
-            action: "render-all-categories"
-          markUpCleanUpRule:
-            trigger: "markUpCleanUpTrigger"
-            action: "mark-up-clean-up"
+        # triggers:
+        #   productPollerTrigger:
+        #     feed: "/whisk.system/alarms/interval"
+        #     inputs:
+        #       minutes: 5
+        #   productScraperTrigger:
+        #     feed: "/whisk.system/alarms/interval"
+        #     inputs:
+        #       minutes: 60
+        #   renderAllCategoriesTrigger:
+        #     feed: "/whisk.system/alarms/interval"
+        #     inputs:
+        #       minutes: 15
+        #   markUpCleanUpTrigger:
+        #     feed: "/whisk.system/alarms/interval"
+        #     inputs:
+        #       minutes: 60
+        # rules:
+        #   productPollerRule:
+        #     trigger: "productPollerTrigger"
+        #     action: "check-product-changes"
+        #   productScraperRule:
+        #     trigger: "productScraperTrigger"
+        #     action: "fetch-all-products"
+        #   renderAllCategoriesRule:
+        #     trigger: "renderAllCategoriesTrigger"
+        #     action: "render-all-categories"
+        #   markUpCleanUpRule:
+        #     trigger: "markUpCleanUpTrigger"
+        #     action: "mark-up-clean-up"

@@ -17,6 +17,10 @@ const { ObservabilityClient } = require('../lib/observability');
 const { getRuntimeConfig } = require('../lib/runtimeConfig');
 const { handleActionError } = require('../lib/errorHandler');
 
+// Must match timeout in app.config.yaml. The mutex TTL is derived from this so the
+// lock auto-expires if the runtime kills the process before the finally block runs.
+const ACTION_TIMEOUT_MS = 10800000; // 3 hours
+
 /**
  * Entry point for the "Product changes check" action.
  * @param {Object} params
@@ -65,7 +69,7 @@ async function main(params) {
 
         try {
             // Mark job as running with TTL to avoid permanent lock on unexpected failures
-            await stateMgr.put('running', 'true', { ttl: 3600 });
+            await stateMgr.put('running', 'true', { ttl: ACTION_TIMEOUT_MS / 1000 });
 
             // Core logic
             activationResult = await poll(cfg, { stateLib: stateMgr, filesLib }, logger);
