@@ -35,6 +35,9 @@ const { JobFailedError, ERROR_CODES } = require('../lib/errorHandler');
 const crypto = require('crypto');
 const BATCH_SIZE = 50;
 const DATA_KEY = 'skus';
+// If no render has completed in this window the action is frozen — exit rather than burning the full timeout.
+const WATCHDOG_TIMEOUT_MS = 5 * 60 * 1000;
+const WATCHDOG_CHECK_INTERVAL_MS = 30 * 1000;
 
 function checkParams(params) {
   validateRequiredParams(params, [
@@ -96,7 +99,7 @@ async function enrichProductWithRenderedHash(product, context) {
   const { sku, urlKey, path } = product;
 
   if (!renderLimit$) {
-    renderLimit$ = import('p-limit').then(({ default: pLimit }) => pLimit(50));
+    renderLimit$ = import('p-limit').then(({ default: pLimit }) => pLimit(20));
   }
 
   return (await renderLimit$)(async () => {
@@ -122,6 +125,7 @@ async function enrichProductWithRenderedHash(product, context) {
       logger.error(`Error generating product HTML for SKU ${sku}:`, e);
     }
 
+    context.recordActivity?.();
     return product;
   });
 }
@@ -284,11 +288,31 @@ async function poll(params, aioLibs, logger) {
 
     let stateText = 'completed';
 
+    // Watchdog: if no render completes for WATCHDOG_TIMEOUT_MS the event loop is frozen.
+    // recordActivity is called after every render (success or failure) to reset the timer.
+    let lastActivityAt = Date.now();
+    let watchdogIntervalId;
+    const watchdogPromise = new Promise((_, reject) => {
+      watchdogIntervalId = setInterval(() => {
+        const idleMs = Date.now() - lastActivityAt;
+        if (idleMs > WATCHDOG_TIMEOUT_MS) {
+          clearInterval(watchdogIntervalId);
+          const err = Object.assign(
+            new Error(`Watchdog: no render activity for ${Math.floor(idleMs / 60000)} minutes — aborting`),
+            { isWatchdog: true },
+          );
+          logger.error(err.message);
+          reject(err);
+        }
+      }, WATCHDOG_CHECK_INTERVAL_MS);
+    });
+    sharedContext.recordActivity = () => { lastActivityAt = Date.now(); };
+
     try {
       // start processing preview and publish queues
       await adminApi.startProcessing();
 
-      const results = await Promise.all(
+      const localeProcessing = Promise.all(
         locales.map(async (locale) => {
           const timings = new Timings();
           const context = { ...sharedContext, startTime: new Date() };
@@ -386,6 +410,8 @@ async function poll(params, aioLibs, logger) {
         }),
       );
 
+      const results = await Promise.race([localeProcessing, watchdogPromise]);
+
       await adminApi.stopProcessing();
 
       // aggregate timings
@@ -406,8 +432,14 @@ async function poll(params, aioLibs, logger) {
         code: e.code,
         stack: e.stack,
       });
-      // wait for queues to finish, even in error case
-      await adminApi.stopProcessing();
+      if (e.isWatchdog) {
+        // Don't drain queues — the action is frozen. Abort immediately so the mutex is
+        // cleared promptly and the next scheduled run can start.
+        adminApi.abortProcessing();
+      } else {
+        // wait for queues to finish, even in error case
+        await adminApi.stopProcessing();
+      }
       stateText = 'failure';
 
       // If it's a JobFailedError, re-throw it
@@ -422,6 +454,8 @@ async function poll(params, aioLibs, logger) {
         e.statusCode || 500,
         { originalError: e.message },
       );
+    } finally {
+      clearInterval(watchdogIntervalId);
     }
 
     // get memory usage

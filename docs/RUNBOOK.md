@@ -1,4 +1,7 @@
 # Runbook
+
+Note: when you are checking the activations, you need to consider that Adobe I/O Runtime does not record an activation in the list (and `aio rt activation logs <id>` has nothing to fetch) until that invocation **finishes**. A long-running action therefore stays invisible in the activation list for the whole duration—for example, a run that takes three hours will not appear until those three hours have elapsed.
+
 ## Product change detector (aka "poller")
 
 It runs a cycle every 5 minutes (by default, and this value can be changed in aio.app.yamml), checking whether a product's lat modified date and resulting markup changed: the product page is previewed and the preview is then compared with the one stored in a cloud storage bucket. Logic is defined in [poller.js](../actions/check-product-changes/poller.js)
@@ -43,7 +46,7 @@ you may notice that the line
 ```
 
 reports an execution time of `601127ms` which means that, very likely, it detected changes in some products and generated product pages
-you can then check the returned state (results) via 
+you can then check the returned state (results) via
 ```bash
 aio rt activation get 02122ee8933f441c922ee8933f841c87
 ```
@@ -159,7 +162,7 @@ aio rt activation get 02122ee8933f441c922ee8933f841c87
 specifically
 
 ```json
-{ 
+{
     "status": {
         "failed": 4331,
         "ignored": 688,
@@ -171,7 +174,7 @@ specifically
 
 you can see that there are 4k errored products.
 
-1. So, we can check the logs via 
+1. So, we can check the logs via
 
 ```bash
 aio rt activation logs 02122ee8933f441c922ee8933f841c87

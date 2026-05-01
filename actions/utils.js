@@ -13,7 +13,8 @@ const deepmerge = require('@fastify/deepmerge')();
 const helixSharedStringLib = require('@adobe/helix-shared-string');
 const { ERROR_CODES } = require('./lib/errorHandler');
 
-const BATCH_SIZE = 50;
+// Admin API limits Overlay requests to 600 per minute, so we will make 1 batch of 600 every minute.
+const BATCH_SIZE = 600;
 
 const SITE_TYPES = Object.freeze({
   ACO: 'aco',
