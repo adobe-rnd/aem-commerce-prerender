@@ -67,8 +67,11 @@ async function markUpCleanUP(context, filesLib, logger, adminApi) {
   try {    
     const publishedProducts = await requestPublishedProductsIndex(context);  
     const publishedSkus = publishedProducts.data.map((product) => product.sku);
-    let queryResult = await requestSaaS(GetUrlKeyQuery, 'getUrlKey', { skus: publishedSkus }, context);
-    queryResult = queryResult.data.products;
+    const skuBatches = createBatches(publishedSkus);
+    const batchResults = await Promise.all(
+      skuBatches.map((batch) => requestSaaS(GetUrlKeyQuery, 'getUrlKey', { skus: batch }, context))
+    );
+    const queryResult = batchResults.flatMap((result) => result.data.products);
 
     const redundantpublishedProducts = publishedProducts.data.filter((product) => !urlkeymatch(product, queryResult, context))
     context.counts.detected = redundantpublishedProducts.length;
