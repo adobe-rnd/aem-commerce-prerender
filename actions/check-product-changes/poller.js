@@ -35,7 +35,8 @@ const { JobFailedError, ERROR_CODES } = require('../lib/errorHandler');
 const crypto = require('crypto');
 const BATCH_SIZE = 50;
 const DATA_KEY = 'skus';
-// If no render has completed in this window the action is frozen — exit rather than burning the full timeout.
+// Exit early rather than burning the full 3-hour timeout when processing stalls.
+// Activity is recorded after each render completes and after each AEM batch completes.
 const WATCHDOG_TIMEOUT_MS = 5 * 60 * 1000;
 const WATCHDOG_CHECK_INTERVAL_MS = 30 * 1000;
 
@@ -288,8 +289,8 @@ async function poll(params, aioLibs, logger) {
 
     let stateText = 'completed';
 
-    // Watchdog: if no render completes for WATCHDOG_TIMEOUT_MS the event loop is frozen.
-    // recordActivity is called after every render (success or failure) to reset the timer.
+    // Watchdog: fires if no progress (render or AEM batch completion) for WATCHDOG_TIMEOUT_MS.
+    // recordActivity is called after each render (success or failure) and after each AEM batch completes.
     let lastActivityAt = Date.now();
     let watchdogIntervalId;
     const watchdogPromise = new Promise((_, reject) => {
@@ -298,7 +299,7 @@ async function poll(params, aioLibs, logger) {
         if (idleMs > WATCHDOG_TIMEOUT_MS) {
           clearInterval(watchdogIntervalId);
           const err = Object.assign(
-            new Error(`Watchdog: no render activity for ${Math.floor(idleMs / 60000)} minutes — aborting`),
+            new Error(`Watchdog: no processing activity for ${Math.floor(idleMs / 60000)} minutes — aborting`),
             { isWatchdog: true },
           );
           logger.error(err.message);
@@ -367,13 +368,14 @@ async function poll(params, aioLibs, logger) {
                   const records = products.map(({ sku, path, renderedAt }) => ({ sku, path, renderedAt }));
                   return adminApi
                     .previewAndPublish(records, locale, batchNumber + 1)
-                    .then((publishedBatch) =>
-                      processPublishedBatch(publishedBatch, state, counts, products, aioLibs, {
+                    .then((publishedBatch) => {
+                      context.recordActivity?.();
+                      return processPublishedBatch(publishedBatch, state, counts, products, aioLibs, {
                         dataKey: DATA_KEY,
                         keyField: 'sku',
                         filePrefix: FILE_PREFIX,
-                      }),
-                    )
+                      });
+                    })
                     .catch((error) => {
                       // Handle batch errors gracefully - don't fail the entire job
                       if (error.code === ERROR_CODES.BATCH_ERROR) {
@@ -433,7 +435,7 @@ async function poll(params, aioLibs, logger) {
         stack: e.stack,
       });
       if (e.isWatchdog) {
-        // Don't drain queues — the action is frozen. Abort immediately so the mutex is
+        // Don't drain queues — processing is stalled. Abort immediately so the mutex is
         // cleared promptly and the next scheduled run can start.
         adminApi.abortProcessing();
       } else {

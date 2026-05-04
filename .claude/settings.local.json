@@ -1,8 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "Bash(aio activation *)",
-      "Bash(aio --help)"
+      "WebFetch(domain:www.aem.live)",
     ]
   }
 }
