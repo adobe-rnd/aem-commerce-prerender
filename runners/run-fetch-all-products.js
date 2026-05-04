@@ -25,7 +25,7 @@ const { main } = require('../actions/fetch-all-products/index');
             CONFIG_SHEET: process.env.CONFIG_SHEET,
             STORE_URL: process.env.STORE_URL,
             LOCAL_FS: process.env.LOCAL_FS,
-            LOG_LEVEL: 'debug',
+            LOG_LEVEL: process.env.LOG_LEVEL,
             LOG_INGESTOR_ENDPOINT: process.env.LOG_INGESTOR_ENDPOINT,
             LOCALES: process.env.LOCALES,
             PRODUCT_PAGE_URL_FORMAT: process.env.PRODUCT_PAGE_URL_FORMAT,
