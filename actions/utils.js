@@ -513,18 +513,18 @@ function getProductUrl(product, context, addStore = true) {
 }
 
 /**
- * Returns the default store URL.
- *
- * @param {object} params The parameters object.
- * @returns {string} The default store URL.
- */
-/**
- * Constructs the URL path for a category page.
+ * Constructs the URL path for a category page (the path used for EDS storage,
+ * preview/publish, and navigational links).
  *
  * For ACO, the category slug IS the URL path (e.g. "electronics/computers-tablets"),
  * so no configurable path format is needed (unlike PDP's PRODUCT_PAGE_URL_FORMAT).
  * If a configurable PLP URL format is needed in the future, a CATEGORY_PAGE_URL_FORMAT
  * env variable can be added following the same pattern as getProductUrl.
+ *
+ * Each path segment is passed through Helix `sanitizeName` (from `@adobe/helix-shared-string`)
+ * so the result is valid for Edge admin (e.g. double hyphens in a segment
+ * are normalized). That path may differ from the commerce category slug; use the canonical
+ * slug from the product-list `urlPath` block for runtime commerce queries, not this URL.
  *
  * @param {string} categorySlug - The category slug (e.g. "electronics/computers-tablets").
  * @param {Object} context - The context object containing locale and storeUrl.
@@ -534,13 +534,11 @@ function getProductUrl(product, context, addStore = true) {
 function getCategoryUrl(categorySlug, context, addStore = true) {
   const { storeUrl } = context;
   const segments = [];
-
   if (context.locale) {
     segments.push(context.locale);
   }
-  segments.push(categorySlug);
-
-  const path = helixSharedStringLib.sanitizePath(`/${segments.join('/')}`);
+  segments.push(...String(categorySlug).split('/').filter(Boolean));
+  const path = `/${segments.map((s) => helixSharedStringLib.sanitizeName(s)).join('/')}`;
 
   if (addStore && storeUrl) {
     return `${storeUrl}${path}`;
@@ -548,6 +546,12 @@ function getCategoryUrl(categorySlug, context, addStore = true) {
   return path;
 }
 
+/**
+ * Returns the default store URL.
+ *
+ * @param {object} params The parameters object.
+ * @returns {string} The default store URL.
+ */
 function getDefaultStoreURL(params) {
   const { ORG: orgName, SITE: siteName } = params;
   return `https://main--${siteName}--${orgName}.aem.live`;

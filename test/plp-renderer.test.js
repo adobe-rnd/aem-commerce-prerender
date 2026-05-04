@@ -136,4 +136,34 @@ describe('plp-renderer generateCategoryHtml', () => {
     expect(ld.mainEntity.numberOfItems).toBe(0);
     expect(ld.mainEntity.itemListElement).toEqual([]);
   });
+
+  test('urlPath block keeps canonical slug; og:url and breadcrumbs use sanitized segments', () => {
+    const slugWithDoubleHyphen = 'parts-a/seals--gaskets-b';
+    const categoryMapHyphen = new Map([
+      ['parts-a', { name: 'Parts A', slug: 'parts-a' }],
+      ['parts-a/seals--gaskets-b', { name: 'Seals', slug: slugWithDoubleHyphen }],
+    ]);
+    const categoryDataHyphen = {
+      name: 'Seals',
+      slug: slugWithDoubleHyphen,
+      metaTags: { title: 'Seals' },
+      images: [],
+    };
+
+    const html = generateCategoryHtml(categoryDataHyphen, [], categoryMapHyphen, baseContext);
+    const $ = cheerio.load(html);
+
+    expect(getUrlPathRowSlugs($)).toEqual([slugWithDoubleHyphen]);
+    expect($('meta[property="og:url"]').attr('content')).toBe(
+      'https://example.com/en/parts-a/seals-gaskets-b',
+    );
+
+    const crumbHrefs = $('.breadcrumb ol li a')
+      .map((_, el) => $(el).attr('href'))
+      .get();
+    expect(crumbHrefs).toEqual([
+      'https://example.com/en/parts-a',
+      'https://example.com/en/parts-a/seals-gaskets-b',
+    ]);
+  });
 });

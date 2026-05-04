@@ -407,6 +407,17 @@ describe('getCategoryUrl', () => {
     const context = { storeUrl: 'https://example.com' };
     expect(getCategoryUrl('electronics', context, false)).toBe('/electronics');
   });
+
+  test('sanitizes each path segment for EDS (e.g. collapses double hyphens in a segment)', () => {
+    const context = { storeUrl: 'https://example.com', locale: 'en' };
+    const slug = 'parts-categories/sprayer-parts/seals--gaskets-04/kit-00';
+    expect(getCategoryUrl(slug, context, false)).toBe(
+      '/en/parts-categories/sprayer-parts/seals-gaskets-04/kit-00',
+    );
+    expect(getCategoryUrl(slug, context)).toBe(
+      'https://example.com/en/parts-categories/sprayer-parts/seals-gaskets-04/kit-00',
+    );
+  });
 });
 
 // ─── getCategoryMapFromFamilies / getCategorySlugsFromFamilies ─────────────
