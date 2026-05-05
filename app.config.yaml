@@ -50,7 +50,7 @@ application:
               final: true
             limits:
               memorySize: 512
-              timeout: 3600000
+              timeout: 3600000 # 1 hour
           get-overlay-url:
             function: "actions/get-overlay-url/index.js"
             runtime: "nodejs:22"
