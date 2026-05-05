@@ -37,7 +37,7 @@ class Emitter {
     const direct = this._listeners.get(name) || [];
     const wildcard = this._listeners.get('*') || [];
     for (const fn of [...direct, ...wildcard]) {
-      try { fn(event); } catch (_) {}
+      try { fn(event); } catch { /* ignore */ }
     }
     return this;
   }
