@@ -25,7 +25,7 @@ const { main } = require('../actions/render-all-categories/index');
             CONFIG_NAME: process.env.CONFIG_NAME,
             CONFIG_SHEET: process.env.CONFIG_SHEET,
             LOCAL_FS: process.env.LOCAL_FS,
-            LOG_LEVEL: 'debug',
+            LOG_LEVEL: process.env.LOG_LEVEL,
             LOG_INGESTOR_ENDPOINT: process.env.LOG_INGESTOR_ENDPOINT,
             PRODUCT_PAGE_URL_FORMAT: process.env.PRODUCT_PAGE_URL_FORMAT,
             PRODUCTS_TEMPLATE: process.env.PRODUCTS_TEMPLATE,
