@@ -10,26 +10,33 @@ OF ANY KIND, either express or implied. See the License for the specific languag
 governing permissions and limitations under the License.
 */
 
-const cheerio = require('cheerio');
-const { http, HttpResponse } = require('msw');
+import { jest } from '@jest/globals';
+import * as cheerio from 'cheerio';
+import { http, HttpResponse } from 'msw';
+import { useMockServer, handlers } from './mock-server.mjs';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
+import Handlebars from 'handlebars';
 
-const { useMockServer, handlers } = require('./mock-server.js');
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
+const require = createRequire(import.meta.url);
 
+const mockLoggerInstance = { info: jest.fn(), debug: jest.fn(), error: jest.fn() };
 jest.mock('@adobe/aio-sdk', () => ({
   Core: {
-    Logger: jest.fn()
+    Logger: jest.fn().mockReturnValue(mockLoggerInstance)
   }
-}))
+}));
 
+const { Core } = await import('@adobe/aio-sdk');
+const action = await import('./../actions/pdp-renderer/index.js');
+const { generateProductHtml } = await import('../actions/pdp-renderer/render.js');
 
-const { Core } = require('@adobe/aio-sdk')
-const mockLoggerInstance = { info: jest.fn(), debug: jest.fn(), error: jest.fn() }
-Core.Logger.mockReturnValue(mockLoggerInstance)
-
-const action = require('./../actions/pdp-renderer/index.js')
-const fs = require("fs");
-const path = require("path");
-const Handlebars = require("handlebars");
+const fakeParams = {
+  __ow_headers: {},
+};
 
 beforeEach(() => {
   Core.Logger.mockClear()
@@ -37,10 +44,6 @@ beforeEach(() => {
   mockLoggerInstance.debug.mockReset()
   mockLoggerInstance.error.mockReset()
 })
-
-const fakeParams = {
-  __ow_headers: {},
-};
 
 describe('pdp-renderer', () => {
   const server = useMockServer();
@@ -87,7 +90,7 @@ describe('pdp-renderer', () => {
 
       expect(response.body).toBeDefined();
       expect(typeof response.body).toBe('string');
-      
+
       const $ = cheerio.load(response.body);
       expect($('.product-recommendations')).toHaveLength(1);
       expect($('body > main > div')).toHaveLength(2);
@@ -239,7 +242,7 @@ describe('pdp-renderer', () => {
         PRODUCT_PAGE_URL_FORMAT: '/{urlKey}',
         __ow_path: `/crown-summit-backpack`,
       });
-     
+
       const $ = cheerio.load(response.body);
       expect($('main .product-details h1').text()).toEqual('Crown Summit Backpack');
     });
@@ -266,11 +269,9 @@ describe('pdp-renderer', () => {
 
       expect(configRequestUrl).toBe('https://content.com/en/config.json');
 
-      // Validate product
       const $ = cheerio.load(response.body);
       expect($('main .product-details h1').text()).toEqual('Crown Summit Backpack');
 
-      // Validate product url in structured data
       const ldJson = JSON.parse($('head > script[type="application/ld+json"]').html());
       expect(ldJson.offers[0].url).toEqual('https://store.com/en/products/24-mb03');
     });
@@ -321,7 +322,7 @@ describe('pdp-renderer', () => {
 
     test('render images', async () => {
       const response = await getProductResponse();
-      
+
       const $ = cheerio.load(response.body);
 
       expect(
@@ -339,7 +340,7 @@ describe('pdp-renderer', () => {
 
     test('render description', async () => {
       const response = await getProductResponse();
-      
+
       const $ = cheerio.load(response.body);
       const descContainer = $('main .product-details h2:contains("Description")').parent().next();
 
@@ -358,7 +359,7 @@ describe('pdp-renderer', () => {
 
     test('render price', async () => {
       const response = await getProductResponse();
-      
+
       const $ = cheerio.load(response.body);
 
       expect(
@@ -371,7 +372,7 @@ describe('pdp-renderer', () => {
 
     test('render title', async () => {
       const response = await getProductResponse();
-      
+
       const $ = cheerio.load(response.body);
       expect($('main .product-details h1').text()).toEqual('Crown Summit Backpack');
     });
@@ -476,19 +477,16 @@ describe('pdp-renderer', () => {
 })
 
 describe('generateProductHtml', () => {
-  const { generateProductHtml } = require('../actions/pdp-renderer/render');
   const mockConfig = require('./mock-responses/mock-config.json');
   const server = useMockServer();
   const defaultContext = {
     logger: { debug: jest.fn() },
     storeUrl: 'https://store.com',
-    contentUrl: 'https://content.com', 
+    contentUrl: 'https://content.com',
     configName: 'config',
   };
 
-  // Mock the getConfig function to avoid HTTP requests
   beforeEach(() => {
-    // Add config handler to mock server
     server.use(
       http.get('https://content.com/config.json', () => {
         return HttpResponse.json(mockConfig);
@@ -504,20 +502,18 @@ describe('generateProductHtml', () => {
     });
 
     test('throws 404 when product not found', async () => {
-      // Use both handlers for 404 responses
       server.use(handlers.return404());
       server.use(handlers.returnLiveSearch404());
-      
-      // Mock the config to be pre-loaded to avoid the HTTP request
+
       const contextWithConfig = {
         ...defaultContext,
         config: mockConfig.data.reduce((acc, { key, value }) => ({ ...acc, [key]: value }), {})
       };
-      
+
       await expect(generateProductHtml('NON-EXISTENT', null, contextWithConfig))
         .rejects
         .toThrow('Product not found');
-        
+
       await expect(generateProductHtml(null, 'non-existent-product', contextWithConfig))
         .rejects
         .toThrow('Product not found');
@@ -527,8 +523,7 @@ describe('generateProductHtml', () => {
   describe('HTML generation', () => {
     test('generates HTML with product template', async () => {
       server.use(handlers.defaultProduct());
-      
-      // Mock the template fetch
+
       const templateHtml = fs.readFileSync(path.join(__dirname, 'mock-responses', 'product-default.html'), 'utf8');
       server.use(
         http.get('https://content.com/products/default.plain.html', () => {
@@ -536,7 +531,6 @@ describe('generateProductHtml', () => {
         })
       );
 
-      // Mock the config to be pre-loaded
       const contextWithConfig = {
         ...defaultContext,
         productsTemplate: 'https://content.com/products/default',
@@ -552,7 +546,6 @@ describe('generateProductHtml', () => {
     test('generates HTML without product template', async () => {
       server.use(handlers.defaultProduct());
 
-      // Mock the config to be pre-loaded
       const contextWithConfig = {
         ...defaultContext,
         config: mockConfig.data.reduce((acc, { key, value }) => ({ ...acc, [key]: value }), {})
@@ -567,7 +560,6 @@ describe('generateProductHtml', () => {
     test('generates HTML using urlKey', async () => {
       server.use(handlers.defaultProductLiveSearch());
 
-      // Mock the config to be pre-loaded
       const contextWithConfig = {
         ...defaultContext,
         config: mockConfig.data.reduce((acc, { key, value }) => ({ ...acc, [key]: value }), {})

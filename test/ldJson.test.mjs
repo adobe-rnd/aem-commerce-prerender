@@ -10,10 +10,11 @@ OF ANY KIND, either express or implied. See the License for the specific languag
 governing permissions and limitations under the License.
 */
 
-const { graphql, HttpResponse } = require('msw');
+import { jest } from '@jest/globals';
+import { graphql, HttpResponse } from 'msw';
 
-const { generateLdJson } = require('../actions/pdp-renderer/ldJson');
-const { useMockServer, handlers } = require('./mock-server.js');
+import { generateLdJson } from '../actions/pdp-renderer/ldJson.js';
+import { useMockServer, handlers } from './mock-server.mjs';
 
 describe('ldJson', () => {
 

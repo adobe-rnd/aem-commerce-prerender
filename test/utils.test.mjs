@@ -5,10 +5,15 @@ you may not use this file except in compliance with the License. You may obtain 
 of the License at http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software distributed under
-the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR REPRESENTATIONS
+the LICENSE is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR REPRESENTATIONS
 OF ANY KIND, either express or implied. See the License for the specific language
 governing permissions and limitations under the License.
 */
+
+import { jest } from '@jest/globals';
+import { useMockServer } from './mock-server.mjs';
+import { errorResponse, checkMissingRequestInputs, getBearerToken, request, requestSpreadsheet, getConfig, requestSaaS, getProductUrl } from './../actions/utils.js';
+import { http, HttpResponse } from 'msw';
 
 const SAMPLE_CONFIGBUS_RESPONSE = {
 	"public": {
@@ -31,10 +36,6 @@ const SAMPLE_CONFIGBUS_RESPONSE = {
 		}
 	}
 };
-
-const { useMockServer } = require('./mock-server');
-const { errorResponse, checkMissingRequestInputs, getBearerToken, request, requestSpreadsheet, getConfig, requestSaaS, getProductUrl } = require('./../actions/utils.js');
-const { http, HttpResponse } = require('msw');
 
 test('interface', () => {
   expect(typeof errorResponse).toBe('function')
@@ -148,7 +149,6 @@ describe('request', () => {
     expect(config).toEqual({ testKey: 'testValue', __hasLegacyFormat: true });
   });
 
-
   test('getConfig (ConfigBus)', async () => {
     server.use(http.get('https://content.com/config.json', async () => {
       return HttpResponse.json(SAMPLE_CONFIGBUS_RESPONSE);
@@ -244,12 +244,8 @@ describe('request', () => {
     };
     server.use(http.post('https://commerce-endpoint.com', async () => {
       return HttpResponse.json({
-        data: {
-          result: 'success'
-        },
-        errors: [
-          graphqlError
-        ],
+        data: { result: 'success' },
+        errors: [graphqlError],
       });
     }));
 
@@ -325,7 +321,7 @@ describe('request', () => {
 });
 
 describe('getProductUrl', () => {
-  
+
   test('getProductUrl with no product, with products prefix, with locale', () => {
     const context = { storeUrl: 'https://example.com', pathFormat: '/{locale}/products/{urlKey}/{sku}', locale: 'en' };
     expect(getProductUrl({ }, context, false)).toBe('/en/products');

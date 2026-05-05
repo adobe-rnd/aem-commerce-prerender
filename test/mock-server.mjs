@@ -9,10 +9,16 @@ the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR REPRESENTA
 OF ANY KIND, either express or implied. See the License for the specific language
 governing permissions and limitations under the License.
 */
-const { setupServer } = require('msw/node');
-const { http, graphql, HttpResponse } = require('msw');
-const fs = require('fs');
-const path = require('path');
+import { jest } from '@jest/globals';
+import { setupServer } from 'msw/node';
+import { http, graphql, HttpResponse } from 'msw';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
+
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
+const require = createRequire(import.meta.url);
 
 const mockConfig = require('./mock-responses/mock-config.json');
 const mockVariants = require('./mock-responses/mock-variants.json');
@@ -89,4 +95,4 @@ function useMockServer() {
   return server;
 }
 
-module.exports = { useMockServer, handlers };
+export { useMockServer, handlers };
