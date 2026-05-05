@@ -20,6 +20,7 @@ const {
   requestSaaS,
   requestPublishedProductsIndex,
   createBatches,
+  CATALOG_BATCH_SIZE,
 } = require('../utils');
 const { getHtmlFilePath } = require('../renderUtils');
 
@@ -67,7 +68,7 @@ async function markUpCleanUP(context, filesLib, logger, adminApi) {
   try {    
     const publishedProducts = await requestPublishedProductsIndex(context);  
     const publishedSkus = publishedProducts.data.map((product) => product.sku);
-    const skuBatches = createBatches(publishedSkus);
+    const skuBatches = createBatches(publishedSkus, CATALOG_BATCH_SIZE);
     const batchResults = await Promise.all(
       skuBatches.map((batch) => requestSaaS(GetUrlKeyQuery, 'getUrlKey', { skus: batch }, context))
     );
