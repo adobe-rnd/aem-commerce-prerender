@@ -99,6 +99,10 @@ async function enrichProductWithRenderedHash(product, context) {
   const { logger } = context;
   const { sku, urlKey, path } = product;
 
+  // Reduced from 50 → 20: each concurrent render makes a full-detail GraphQL
+  // request to the Commerce API (ProductQuery) plus HTML compilation. At 50
+  // concurrent renders the Commerce API returned 504s, stalling the action and
+  // triggering the watchdog.
   if (!renderLimit$) {
     renderLimit$ = import('p-limit').then(({ default: pLimit }) => pLimit(20));
   }
