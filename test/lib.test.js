@@ -98,6 +98,7 @@ describe('lib', () => {
         // Mock fetch globally for these tests
         const originalFetch = global.fetch;
         const mockTemplateHtml = '<div class="hero">Hero content</div><div class="product-recommendations">Recommendations</div>';
+        const okResponse = (html) => ({ ok: true, text: () => Promise.resolve(html) });
 
         beforeEach(() => {
             global.fetch = jest.fn();
@@ -110,9 +111,7 @@ describe('lib', () => {
 
         // test 1: should replace {locale} token when locale is provided and not default
         test('should replace {locale} token when locale is provided and not default', async () => {
-            global.fetch.mockResolvedValueOnce({
-                text: () => Promise.resolve(mockTemplateHtml)
-            });
+            global.fetch.mockResolvedValueOnce(okResponse(mockTemplateHtml));
 
             const url = 'https://content.com/{locale}/products/default';
             const blocks = ['product-recommendations'];
@@ -125,9 +124,7 @@ describe('lib', () => {
 
         // test 2: should replace {locale} token with complex locale codes
         test('should replace {locale} token with complex locale codes', async () => {
-            global.fetch.mockResolvedValueOnce({
-                text: () => Promise.resolve(mockTemplateHtml)
-            });
+            global.fetch.mockResolvedValueOnce(okResponse(mockTemplateHtml));
 
             const url = 'https://content.com/{locale}/products/default';
             const blocks = ['product-recommendations'];
@@ -139,9 +136,7 @@ describe('lib', () => {
         });
 
         test('should handle URL with multiple {locale} tokens (only replaces first occurrence)', async () => {
-            global.fetch.mockResolvedValueOnce({
-                text: () => Promise.resolve(mockTemplateHtml)
-            });
+            global.fetch.mockResolvedValueOnce(okResponse(mockTemplateHtml));
 
             const url = 'https://content.com/{locale}/category/{locale}/products/default';
             const blocks = ['product-recommendations'];
@@ -154,9 +149,7 @@ describe('lib', () => {
         });
 
         test('should trim whitespace and trailing slash before locale replacement', async () => {
-            global.fetch.mockResolvedValueOnce({
-                text: () => Promise.resolve(mockTemplateHtml)
-            });
+            global.fetch.mockResolvedValueOnce(okResponse(mockTemplateHtml));
 
             const url = '  https://content.com/{locale}/products/default/  ';
             const blocks = ['product-recommendations'];
@@ -168,9 +161,7 @@ describe('lib', () => {
         });
 
         test('should not replace {locale} token when locale is "default"', async () => {
-            global.fetch.mockResolvedValueOnce({
-                text: () => Promise.resolve(mockTemplateHtml)
-            });
+            global.fetch.mockResolvedValueOnce(okResponse(mockTemplateHtml));
 
             const url = 'https://content.com/{locale}/products/default';
             const blocks = ['product-recommendations'];
@@ -182,9 +173,7 @@ describe('lib', () => {
         });
 
         test('should not replace {locale} token when locale is not provided', async () => {
-            global.fetch.mockResolvedValueOnce({
-                text: () => Promise.resolve(mockTemplateHtml)
-            });
+            global.fetch.mockResolvedValueOnce(okResponse(mockTemplateHtml));
 
             const url = 'https://content.com/{locale}/products/default';
             const blocks = ['product-recommendations'];
@@ -196,9 +185,7 @@ describe('lib', () => {
         });
 
         test('should not replace {locale} token when locale is null', async () => {
-            global.fetch.mockResolvedValueOnce({
-                text: () => Promise.resolve(mockTemplateHtml)
-            });
+            global.fetch.mockResolvedValueOnce(okResponse(mockTemplateHtml));
 
             const url = 'https://content.com/{locale}/products/default';
             const blocks = ['product-recommendations'];
@@ -210,9 +197,7 @@ describe('lib', () => {
         });
 
         test('should not replace {locale} token when locale is undefined', async () => {
-            global.fetch.mockResolvedValueOnce({
-                text: () => Promise.resolve(mockTemplateHtml)
-            });
+            global.fetch.mockResolvedValueOnce(okResponse(mockTemplateHtml));
 
             const url = 'https://content.com/{locale}/products/default';
             const blocks = ['product-recommendations'];
@@ -224,9 +209,7 @@ describe('lib', () => {
         });
 
         test('should replace blocks with handlebars partials after locale replacement', async () => {
-            global.fetch.mockResolvedValueOnce({
-                text: () => Promise.resolve(mockTemplateHtml)
-            });
+            global.fetch.mockResolvedValueOnce(okResponse(mockTemplateHtml));
 
             const url = 'https://content.com/{locale}/products/default';
             const blocks = ['hero', 'product-recommendations'];
@@ -240,9 +223,7 @@ describe('lib', () => {
         });
 
         test('should handle URL without {locale} token', async () => {
-            global.fetch.mockResolvedValueOnce({
-                text: () => Promise.resolve(mockTemplateHtml)
-            });
+            global.fetch.mockResolvedValueOnce(okResponse(mockTemplateHtml));
 
             const url = 'https://content.com/products/default';
             const blocks = ['product-recommendations'];
@@ -254,9 +235,7 @@ describe('lib', () => {
         });
 
         test('should handle empty blocks array', async () => {
-            global.fetch.mockResolvedValueOnce({
-                text: () => Promise.resolve(mockTemplateHtml)
-            });
+            global.fetch.mockResolvedValueOnce(okResponse(mockTemplateHtml));
 
             const url = 'https://content.com/{locale}/products/default';
             const blocks = [];
@@ -270,9 +249,7 @@ describe('lib', () => {
 
         test('should decode HTML entities in the output (only &gt; is decoded)', async () => {
             const htmlWithEntities = '<div class="hero">&gt; Hero content &lt;</div>';
-            global.fetch.mockResolvedValueOnce({
-                text: () => Promise.resolve(htmlWithEntities)
-            });
+            global.fetch.mockResolvedValueOnce(okResponse(htmlWithEntities));
 
             const url = 'https://content.com/{locale}/products/default';
             const blocks = [];
