@@ -11,6 +11,7 @@ governing permissions and limitations under the License.
 */
 
 const { Core, Files } = require('@adobe/aio-sdk');
+const { localFilesLib } = require('../lib/localFilesLib');
 const { ObservabilityClient } = require('../lib/observability');
 const { GetUrlKeyQuery } = require('../queries');
 const { getRuntimeConfig } = require('../lib/runtimeConfig');
@@ -19,6 +20,7 @@ const {
   requestSaaS,
   requestPublishedProductsIndex,
   createBatches,
+  CATALOG_BATCH_SIZE,
 } = require('../utils');
 const { getHtmlFilePath } = require('../renderUtils');
 
@@ -66,8 +68,11 @@ async function markUpCleanUP(context, filesLib, logger, adminApi) {
   try {    
     const publishedProducts = await requestPublishedProductsIndex(context);  
     const publishedSkus = publishedProducts.data.map((product) => product.sku);
-    let queryResult = await requestSaaS(GetUrlKeyQuery, 'getUrlKey', { skus: publishedSkus }, context);
-    queryResult = queryResult.data.products;
+    const skuBatches = createBatches(publishedSkus, CATALOG_BATCH_SIZE);
+    const batchResults = await Promise.all(
+      skuBatches.map((batch) => requestSaaS(GetUrlKeyQuery, 'getUrlKey', { skus: batch }, context))
+    );
+    const queryResult = batchResults.flatMap((result) => result.data.products);
 
     const redundantpublishedProducts = publishedProducts.data.filter((product) => !urlkeymatch(product, queryResult, context))
     context.counts.detected = redundantpublishedProducts.length;
@@ -117,7 +122,7 @@ async function main(params) {
     org: cfg.org,
     site: cfg.site
   });
-  const filesLib = await Files.init(params.libInit || {});  
+  const filesLib = params.LOCAL_FS ? localFilesLib : await Files.init(params.libInit || {});
 
   const {
     // required

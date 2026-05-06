@@ -125,12 +125,12 @@ describe('AdminAPI Optimized Tests', () => {
             expect(adminAPI.getPendingCount()).toBe(2);
         });
 
-        test('MAX_PENDING_JOBS is 20', () => {
-            expect(adminAPI.MAX_PENDING_JOBS).toBe(20);
+        test('MAX_PENDING_JOBS is 4', () => {
+            expect(adminAPI.MAX_PENDING_JOBS).toBe(4);
         });
 
-        test('JOB_STATUS_POLL_INTERVAL_MS is 5000', () => {
-            expect(adminAPI.JOB_STATUS_POLL_INTERVAL_MS).toBe(5000);
+        test('JOB_STATUS_POLL_INTERVAL_MS is 15000', () => {
+            expect(adminAPI.JOB_STATUS_POLL_INTERVAL_MS).toBe(15000);
         });
 
         test('previewAndPublish waits when pending >= MAX_PENDING_JOBS (backpressure)', async () => {

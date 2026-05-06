@@ -35,6 +35,10 @@ const { JobFailedError, ERROR_CODES } = require('../lib/errorHandler');
 const crypto = require('crypto');
 const BATCH_SIZE = 50;
 const DATA_KEY = 'skus';
+// Exit early rather than burning the full 3-hour timeout when processing stalls.
+// Activity is recorded after each render completes and after each AEM batch completes.
+const WATCHDOG_TIMEOUT_MS = 5 * 60 * 1000;
+const WATCHDOG_CHECK_INTERVAL_MS = 30 * 1000;
 
 function checkParams(params) {
   validateRequiredParams(params, [
@@ -95,8 +99,12 @@ async function enrichProductWithRenderedHash(product, context) {
   const { logger } = context;
   const { sku, urlKey, path } = product;
 
+  // Reduced from 50 → 20: each concurrent render makes a full-detail GraphQL
+  // request to the Commerce API (ProductQuery) plus HTML compilation. At 50
+  // concurrent renders the Commerce API returned 504s, stalling the action and
+  // triggering the watchdog.
   if (!renderLimit$) {
-    renderLimit$ = import('p-limit').then(({ default: pLimit }) => pLimit(50));
+    renderLimit$ = import('p-limit').then(({ default: pLimit }) => pLimit(20));
   }
 
   return (await renderLimit$)(async () => {
@@ -122,6 +130,7 @@ async function enrichProductWithRenderedHash(product, context) {
       logger.error(`Error generating product HTML for SKU ${sku}:`, e);
     }
 
+    context.recordActivity?.();
     return product;
   });
 }
@@ -284,11 +293,31 @@ async function poll(params, aioLibs, logger) {
 
     let stateText = 'completed';
 
+    // Watchdog: fires if no progress (render or AEM batch completion) for WATCHDOG_TIMEOUT_MS.
+    // recordActivity is called after each render (success or failure) and after each AEM batch completes.
+    let lastActivityAt = Date.now();
+    let watchdogIntervalId;
+    const watchdogPromise = new Promise((_, reject) => {
+      watchdogIntervalId = setInterval(() => {
+        const idleMs = Date.now() - lastActivityAt;
+        if (idleMs > WATCHDOG_TIMEOUT_MS) {
+          clearInterval(watchdogIntervalId);
+          const err = Object.assign(
+            new Error(`Watchdog: no processing activity for ${Math.floor(idleMs / 60000)} minutes — aborting`),
+            { isWatchdog: true },
+          );
+          logger.error(err.message);
+          reject(err);
+        }
+      }, WATCHDOG_CHECK_INTERVAL_MS);
+    });
+    sharedContext.recordActivity = () => { lastActivityAt = Date.now(); };
+
     try {
       // start processing preview and publish queues
       await adminApi.startProcessing();
 
-      const results = await Promise.all(
+      const localeProcessing = Promise.all(
         locales.map(async (locale) => {
           const timings = new Timings();
           const context = { ...sharedContext, startTime: new Date() };
@@ -343,13 +372,14 @@ async function poll(params, aioLibs, logger) {
                   const records = products.map(({ sku, path, renderedAt }) => ({ sku, path, renderedAt }));
                   return adminApi
                     .previewAndPublish(records, locale, batchNumber + 1)
-                    .then((publishedBatch) =>
-                      processPublishedBatch(publishedBatch, state, counts, products, aioLibs, {
+                    .then((publishedBatch) => {
+                      context.recordActivity?.();
+                      return processPublishedBatch(publishedBatch, state, counts, products, aioLibs, {
                         dataKey: DATA_KEY,
                         keyField: 'sku',
                         filePrefix: FILE_PREFIX,
-                      }),
-                    )
+                      });
+                    })
                     .catch((error) => {
                       // Handle batch errors gracefully - don't fail the entire job
                       if (error.code === ERROR_CODES.BATCH_ERROR) {
@@ -386,6 +416,8 @@ async function poll(params, aioLibs, logger) {
         }),
       );
 
+      const results = await Promise.race([localeProcessing, watchdogPromise]);
+
       await adminApi.stopProcessing();
 
       // aggregate timings
@@ -406,8 +438,14 @@ async function poll(params, aioLibs, logger) {
         code: e.code,
         stack: e.stack,
       });
-      // wait for queues to finish, even in error case
-      await adminApi.stopProcessing();
+      if (e.isWatchdog) {
+        // Don't drain queues — processing is stalled. Abort immediately so the mutex is
+        // cleared promptly and the next scheduled run can start.
+        adminApi.abortProcessing();
+      } else {
+        // wait for queues to finish, even in error case
+        await adminApi.stopProcessing();
+      }
       stateText = 'failure';
 
       // If it's a JobFailedError, re-throw it
@@ -422,6 +460,8 @@ async function poll(params, aioLibs, logger) {
         e.statusCode || 500,
         { originalError: e.message },
       );
+    } finally {
+      clearInterval(watchdogIntervalId);
     }
 
     // get memory usage

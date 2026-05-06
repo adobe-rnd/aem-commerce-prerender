@@ -337,9 +337,9 @@ describe('Poller', () => {
       expect(result.status.published).toBe(skus.length);
       expect(result.status.ignored).toBe(0);
 
-      // Verify API calls (batch size is 50)
+      // SaaS last-modified requests chunk by poller BATCH_SIZE (50); preview/publish uses utils createBatches default (600).
       expect(requestSaaS).toHaveBeenCalledTimes(skus.length / 50);
-      expect(AdminAPI.prototype.previewAndPublish).toHaveBeenCalledTimes(skus.length / 50);
+      expect(AdminAPI.prototype.previewAndPublish).toHaveBeenCalledTimes(Math.ceil(skus.length / 600));
       expect(AdminAPI.prototype.startProcessing).toHaveBeenCalledTimes(1);
       expect(AdminAPI.prototype.stopProcessing).toHaveBeenCalledTimes(1);
     });

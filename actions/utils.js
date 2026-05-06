@@ -13,7 +13,11 @@ const deepmerge = require('@fastify/deepmerge')();
 const helixSharedStringLib = require('@adobe/helix-shared-string');
 const { ERROR_CODES } = require('./lib/errorHandler');
 
-const BATCH_SIZE = 50;
+// Admin API limits Overlay requests to 600 per minute, so we will make 1 batch of 600 every minute.
+const BATCH_SIZE = 600;
+// Catalog Service GraphQL enforces a maximum of 100 products per query.
+// (Error observed at 23,398 SKUs: "Product count exceeds the maximum allowed (100)".)
+const CATALOG_BATCH_SIZE = 100;
 
 const SITE_TYPES = Object.freeze({
   ACO: 'aco',
@@ -32,9 +36,9 @@ const [STATE_FILE_EXT, PDP_FILE_EXT] = ['csv', 'html'];
  * @param context
  * @returns {*}
  */
-function createBatches(products) {
+function createBatches(products, size = BATCH_SIZE) {
   return products.reduce((acc, product) => {
-    if (!acc.length || acc[acc.length - 1].length === BATCH_SIZE) {
+    if (!acc.length || acc[acc.length - 1].length === size) {
       acc.push([]);
     }
     acc[acc.length - 1].push(product);
@@ -569,6 +573,7 @@ function formatMemoryUsage(data) {
 
 module.exports = {
   createBatches,
+  CATALOG_BATCH_SIZE,
   errorResponse,
   getBearerToken,
   checkMissingRequestInputs,

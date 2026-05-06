@@ -36,8 +36,8 @@ application:
               - - "actions/pdp-renderer/templates/*.hbs"
                 - "templates/"
             limits:
-              memorySize: 512
-              timeout: 3600000
+              memorySize: 4096
+              timeout: 10800000 # 3 hours – must match ACTION_TIMEOUT_MS in actions/check-product-changes/index.js
             inputs:
               AEM_ADMIN_API_AUTH_TOKEN: "${AEM_ADMIN_API_AUTH_TOKEN}"
             annotations:
@@ -50,7 +50,7 @@ application:
               final: true
             limits:
               memorySize: 512
-              timeout: 180000 # 3 minutes
+              timeout: 3600000 # 1 hour
           get-overlay-url:
             function: "actions/get-overlay-url/index.js"
             runtime: "nodejs:22"

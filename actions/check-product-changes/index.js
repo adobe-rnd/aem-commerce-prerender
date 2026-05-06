@@ -10,11 +10,16 @@ governing permissions and limitations under the License.
 */
 
 const { Core, State, Files } = require('@adobe/aio-sdk');
+const { localFilesLib } = require('../lib/localFilesLib');
 const { poll } = require('./poller');
 const { StateManager } = require('../lib/state');
 const { ObservabilityClient } = require('../lib/observability');
 const { getRuntimeConfig } = require('../lib/runtimeConfig');
 const { handleActionError } = require('../lib/errorHandler');
+
+// Must match timeout in app.config.yaml. The mutex TTL is derived from this so the
+// lock auto-expires if the runtime kills the process before the finally block runs.
+const ACTION_TIMEOUT_MS = 10800000; // 3 hours
 
 /**
  * Entry point for the "Product changes check" action.
@@ -38,8 +43,11 @@ async function main(params) {
         });
 
         // Init SDK libs and state manager
-        const stateLib = await State.init(params.libInit || {});
-        const filesLib = await Files.init(params.libInit || {});
+        const isLocal = !!params.LOCAL_FS;
+        const stateLib = isLocal
+            ? { get: async () => null, put: async () => {}, delete: async () => {} }
+            : await State.init(params.libInit || {});
+        const filesLib = isLocal ? localFilesLib : await Files.init(params.libInit || {});
         const stateMgr = new StateManager(stateLib, { logger });
 
         let activationResult;
@@ -61,7 +69,7 @@ async function main(params) {
 
         try {
             // Mark job as running with TTL to avoid permanent lock on unexpected failures
-            await stateMgr.put('running', 'true', { ttl: 3600 });
+            await stateMgr.put('running', 'true', { ttl: ACTION_TIMEOUT_MS / 1000 });
 
             // Core logic
             activationResult = await poll(cfg, { stateLib: stateMgr, filesLib }, logger);

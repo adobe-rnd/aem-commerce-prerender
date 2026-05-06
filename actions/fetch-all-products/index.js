@@ -13,6 +13,7 @@ governing permissions and limitations under the License.
 */
 
 const { Core, Files } = require('@adobe/aio-sdk');
+const { localFilesLib } = require('../lib/localFilesLib');
 const { getConfig, getSiteType, requestSaaS, SITE_TYPES, FILE_PREFIX } = require('../utils');
 const { ProductsQuery, ProductCountQuery } = require('../queries');
 const { Timings } = require('../lib/benchmark');
@@ -224,7 +225,7 @@ async function main(params) {
         const allProducts = await getAllProducts(siteType, context, cfg.categoryFamilies);
 
         timings.sample('getAllProducts');
-        const filesLib = await Files.init(params.libInit || {});
+        const filesLib = params.LOCAL_FS ? localFilesLib : await Files.init(params.libInit || {});
         timings.sample('saveFile');
         const productsFileName = `${FILE_PREFIX}/${stateFilePrefix}-products.json`;
         logger.debug(`Saving products to ${productsFileName}`);
