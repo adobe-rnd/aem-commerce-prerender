@@ -10,16 +10,31 @@ OF ANY KIND, either express or implied. See the License for the specific languag
 governing permissions and limitations under the License.
 */
 
-// Mock implementation of @adobe/helix-shared-string for Jest tests
+/**
+ * Mirrors `@adobe/helix-shared-string` `sanitizeName` / `sanitizePath` so Jest (CJS) matches
+ * production without loading the package ESM entry in `requireActual`.
+ */
+
+function sanitizeName(name) {
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+function sanitizePath(filepath, opts = {}) {
+  const idx = filepath.lastIndexOf('/') + 1;
+  const extIdx = opts.ignoreExtension ? -1 : filepath.lastIndexOf('.');
+  const pfx = filepath.substring(0, idx);
+  const basename = extIdx < idx ? filepath.substring(idx) : filepath.substring(idx, extIdx);
+  const ext = extIdx < idx ? '' : filepath.substring(extIdx);
+  const name = sanitizeName(basename);
+  return `${pfx}${name}${ext}`;
+}
+
 module.exports = {
-  sanitizePath: (path) => {
-    // Simple implementation that mimics the basic functionality
-    if (!path) return '/';
-    
-    // Remove duplicate slashes and normalize
-    const normalized = path.replace(/\/+/g, '/');
-    
-    // Ensure it starts with /
-    return normalized.startsWith('/') ? normalized : `/${normalized}`;
-  }
-}; 
+  sanitizeName,
+  sanitizePath,
+};
