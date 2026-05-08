@@ -85,8 +85,8 @@ describe(`PLP e2e - slug: ${slug}`, () => {
     }
   });
 
-  test('breadcrumb nav exists with at least one link', () => {
-    const breadcrumbLinks = $('nav.breadcrumb a');
+  test('breadcrumb div exists with at least one link', () => {
+    const breadcrumbLinks = $('div.breadcrumb a');
     expect(breadcrumbLinks.length).toBeGreaterThan(0);
     breadcrumbLinks.each((_, el) => {
       const href = $(el).attr('href');

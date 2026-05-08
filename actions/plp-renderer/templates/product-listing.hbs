@@ -1,19 +1,19 @@
 <h1>{{categoryName}}</h1>
+<div class="breadcrumb">
+  <div>
+    <div>
+      <ol>
+        {{#each breadcrumbs}}
+        <li><a href="{{url}}">{{name}}</a></li>
+        {{/each}}
+      </ol>
+    </div>
+  </div>
+</div>
 <div class="product-list-page">
   <div>
     <div>urlPath</div>
     <div>{{categorySlug}}</div>
-  </div>
-  <div>
-    <div>
-      <nav class="breadcrumb" aria-label="Breadcrumb">
-        <ol>
-          {{#each breadcrumbs}}
-          <li><a href="{{url}}">{{name}}</a></li>
-          {{/each}}
-        </ol>
-      </nav>
-    </div>
   </div>
   {{#if categoryDescription}}
   <div>
