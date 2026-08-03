@@ -357,7 +357,19 @@ function getCsHeaders(config) {
   let csHeaders = {};
 
   if (siteType === SITE_TYPES.ACO) {
-    const configHeaders = lowercaseKeys(config.headers?.cs);
+    let configHeaders;
+    if (config.__hasLegacyFormat) {
+      // Legacy spreadsheet configs are flat (no config.headers.cs object), so AC- headers
+      // live under dotted keys like `commerce.headers.cs.AC-View-Id` instead.
+      const prefix = 'commerce.headers.cs.';
+      configHeaders = Object.fromEntries(
+        Object.entries(config)
+          .filter(([key]) => key.toLowerCase().startsWith(`${prefix}ac-`))
+          .map(([key, value]) => [key.slice(prefix.length).toLowerCase(), value]),
+      );
+    } else {
+      configHeaders = lowercaseKeys(config.headers?.cs);
+    }
     const policyHeaders = Object.fromEntries(
       Object.entries(configHeaders).filter(([key]) => key.startsWith('ac-policy-')),
     );
@@ -449,13 +461,25 @@ async function requestSaaS(query, operationName, variables, context) {
  * @returns {string} One of SITE_TYPES.ACO or SITE_TYPES.ACCS.
  */
 function getSiteType(config) {
-  if (config['adobe-commerce-optimizer'] === true) {
+	const acoFlag = config['adobe-commerce-optimizer'];
+  // Legacy spreadsheet configs never get boolean coercion, so the flag arrives as a string.
+  if (acoFlag === true || (typeof acoFlag === 'string' && acoFlag.toLowerCase() === 'true')) {
     return SITE_TYPES.ACO;
   }
-  const csHeaders = config.headers?.cs;
-  if (csHeaders && Object.keys(csHeaders).some((key) => key.toLowerCase().startsWith('ac-'))) {
-    return SITE_TYPES.ACO;
+
+  if (config.__hasLegacyFormat) {
+    // No nested config.headers.cs under legacy format; scan the flat dotted keys instead.
+    const hasAcKey = Object.keys(config).some((key) => key.toLowerCase().startsWith('commerce.headers.cs.ac-'));
+    if (hasAcKey) {
+      return SITE_TYPES.ACO;
+    }
+  } else {
+    const csHeaders = config.headers?.cs;
+    if (csHeaders && Object.keys(csHeaders).some((key) => key.toLowerCase().startsWith('ac-'))) {
+      return SITE_TYPES.ACO;
+    }
   }
+
   return SITE_TYPES.ACCS;
 }
 
@@ -588,6 +612,7 @@ module.exports = {
   formatMemoryUsage,
   requestPublishedProductsIndex,
   getSiteType,
+  getCsHeaders,
   SITE_TYPES,
   FILE_PREFIX,
   PLP_FILE_PREFIX,

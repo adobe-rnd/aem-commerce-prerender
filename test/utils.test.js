@@ -33,7 +33,7 @@ const SAMPLE_CONFIGBUS_RESPONSE = {
 };
 
 const { useMockServer } = require('./mock-server');
-const { errorResponse, checkMissingRequestInputs, getBearerToken, request, requestSpreadsheet, getConfig, requestSaaS, getProductUrl } = require('./../actions/utils.js');
+const { errorResponse, checkMissingRequestInputs, getBearerToken, request, requestSpreadsheet, getConfig, requestSaaS, getProductUrl, getSiteType, getCsHeaders, SITE_TYPES } = require('./../actions/utils.js');
 const { http, HttpResponse } = require('msw');
 
 test('interface', () => {
@@ -325,7 +325,7 @@ describe('request', () => {
 });
 
 describe('getProductUrl', () => {
-  
+
   test('getProductUrl with no product, with products prefix, with locale', () => {
     const context = { storeUrl: 'https://example.com', pathFormat: '/{locale}/products/{urlKey}/{sku}', locale: 'en' };
     expect(getProductUrl({ }, context, false)).toBe('/en/products');
@@ -364,5 +364,96 @@ describe('getProductUrl', () => {
   test('getProductUrl with path only', () => {
       const context = { storeUrl: 'https://example.com', pathFormat: '/{locale}/products/{urlKey}/{sku}', locale: 'de' };
       expect(getProductUrl({ urlKey: 'my-url-key', sku: 'my-sku' }, context, false)).toBe('/de/products/my-url-key/my-sku');
+  });
+});
+
+describe('getSiteType / getCsHeaders', () => {
+  describe('public config format', () => {
+    test('detects aco via boolean adobe-commerce-optimizer flag', () => {
+      const config = { 'adobe-commerce-optimizer': true };
+      expect(getSiteType(config)).toBe(SITE_TYPES.ACO);
+    });
+
+    test('detects aco via headers.cs AC- prefixed key, case insensitive', () => {
+      const config = { headers: { cs: { 'AC-View-Id': 'view-1' } } };
+			const configLowerCase = { headers: { cs: { 'ac-view-id': 'view-1' } } };
+      expect(getSiteType(config)).toBe(SITE_TYPES.ACO);
+			expect(getSiteType(configLowerCase)).toBe(SITE_TYPES.ACO);
+    });
+
+    test('defaults to accs with no aco signal', () => {
+      const config = { headers: { cs: { 'Magento-Customer-Group': 'group' } } };
+      expect(getSiteType(config)).toBe(SITE_TYPES.ACCS);
+    });
+
+    test('getCsHeaders builds ac- headers from headers.cs', () => {
+      const config = {
+        headers: {
+          cs: {
+            'AC-View-Id': 'view-1',
+            'AC-Price-Book-Id': 'price-book-1',
+            'AC-Policy-Foo': 'policy-foo',
+          },
+        },
+      };
+      expect(getCsHeaders(config)).toEqual({
+        'ac-view-id': 'view-1',
+        'ac-price-book-id': 'price-book-1',
+        'ac-policy-foo': 'policy-foo',
+      });
+    });
+  });
+
+  describe('legacy (spreadsheet) format', () => {
+    test('detects aco via string adobe-commerce-optimizer flag', () => {
+      const config = { 'adobe-commerce-optimizer': 'true', __hasLegacyFormat: true };
+      expect(getSiteType(config)).toBe(SITE_TYPES.ACO);
+    });
+
+    test('detects aco via flat commerce.headers.cs.AC- key, case insensitive', () => {
+      const config = { 'commerce.headers.cs.AC-View-Id': 'view-1', __hasLegacyFormat: true };
+			const configLowerCase = { 'commerce.headers.cs.ac-view-id': 'view-1', __hasLegacyFormat: true };
+      expect(getSiteType(config)).toBe(SITE_TYPES.ACO);
+			expect(getSiteType(configLowerCase)).toBe(SITE_TYPES.ACO);
+    });
+
+    test('defaults to accs with no aco signal', () => {
+      const config = { 'commerce.headers.cs.Magento-Customer-Group': 'group', __hasLegacyFormat: true };
+      expect(getSiteType(config)).toBe(SITE_TYPES.ACCS);
+    });
+
+    test('getCsHeaders builds ac- headers from flat legacy keys', () => {
+      const config = {
+        __hasLegacyFormat: true,
+        'commerce.headers.cs.AC-View-Id': 'view-1',
+        'commerce.headers.cs.AC-Price-Book-Id': 'price-book-1',
+        'commerce.headers.cs.AC-Policy-Foo': 'policy-foo',
+      };
+      expect(getCsHeaders(config)).toEqual({
+        'ac-view-id': 'view-1',
+        'ac-price-book-id': 'price-book-1',
+        'ac-policy-foo': 'policy-foo',
+      });
+    });
+
+    test('regression: existing Magento header extraction still works', () => {
+      const config = {
+        __hasLegacyFormat: true,
+        'commerce.headers.cs.Magento-Customer-Group': 'customer-group',
+        'commerce.headers.cs.Magento-Environment-Id': 'environment-id',
+        'commerce.headers.cs.Magento-Store-Code': 'store-code',
+        'commerce.headers.cs.Magento-Store-View-Code': 'store-view-code',
+        'commerce.headers.cs.Magento-Website-Code': 'website-code',
+        'commerce.headers.cs.x-api-key': 'api-key',
+      };
+      expect(getCsHeaders(config)).toEqual({
+        'magento-customer-group': 'customer-group',
+        'magento-environment-id': 'environment-id',
+        'magento-store-code': 'store-code',
+        'magento-store-view-code': 'store-view-code',
+        'magento-website-code': 'website-code',
+        'x-api-key': 'api-key',
+      });
+    });
   });
 });

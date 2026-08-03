@@ -10,15 +10,36 @@ OF ANY KIND, either express or implied. See the License for the specific languag
 governing permissions and limitations under the License.
 */
 
+jest.mock('../actions/utils', () => {
+  const actual = jest.requireActual('../actions/utils');
+  return {
+    ...actual,
+    getConfig: jest.fn(actual.getConfig),
+    getSiteType: jest.fn(actual.getSiteType),
+  };
+});
+
+jest.mock('../actions/categories', () => {
+  const actual = jest.requireActual('../actions/categories');
+  return {
+    ...actual,
+    getCategoryMapFromFamilies: jest.fn(actual.getCategoryMapFromFamilies),
+    getCategoryMap: jest.fn(actual.getCategoryMap),
+  };
+});
+
 const { loadState, saveState, getFileLocation } = require('../actions/renderUtils');
-const { PLP_FILE_PREFIX } = require('../actions/utils');
+const { PLP_FILE_PREFIX, getConfig, getSiteType } = require('../actions/utils');
 const { generatePlpLdJson } = require('../actions/plp-renderer/ldJson');
 const {
   buildBreadcrumbs,
   getCategorySlugsFromFamilies,
   getCategoryMapFromFamilies,
+  getCategoryMap,
 } = require('../actions/categories');
 const { getCategoryUrl } = require('../actions/utils');
+const { poll } = require('../actions/render-all-categories/poller');
+const { AdminAPI } = require('../actions/lib/aem');
 const Files = require('./__mocks__/files');
 const { useMockServer } = require('./mock-server');
 const { http, HttpResponse } = require('msw');
@@ -529,5 +550,65 @@ describe('category tree fetching', () => {
     expect(data.name).toBe('Electronics');
     expect(data.metaTags.title).toBe('Electronics');
     expect(data.images).toHaveLength(1);
+  });
+});
+
+// ─── poll() site-type branching ─────────────────────────────────────────────
+
+describe('poll() category-discovery branching', () => {
+  jest.spyOn(AdminAPI.prototype, 'startProcessing').mockImplementation(jest.fn());
+  jest.spyOn(AdminAPI.prototype, 'stopProcessing').mockImplementation(jest.fn());
+
+  const baseParams = {
+    site: 'test-site',
+    org: 'test-org',
+    pathFormat: '/{urlKey}',
+    adminAuthToken: 'token',
+    configName: 'config',
+    contentUrl: 'https://content.com',
+    storeUrl: 'https://store.com',
+  };
+
+  let aioLibs;
+  const logger = { info: jest.fn(), debug: jest.fn(), error: jest.fn(), warn: jest.fn() };
+
+  beforeEach(() => {
+    aioLibs = { filesLib: new Files(0) };
+    getConfig.mockReset();
+    getSiteType.mockReset();
+    getCategoryMapFromFamilies.mockReset();
+    getCategoryMap.mockReset();
+  });
+
+  test('aco site config discovers categories via getCategoryMapFromFamilies, not getCategoryMap', async () => {
+    getConfig.mockResolvedValue({ 'adobe-commerce-optimizer': true });
+    getSiteType.mockReturnValue('aco');
+    getCategoryMapFromFamilies.mockResolvedValue(new Map());
+
+    await poll({ ...baseParams, categoryFamilies: ['electronics'] }, aioLibs, logger);
+
+    expect(getCategoryMapFromFamilies).toHaveBeenCalled();
+    expect(getCategoryMap).not.toHaveBeenCalled();
+  });
+
+  test('aco site config with no category families throws JobFailedError', async () => {
+    getConfig.mockResolvedValue({ 'adobe-commerce-optimizer': true });
+    getSiteType.mockReturnValue('aco');
+
+    await expect(poll({ ...baseParams, categoryFamilies: [] }, aioLibs, logger)).rejects.toThrow(
+      'Missing ACO_CATEGORY_FAMILIES configuration',
+    );
+    expect(getCategoryMapFromFamilies).not.toHaveBeenCalled();
+  });
+
+  test('non-aco site config discovers categories via getCategoryMap and ignores categoryFamilies', async () => {
+    getConfig.mockResolvedValue({});
+    getSiteType.mockReturnValue('accs');
+    getCategoryMap.mockResolvedValue(new Map());
+
+    await poll({ ...baseParams, categoryFamilies: ['electronics'] }, aioLibs, logger);
+
+    expect(getCategoryMap).toHaveBeenCalled();
+    expect(getCategoryMapFromFamilies).not.toHaveBeenCalled();
   });
 });

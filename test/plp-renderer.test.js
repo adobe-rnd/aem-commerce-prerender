@@ -10,8 +10,30 @@ OF ANY KIND, either express or implied. See the License for the specific languag
 governing permissions and limitations under the License.
 */
 
+jest.mock('../actions/utils', () => {
+  const actual = jest.requireActual('../actions/utils');
+  return {
+    ...actual,
+    getConfig: jest.fn(),
+    getSiteType: jest.fn(),
+    requestSaaS: jest.fn(),
+  };
+});
+
+jest.mock('../actions/categories', () => {
+  const actual = jest.requireActual('../actions/categories');
+  return {
+    ...actual,
+    getCategoryMapFromFamilies: jest.fn(),
+    getCategoryMap: jest.fn(),
+  };
+});
+
 const cheerio = require('cheerio');
 const { generateCategoryHtml } = require('../actions/plp-renderer/render');
+const { getConfig, getSiteType, requestSaaS } = require('../actions/utils');
+const { getCategoryMapFromFamilies, getCategoryMap } = require('../actions/categories');
+const { main } = require('../actions/plp-renderer');
 
 /**
  * @param {import('cheerio').CheerioAPI} $
@@ -165,5 +187,59 @@ describe('plp-renderer generateCategoryHtml', () => {
       'https://example.com/en/parts-a',
       'https://example.com/en/parts-a/seals-gaskets-b',
     ]);
+  });
+});
+
+describe('plp-renderer main() category-discovery branching', () => {
+  const baseParams = {
+    slug: 'electronics',
+    CONTENT_URL: 'https://content.com',
+    STORE_URL: 'https://store.com',
+    PRODUCT_PAGE_URL_FORMAT: '/products/{urlKey}/{sku}',
+  };
+
+  const categoryData = { name: 'Electronics', slug: 'electronics', level: 1 };
+
+  beforeEach(() => {
+    getConfig.mockReset();
+    getSiteType.mockReset();
+    getCategoryMapFromFamilies.mockReset();
+    getCategoryMap.mockReset();
+    requestSaaS.mockReset().mockResolvedValue({ data: { productSearch: { items: [] } } });
+  });
+
+  test('aco config discovers categories via getCategoryMapFromFamilies, not getCategoryMap', async () => {
+    getConfig.mockResolvedValue({ 'adobe-commerce-optimizer': true });
+    getSiteType.mockReturnValue('aco');
+    getCategoryMapFromFamilies.mockResolvedValue(new Map([['electronics', categoryData]]));
+
+    const response = await main({ ...baseParams, ACO_CATEGORY_FAMILIES: 'electronics' });
+
+    expect(response.statusCode).toBe(200);
+    expect(getCategoryMapFromFamilies).toHaveBeenCalled();
+    expect(getCategoryMap).not.toHaveBeenCalled();
+  });
+
+  test('aco config with no category families returns a 400 error', async () => {
+    getConfig.mockResolvedValue({ 'adobe-commerce-optimizer': true });
+    getSiteType.mockReturnValue('aco');
+
+    const response = await main({ ...baseParams, ACO_CATEGORY_FAMILIES: '' });
+
+    expect(response.error.statusCode).toBe(400);
+    expect(response.error.body.error).toMatch(/Missing ACO_CATEGORY_FAMILIES configuration/);
+    expect(getCategoryMapFromFamilies).not.toHaveBeenCalled();
+  });
+
+  test('non-aco config discovers categories via getCategoryMap and ignores categoryFamilies', async () => {
+    getConfig.mockResolvedValue({});
+    getSiteType.mockReturnValue('accs');
+    getCategoryMap.mockResolvedValue(new Map([['electronics', categoryData]]));
+
+    const response = await main({ ...baseParams, ACO_CATEGORY_FAMILIES: 'electronics' });
+
+    expect(response.statusCode).toBe(200);
+    expect(getCategoryMap).toHaveBeenCalled();
+    expect(getCategoryMapFromFamilies).not.toHaveBeenCalled();
   });
 });

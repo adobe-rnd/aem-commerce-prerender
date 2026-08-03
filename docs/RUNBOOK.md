@@ -246,6 +246,8 @@ Issues with the rendering process can be found in the logs from above.
 
 The `render-all-categories` action runs every 15 minutes (configurable in `app.config.yaml`). For Commerce Optimizer sites, it discovers all categories from the configured `ACO_CATEGORY_FAMILIES`, renders PLPs, and detects changes via hash comparison. Logic is defined in [poller.js](../actions/render-all-categories/poller.js).
 
+For PaaS + Catalog Service and ACCS sites, category discovery is fully automatic via the catalog's `categories` query — no family configuration is needed, and `ACO_CATEGORY_FAMILIES` is ignored entirely.
+
 A `plp-running` mutex prevents concurrent executions, similar to the PDP poller.
 
 ### Force re-rendering all PLPs
