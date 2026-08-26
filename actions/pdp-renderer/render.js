@@ -1,7 +1,14 @@
 const fs = require('fs');
 const path = require('path');
 const Handlebars = require('handlebars');
-const { findDescription, prepareBaseTemplate, getPrimaryImage, generatePriceString, getImageList, sanitize } = require('./lib');
+const {
+  findDescription,
+  prepareBaseTemplate,
+  getPrimaryImage,
+  generatePriceString,
+  getImageList,
+  sanitize,
+} = require('../renderUtils');
 const { generateLdJson } = require('./ldJson');
 const { requestSaaS, getProductUrl } = require('../utils');
 const { ProductQuery, ProductByUrlKeyQuery } = require('../queries');
@@ -70,8 +77,8 @@ async function generateProductHtml(sku, urlKey, context) {
       return {
         title: sanitize(option.title, 'inline'),
         id: sanitize(option.id, 'no'),
-        required: sanitize(option.required, 'no'),
-        values: option.values
+        required: sanitize(String(option.required), 'no'),
+        values: option.values,
       };
     });
   }
@@ -83,7 +90,9 @@ async function generateProductHtml(sku, urlKey, context) {
   const ldJson = await generateLdJson(baseProduct, context);
 
   // Load the Handlebars template
-  const [pageHbs, headHbs, productDetailsHbs] = ['page', 'head', 'product-details'].map((template) => fs.readFileSync(path.join(__dirname, 'templates', `${template}.hbs`), 'utf8'));
+  const [pageHbs, headHbs, productDetailsHbs] = ['page', 'head', 'product-details'].map((template) =>
+    fs.readFileSync(path.join(__dirname, 'templates', `${template}.hbs`), 'utf8'),
+  );
   const pageTemplate = Handlebars.compile(pageHbs);
   Handlebars.registerPartial('head', headHbs);
   Handlebars.registerPartial('product-details', productDetailsHbs);
@@ -96,7 +105,8 @@ async function generateProductHtml(sku, urlKey, context) {
   if (context.productsTemplate) {
     const productsTemplateURL = context.productsTemplate.replace(/\s+/g, '').replace('{locale}', localeKey);
     if (!productTemplateCache[localeKey]) productTemplateCache[localeKey] = {};
-    if (!productTemplateCache[localeKey].baseTemplate) productTemplateCache[localeKey].baseTemplate = prepareBaseTemplate(productsTemplateURL, blocksToReplace, context);
+    if (!productTemplateCache[localeKey].baseTemplate)
+      productTemplateCache[localeKey].baseTemplate = prepareBaseTemplate(productsTemplateURL, blocksToReplace, context);
     const baseTemplate = await productTemplateCache[localeKey].baseTemplate;
     Handlebars.registerPartial('content', baseTemplate);
   } else {

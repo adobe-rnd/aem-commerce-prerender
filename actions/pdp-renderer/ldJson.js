@@ -1,5 +1,5 @@
 const { requestSaaS, getProductUrl } = require('../utils');
-const { findDescription, getPrimaryImage } = require('./lib');
+const { findDescription, getPrimaryImage, getGTIN } = require('../renderUtils');
 const { VariantsQuery } = require('../queries');
 
 function lowercaseUrlPath(url) {
@@ -11,8 +11,10 @@ function lowercaseUrlPath(url) {
 
 function getOffer(product, url) {
   const { sku, inStock, price } = product;
-  const finalPriceCurrency = (price?.final?.amount?.currency || 'NONE') === 'NONE' ? 'USD' : price?.final?.amount?.currency;
-  const regularPriceCurrency = (price?.regular?.amount?.currency || 'NONE') === 'NONE' ? 'USD' : price?.regular?.amount?.currency;
+  const finalPriceCurrency =
+    (price?.final?.amount?.currency || 'NONE') === 'NONE' ? 'USD' : price?.final?.amount?.currency;
+  const regularPriceCurrency =
+    (price?.regular?.amount?.currency || 'NONE') === 'NONE' ? 'USD' : price?.regular?.amount?.currency;
 
   const offer = {
     '@type': 'Offer',
@@ -40,8 +42,10 @@ async function getVariants(baseProduct, url, axes, context) {
   const { logger } = context;
   // For bundle products, extract variants from options instead of using VariantsQuery
   // Bundle products have 'product' data in their option values, configurable products don't
-  if (baseProduct.__typename === 'ComplexProductView' &&
-    baseProduct.options?.some(option => option.values?.some(value => value.product))) {
+  if (
+    baseProduct.__typename === 'ComplexProductView' &&
+    baseProduct.options?.some((option) => option.values?.some((value) => value.product))
+  ) {
     return getBundleVariants(baseProduct, url);
   }
 
@@ -49,9 +53,12 @@ async function getVariants(baseProduct, url, axes, context) {
   const variantsData = await requestSaaS(VariantsQuery, 'VariantsQuery', { sku: baseProduct.sku }, context);
   const variants = variantsData.data.variants.variants;
 
-  return variants.map(variant => {
+  return variants.map((variant) => {
     if (!variant.product) {
-      logger.error(`Variant of product ${baseProduct?.sku} is null. Variant data is not correctly synchronized.`, variant);
+      logger.error(
+        `Variant of product ${baseProduct?.sku} is null. Variant data is not correctly synchronized.`,
+        variant,
+      );
       throw new Error('Product variant is null');
     }
 
@@ -64,14 +71,16 @@ async function getVariants(baseProduct, url, axes, context) {
       sku: variant.product.sku,
       name: variant.product.name,
       gtin: getGTIN(variant.product),
-      image: variantImage ? variantImage.url : (() => {
-        const fallbackImage = getPrimaryImage(baseProduct, null);
-        return fallbackImage ? fallbackImage.url : null;
-      })(),
+      image: variantImage
+        ? variantImage.url
+        : (() => {
+            const fallbackImage = getPrimaryImage(baseProduct, null);
+            return fallbackImage ? fallbackImage.url : null;
+          })(),
       offers: [getOffer(variant.product, variantUrl.toString())],
     };
     for (let axis of axes) {
-      const attribute = variant.product.attributes.find(attr => attr.name === axis);
+      const attribute = variant.product.attributes.find((attr) => attr.name === axis);
       if (attribute) {
         ldJson[axis] = attribute.value;
       }
@@ -87,8 +96,8 @@ function getBundleVariants(baseProduct, url) {
   // Extract all unique products from bundle options
   const productMap = new Map();
 
-  baseProduct.options.forEach(option => {
-    option.values.forEach(value => {
+  baseProduct.options.forEach((option) => {
+    option.values.forEach((value) => {
       if (value.product) {
         const product = value.product;
         if (!productMap.has(product.sku)) {
@@ -99,7 +108,7 @@ function getBundleVariants(baseProduct, url) {
             valueId: value.id,
             valueTitle: value.title,
             quantity: value.quantity,
-            isDefault: value.isDefault
+            isDefault: value.isDefault,
           });
         }
       }
@@ -141,21 +150,6 @@ function getBundleVariants(baseProduct, url) {
   return variants;
 }
 
-/**
- * Extracts the GTIN (Global Trade Item Number) from a product's attributes.
- * Checks for GTIN, UPC, or EAN attributes as defined in the Catalog.
- * 
- * @param {Object} product - The product object containing attributes
- * @returns {string} The GTIN value if found, empty string otherwise
- */
-function getGTIN(product) {
-  return product?.attributes?.find(attr => attr.name === 'gtin')?.value
-    || product?.attributes?.find(attr => attr.name === 'upc')?.value
-    || product?.attributes?.find(attr => attr.name === 'ean')?.value
-    || product?.attributes?.find(attr => attr.name === 'isbn')?.value
-    || '';
-}
-
 async function generateLdJson(product, context) {
   const { name, sku, __typename } = product;
   const image = getPrimaryImage(product);
@@ -186,7 +180,7 @@ async function generateLdJson(product, context) {
       productGroupId: sku,
       name,
       gtin,
-      variesBy: axes.map(axis => schemaOrgProperties.includes(axis) ? `https://schema.org/${axis}` : axis),
+      variesBy: axes.map((axis) => (schemaOrgProperties.includes(axis) ? `https://schema.org/${axis}` : axis)),
       description: findDescription(product, ['shortDescription', 'metaDescription', 'description']),
       '@id': lowercaseUrlPath(url),
       hasVariant: await getVariants(product, url, axes, context),

@@ -88,6 +88,41 @@ Inovcation results (example):
 }
 ```
 
+## `check-errors.sh`
+
+This shell script lists Adobe I/O Runtime activations that ended with an error (`statusCode != 0`), then prints full activation details and logs for each ID. It paginates through `aio rt activation list` so you are not limited to the first page of results.
+
+Use it when you need a quick view of recent failures without clicking through the Runtime UI.
+
+### Prerequisites
+
+- [Adobe I/O CLI](https://developer.adobe.com/runtime/docs/guides/getting-started/activations/) (`aio`) with Runtime access configured for the namespace you want to inspect.
+- `jq` installed and on your `PATH`.
+
+### Usage
+
+From the `tools` directory (or pass the path to the script):
+
+```bash
+./check-errors.sh
+./check-errors.sh --hours 15
+```
+
+### Options
+
+```
+--hours N    Only consider activations from the last N hours (maps to aio rt activation list --since).
+```
+
+With no options, all pages of activations are scanned (until a page returns fewer than 50 items).
+
+### Behavior
+
+1. Fetches activations in pages of 50, optionally filtered by `--since` when `--hours` is set.
+2. Collects activation IDs where `statusCode` is not `0`.
+3. If none are found, prints `No error activations found.` and exits successfully.
+4. Otherwise prints each error activation ID, then runs `aio rt activation get <id>` and `aio rt activation logs <id>` for each (failures on individual gets/logs are ignored so the script continues).
+
 ## `get-stats.js`
 
 This script is used to generate charts and statistics from Adobe I/O Runtime poller activations. It can output data in multiple formats: a PNG chart, a JSON file with previewed URLs, and/or a CSV file with detailed statistics.

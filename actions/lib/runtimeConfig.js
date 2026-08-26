@@ -20,7 +20,8 @@ const DEFAULTS = {
     STORE_URL: undefined,
     PRODUCTS_TEMPLATE: undefined,
     LOCALES: undefined,
-    SITE_TOKEN: undefined
+    SITE_TOKEN: undefined,
+    PLP_PRODUCTS_PER_PAGE: undefined
 };
 
 /**
@@ -93,6 +94,14 @@ function getRuntimeConfig(params = {}, options = {}) {
         if (!localesArr.length) localesArr = [null];
     }
 
+    // Normalize ACO_CATEGORY_FAMILIES
+    const categoryFamiliesRaw = merged.ACO_CATEGORY_FAMILIES;
+    const categoryFamiliesArr = (
+        Array.isArray(categoryFamiliesRaw) ? categoryFamiliesRaw
+            : typeof categoryFamiliesRaw === 'string' ? categoryFamiliesRaw.split(',')
+            : []
+    ).map(s => String(s).trim()).filter(Boolean);
+
     const cfg = {
         raw: { ...merged, LOCALES_ARRAY: localesArr },
         org: ORG,
@@ -107,7 +116,9 @@ function getRuntimeConfig(params = {}, options = {}) {
         configName: merged.CONFIG_NAME,
         configSheet: merged.CONFIG_SHEET,
         pathFormat: merged.PRODUCT_PAGE_URL_FORMAT,
-        locales: localesArr
+        locales: localesArr,
+        categoryFamilies: categoryFamiliesArr,
+        plpProductsPerPage: parseInt(merged.PLP_PRODUCTS_PER_PAGE, 10) || 9
     };
 
     // URL sanity checks

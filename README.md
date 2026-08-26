@@ -1,6 +1,6 @@
 # AEM Commerce Prerender
 
-The AEM Commerce Prerenderer is a tool to generate static product detail pages from dynamic data sources like Adobe Commerce Catalog Service for publishing via [AEM Edge Delivery Services](https://www.aem.live/). It integrates with [BYOM (Bring Your Own Markup)](https://www.aem.live/docs/byo-markup) and EDS indexes to deliver fast, SEO-friendly pages.
+The AEM Commerce Prerenderer is a tool to generate static product detail pages (PDPs) and product listing pages (PLPs) from dynamic data sources like Adobe Commerce Catalog Service for publishing via [AEM Edge Delivery Services](https://www.aem.live/). It integrates with [BYOM (Bring Your Own Markup)](https://www.aem.live/docs/byo-markup) and EDS indexes to deliver fast, SEO-friendly pages.
 
 ## Key Benefits
 
@@ -69,10 +69,12 @@ For detailed setup instructions, see the [Step-by-Step Configuration](#step-by-s
      * `PRODUCTS_TEMPLATE`: The URL for the product template page (auto-populated by wizard). For localized sites with URLs like `https://main--site--org.aem.page/en-us/products/default`, you can use the `{locale}` token: `https://main--site--org.aem.page/{locale}/products/default`
      * `PRODUCT_PAGE_URL_FORMAT`: The URL pattern for product pages (auto-populated by wizard). Supports tokens: `{locale}`, `{urlKey}`, `{sku}`. Default pattern: `/{locale}/products/{urlKey}`. For live environments, consider using a different prefix like `/{locale}/products-prerendered/{urlKey}` for logical separation
      * `LOCALES`: Comma-separated list of locales (e.g., `en-us,en-gb,fr-fr`) or empty for non-localized sites
+     * `ACO_CATEGORY_FAMILIES`: *(Commerce Optimizer only)* Comma-separated list of category family identifiers (e.g., `electronics,apparel`). Determines which categories are included for both PLP and PDP pre-rendering. For PDP pre-rendering, catalogs with 10,000 or fewer products are fetched in full regardless of this setting. For larger catalogs, the system fetches the first 10,000 products plus up to 10,000 per category discovered from these families, deduplicated by SKU. If not configured, only the first 10,000 products are pre-rendered.
+     * `PLP_PRODUCTS_PER_PAGE`: Number of products to display per category listing page (default: `9`)
      * `AEM_ADMIN_API_AUTH_TOKEN`: Long-lived authentication token for AEM Admin API (valid for 1 year). During setup, the wizard will exchange your temporary 24-hour token from [admin.hlx.page](https://admin.hlx.page/) for this long-lived token automatically.
      
      You can modify the environment-specific variables by editing the `.env` file directly or by re-running the setup wizard with `npm run setup`.
-  1. **After Setup Completion**: Once the setup process is complete, the following configurations will be automatically applied:
+  2. **After Setup Completion**: Once the setup process is complete, the following configurations will be automatically applied:
      
      * **Site Context**: A Site Context will be created and stored in your localStorage. This serves as the authentication medium required to operate the [Storefront Prerender Management UI](https://prerender.aem-storefront.com) (you will be redirected to this address).
      
@@ -88,9 +90,11 @@ For detailed setup instructions, see the [Step-by-Step Configuration](#step-by-s
          }
        }
        ```
-  1. [Customize the code](/docs/CUSTOMIZE.md) that contains the rendering logic according to your requirements, for [structured data](/actions/pdp-renderer/ldJson.js), [markup](/actions/pdp-renderer/render.js) and [templates](https://github.com/adobe-rnd/aem-commerce-prerender/tree/main/actions/pdp-renderer/templates)
-  1. Deploy the solution with `npm run deploy`
-  1. **Testing Actions Manually**: Before enabling automated triggers, verify that each action works correctly by invoking them manually:
+  3. [Customize the code](/docs/CUSTOMIZE.md) that contains the rendering logic according to your requirements:
+     * **PDP**: [structured data](/actions/pdp-renderer/ldJson.js), [markup](/actions/pdp-renderer/render.js) and [templates](https://github.com/adobe-rnd/aem-commerce-prerender/tree/main/actions/pdp-renderer/templates)
+     * **PLP**: [structured data](/actions/plp-renderer/ldJson.js), [markup](/actions/plp-renderer/render.js) and [templates](https://github.com/adobe-rnd/aem-commerce-prerender/tree/main/actions/plp-renderer/templates)
+  4. Deploy the solution with `npm run deploy`
+  5. **Testing Actions Manually**: Before enabling automated triggers, verify that each action works correctly by invoking them manually:
      ```bash
      # Fetch all products from Catalog Service and store them in default-products.json
      aio rt action invoke aem-commerce-ssg/fetch-all-products
@@ -100,8 +104,11 @@ For detailed setup instructions, see the [Step-by-Step Configuration](#step-by-s
      
      # Clean up and unpublish deleted products
      aio rt action invoke aem-commerce-ssg/mark-up-clean-up
+     
+     # Render all category listing pages
+     aio rt action invoke aem-commerce-ssg/render-all-categories
      ```
-  1. **Enable Automated Triggers**: Once you've confirmed that all actions work correctly, uncomment the triggers and rules sections in `app.config.yaml`:
+  6. **Enable Automated Triggers**: Once you've confirmed that all actions work correctly, uncomment the triggers and rules sections in `app.config.yaml`:
      ```yaml
      triggers:
        productPollerTrigger:
@@ -116,6 +123,10 @@ For detailed setup instructions, see the [Step-by-Step Configuration](#step-by-s
          feed: "/whisk.system/alarms/interval"
          inputs:
            minutes: 60
+       renderAllCategoriesTrigger:
+         feed: "/whisk.system/alarms/interval"
+         inputs:
+           minutes: 15
      rules:
        productPollerRule:
          trigger: "productPollerTrigger"
@@ -126,9 +137,12 @@ For detailed setup instructions, see the [Step-by-Step Configuration](#step-by-s
        markUpCleanUpRule:
          trigger: "markUpCleanUpTrigger"
          action: "mark-up-clean-up"
+       renderAllCategoriesRule:
+         trigger: "renderAllCategoriesTrigger"
+         action: "render-all-categories"
      ```
      Then redeploy the solution: `npm run deploy`
-  1. **Management UI Overview**: Navigate to the [Storefront Prerender Management UI](https://prerender.aem-storefront.com) to monitor and manage your prerender deployment. The UI provides several tabs:
+  7. **Management UI Overview**: Navigate to the [Storefront Prerender Management UI](https://prerender.aem-storefront.com) to monitor and manage your prerender deployment. The UI provides several tabs:
      
      * **Published Products** (`#/products`): Displays the list of products published on your store, as retrieved from your site's `published-products-index.json`. For sites with over a thousand products, use the pagination interface to navigate through results. The search functionality allows you to filter products on the current page.
      
@@ -149,7 +163,7 @@ For detailed setup instructions, see the [Step-by-Step Configuration](#step-by-s
      
      * **Settings** (`#/settings`): Allows you to access and modify your personal context file. The context file contains information about the prerender app's namespace, authentication token, and the currently active Helix token. Editing the context file enables you to use the prerender UI to manage other App Builder applications.
   
-  1. The system is now up and running. In the first cycle of operation, it will publish all products in the catalog. Subsequent runs will only process products that have changed.
+  8. The system is now up and running. In the first cycle of operation, it will publish all products in the catalog. Subsequent runs will only process products that have changed.
 
 ### Management UI Setup
 

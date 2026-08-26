@@ -31,10 +31,10 @@ class AdminAPI {
     inflight = [];
     MAX_RETRIES = 3;
     RETRY_DELAY = 5000;
-    /** Max number of pending jobs (queues + inflight). Keep low to avoid "noisy neighbor" effect. */
-    MAX_PENDING_JOBS = 20;
-    /** Poll interval for job status (ms). Avoid polling too frequently (e.g. once every 5 seconds). */
-    JOB_STATUS_POLL_INTERVAL_MS = 5000;
+    /** Max number of pending jobs (queues + inflight). With BATCH_SIZE=600, keep small to avoid large memory backlog. */
+    MAX_PENDING_JOBS = 4;
+    /** Poll interval for job status (ms). At BATCH_SIZE=600, jobs take ~60s so 15s polling is sufficient. */
+    JOB_STATUS_POLL_INTERVAL_MS = 15000;
     /** Resolvers for backpressure: call when pending drops below MAX_PENDING_JOBS */
     _backpressureResolvers = [];
 
@@ -132,6 +132,11 @@ class AdminAPI {
             });
         }
         return this.stopProcessing$;
+    }
+
+    abortProcessing() {
+        clearInterval(this.interval);
+        this.interval = null;
     }
 
     trackInFlight(name, callback) {

@@ -11,6 +11,7 @@ governing permissions and limitations under the License.
 */
 
 const { Core, Files } = require('@adobe/aio-sdk');
+const { localFilesLib } = require('../lib/localFilesLib');
 const { ObservabilityClient } = require('../lib/observability');
 const { GetUrlKeyQuery } = require('../queries');
 const { getRuntimeConfig } = require('../lib/runtimeConfig');
@@ -18,9 +19,10 @@ const { AdminAPI } = require('../lib/aem');
 const {
   requestSaaS,
   requestPublishedProductsIndex,
-  PDP_FILE_EXT,
   createBatches,
+  CATALOG_BATCH_SIZE,
 } = require('../utils');
+const { getHtmlFilePath } = require('../renderUtils');
 
 /**
  * helper function for markUpCleanUP() below
@@ -66,17 +68,21 @@ async function markUpCleanUP(context, filesLib, logger, adminApi) {
   try {    
     const publishedProducts = await requestPublishedProductsIndex(context);  
     const publishedSkus = publishedProducts.data.map((product) => product.sku);
-    let queryResult = await requestSaaS(GetUrlKeyQuery, 'getUrlKey', { skus: publishedSkus }, context);
-    queryResult = queryResult.data.products;
+    const skuBatches = createBatches(publishedSkus, CATALOG_BATCH_SIZE);
+    const batchResults = await Promise.all(
+      skuBatches.map((batch) => requestSaaS(GetUrlKeyQuery, 'getUrlKey', { skus: batch }, context))
+    );
+    const queryResult = batchResults.flatMap((result) => result.data.products);
 
     const redundantpublishedProducts = publishedProducts.data.filter((product) => !urlkeymatch(product, queryResult, context))
     context.counts.detected = redundantpublishedProducts.length;
 
     for (const product of redundantpublishedProducts) {
       try {        
-        const result = await filesLib.delete(`/public/pdps${product.path}.${PDP_FILE_EXT}`);
+        const htmlPath = getHtmlFilePath(product.path);
+        const result = await filesLib.delete(htmlPath);
         if (result.length > 0) {
-          logger.info(`Deleted redundant markup at ${product.path}.${PDP_FILE_EXT} for product ${product.sku}`);
+          logger.info(`Deleted redundant markup at ${htmlPath} for product ${product.sku}`);
           context.counts.deleted++;          
         }
       } catch (e) {
@@ -116,7 +122,7 @@ async function main(params) {
     org: cfg.org,
     site: cfg.site
   });
-  const filesLib = await Files.init(params.libInit || {});  
+  const filesLib = params.LOCAL_FS ? localFilesLib : await Files.init(params.libInit || {});
 
   const {
     // required
