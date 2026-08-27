@@ -10,6 +10,7 @@ dist
 
 # Config
 config.json
+!e2e/config.json
 .env*
 .aio
 
