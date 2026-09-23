@@ -70,19 +70,22 @@ async function renderCategory(categoryData, categoryMap, context) {
     };
 
     try {
-      // Fetch first page of products for this category
-      const productsRes = await requestSaaS(
-        PlpProductSearchQuery,
-        'plpProductSearch',
-        {
-          categoryPath: slug,
-          pageSize: context.plpProductsPerPage,
-          currentPage: 1,
-        },
-        context,
-      );
+      // Fetch first page of products for this category, unless product listing is disabled (pageSize 0)
+      let products = null;
+      if (context.plpProductsPerPage > 0) {
+        const productsRes = await requestSaaS(
+          PlpProductSearchQuery,
+          'plpProductSearch',
+          {
+            categoryPath: slug,
+            pageSize: context.plpProductsPerPage,
+            currentPage: 1,
+          },
+          context,
+        );
 
-      const products = productsRes.data.productSearch.items.map((item) => item.productView);
+        products = productsRes.data.productSearch.items.map((item) => item.productView);
+      }
 
       // Render HTML
       const html = generateCategoryHtml(categoryData, products, categoryMap, context);
@@ -205,7 +208,7 @@ async function poll(params, aioLibs, logger) {
       aioLibs,
       logLevel,
       logIngestorEndpoint,
-      plpProductsPerPage: plpProductsPerPage || 9,
+      plpProductsPerPage: Number.isInteger(plpProductsPerPage) ? plpProductsPerPage : 9,
     };
 
     const timings = new Timings();

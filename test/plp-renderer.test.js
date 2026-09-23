@@ -159,6 +159,19 @@ describe('plp-renderer generateCategoryHtml', () => {
     expect(ld.mainEntity.itemListElement).toEqual([]);
   });
 
+  test('renders PLP with product listing disabled (products=null): no product list block, no ItemList/mainEntity at all', () => {
+    const html = generateCategoryHtml(categoryData, null, categoryMap, baseContext);
+    const $ = cheerio.load(html);
+
+    expect(getUrlPathRowSlugs($)).toEqual([categoryData.slug]);
+    expect($('.product-list-page ul')).toHaveLength(0);
+
+    const ld = readPlpLdJson($);
+    expect(ld['@type']).toBe('CollectionPage');
+    expect(ld.mainEntity).toBeUndefined();
+    expect(ld).not.toHaveProperty('mainEntity');
+  });
+
   test('urlPath block keeps canonical slug; og:url and breadcrumbs use sanitized segments', () => {
     const slugWithDoubleHyphen = 'parts-a/seals--gaskets-b';
     const categoryMapHyphen = new Map([
@@ -241,5 +254,17 @@ describe('plp-renderer main() category-discovery branching', () => {
     expect(response.statusCode).toBe(200);
     expect(getCategoryMap).toHaveBeenCalled();
     expect(getCategoryMapFromFamilies).not.toHaveBeenCalled();
+  });
+
+  test('PLP_PRODUCTS_PER_PAGE=0 skips the product fetch entirely and renders with no ItemList', async () => {
+    getConfig.mockResolvedValue({});
+    getSiteType.mockReturnValue('accs');
+    getCategoryMap.mockResolvedValue(new Map([['electronics', categoryData]]));
+
+    const response = await main({ ...baseParams, PLP_PRODUCTS_PER_PAGE: 0 });
+
+    expect(response.statusCode).toBe(200);
+    expect(requestSaaS).not.toHaveBeenCalled();
+    expect(response.body).not.toMatch(/mainEntity/);
   });
 });

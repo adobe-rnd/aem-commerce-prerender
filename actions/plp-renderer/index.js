@@ -66,21 +66,26 @@ async function main(params) {
     }
     logger.debug(`Found category: ${categoryData.name} (level: ${categoryData.level})`);
 
-    // Fetch products for this category
-    logger.info(`Fetching products for category "${slug}" (pageSize: ${cfg.plpProductsPerPage})`);
-    const productsRes = await requestSaaS(
-      PlpProductSearchQuery,
-      'plpProductSearch',
-      {
-        categoryPath: slug,
-        pageSize: cfg.plpProductsPerPage,
-        currentPage: 1,
-      },
-      context,
-    );
+    // Fetch products for this category, unless product listing is disabled (pageSize 0)
+    let products = null;
+    if (cfg.plpProductsPerPage > 0) {
+      logger.info(`Fetching products for category "${slug}" (pageSize: ${cfg.plpProductsPerPage})`);
+      const productsRes = await requestSaaS(
+        PlpProductSearchQuery,
+        'plpProductSearch',
+        {
+          categoryPath: slug,
+          pageSize: cfg.plpProductsPerPage,
+          currentPage: 1,
+        },
+        context,
+      );
 
-    const products = productsRes.data.productSearch.items.map((item) => item.productView);
-    logger.debug(`Retrieved ${products.length} products for category "${slug}"`);
+      products = productsRes.data.productSearch.items.map((item) => item.productView);
+      logger.debug(`Retrieved ${products.length} products for category "${slug}"`);
+    } else {
+      logger.info(`PLP_PRODUCTS_PER_PAGE is 0; skipping product fetch for category "${slug}"`);
+    }
 
     const categoryHtml = generateCategoryHtml(categoryData, products, categoryMap, context);
 

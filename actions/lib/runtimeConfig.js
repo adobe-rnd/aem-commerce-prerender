@@ -118,7 +118,7 @@ function getRuntimeConfig(params = {}, options = {}) {
         pathFormat: merged.PRODUCT_PAGE_URL_FORMAT,
         locales: localesArr,
         categoryFamilies: categoryFamiliesArr,
-        plpProductsPerPage: parseInt(merged.PLP_PRODUCTS_PER_PAGE, 10) || 9
+        plpProductsPerPage: parsePlpProductsPerPage(merged.PLP_PRODUCTS_PER_PAGE)
     };
 
     // URL sanity checks
@@ -139,6 +139,12 @@ function getRuntimeConfig(params = {}, options = {}) {
     }
 
     return cfg;
+}
+
+/** Parse PLP_PRODUCTS_PER_PAGE, allowing an explicit 0 (no products, no ItemList) to override the default of 9 */
+function parsePlpProductsPerPage(value) {
+    const parsed = parseInt(value, 10);
+    return Number.isNaN(parsed) || parsed < 0 ? 9 : parsed;
 }
 
 /** ${var} expander */

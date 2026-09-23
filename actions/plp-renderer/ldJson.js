@@ -33,13 +33,14 @@ function buildOffer(product, productUrl) {
  * of products and a BreadcrumbList.
  *
  * @param {Object} categoryData - Category metadata from the category tree.
- * @param {Array} products - Product items from productSearch.
+ * @param {Array|null} products - Product items from productSearch, or null when product
+ *   listing is disabled (PLP_PRODUCTS_PER_PAGE is 0), in which case no ItemList is emitted.
  * @param {Array} breadcrumbs - Breadcrumb entries with { name, slug }.
  * @param {Object} context - The context object with storeUrl, locale, pathFormat.
  * @returns {string} JSON-LD string.
  */
 function generatePlpLdJson(categoryData, products, breadcrumbs, context) {
-  const itemList = {
+  const itemList = products && {
     '@type': 'ItemList',
     name: categoryData.name,
     numberOfItems: products.length,
@@ -90,7 +91,7 @@ function generatePlpLdJson(categoryData, products, breadcrumbs, context) {
     '@type': 'CollectionPage',
     name: categoryData.name,
     breadcrumb: breadcrumbList,
-    mainEntity: itemList,
+    ...(itemList ? { mainEntity: itemList } : {}),
   };
 
   return JSON.stringify(collectionPage);
