@@ -36,7 +36,8 @@ function getCompiledTemplate() {
  * Generates the HTML for a category listing page.
  *
  * @param {Object} categoryData - Category metadata from the category tree.
- * @param {Array} products - Product items from productSearch (productView objects).
+ * @param {Array|null} products - Product items from productSearch (productView objects), or
+ *   null when product listing is disabled (PLP_PRODUCTS_PER_PAGE is 0).
  * @param {Map} categoryMap - Full category map for breadcrumb resolution.
  * @param {Object} context - The context object with storeUrl, locale, pathFormat, logger.
  * @returns {string} Rendered HTML string.
@@ -64,12 +65,12 @@ function generateCategoryHtml(categoryData, products, categoryMap, context) {
       name: sanitize(crumb.name, 'inline'),
       url: getCategoryUrl(crumb.slug, context),
     })),
-    products: products.map((product) => ({
+    products: (products || []).map((product) => ({
       name: sanitize(product.name, 'inline'),
       url: getProductUrl({ urlKey: product.urlKey, sku: product.sku }, context),
       image: product.images?.find((img) => img.roles?.includes('image'))?.url || null,
     })),
-    hasProducts: products.length > 0,
+    hasProducts: !!products?.length,
   };
 
   const ldJson = generatePlpLdJson(categoryData, products, breadcrumbs, context);

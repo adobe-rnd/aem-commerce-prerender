@@ -355,6 +355,13 @@ describe('generatePlpLdJson', () => {
     expect(parsed.mainEntity.numberOfItems).toBe(0);
     expect(parsed.mainEntity.itemListElement).toHaveLength(0);
   });
+
+  test('omits mainEntity entirely when products is null (product listing disabled)', () => {
+    const parsed = parse(generatePlpLdJson(categoryData, null, breadcrumbs, context));
+
+    expect(parsed).not.toHaveProperty('mainEntity');
+    expect(parsed.breadcrumb.itemListElement).toHaveLength(2);
+  });
 });
 
 // ─── buildBreadcrumbs ───────────────────────────────────────────────────────
